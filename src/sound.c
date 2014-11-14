@@ -1437,6 +1437,75 @@ void Sound_Update(bool FillFrame)
 		WAVFormat_Update(MixBuffer, OldSndBufIdx, SamplesToGenerate);
 }
 
+#ifdef __LIBRETRO__
+extern short signed int SNDBUF[1024*2];
+static void Retro_Audio_CallBack(int len)
+{
+Sint16 *pBuffer;
+int i, window, nSamplesPerFrame;
+pBuffer = (Sint16 *)&SNDBUF[0];
+len = len / 4; // Use length in samples (16 bit stereo), not in bytes
+/* Adjust emulation rate within +/- 0.58% (10 cents) occasionally,
+* to synchronize sound. Note that an octave (frequency doubling)
+* has 12 semitones (12th root of two for a semitone), and that
+* one semitone has 100 cents (1200th root of two for one cent).
+* Ten cents are desired, thus, the 120th root of two minus one is
+* multiplied by 1,000,000 to convert to microseconds, and divided
+* by nScreenRefreshRate=60 to get a 96 microseconds swallow size.
+* (2^(10cents/(12semitones*100cents)) - 1) * 10^6 / nScreenRefreshRate
+* See: main.c - Main_WaitOnVbl()
+*/
+pulse_swallowing_count = 0; /* 0 = Unaltered emulation rate */
+if (ConfigureParams.Sound.bEnableSoundSync)
+{
+/* Sound synchronized emulation */
+nSamplesPerFrame = nAudioFrequency/nScreenRefreshRate;
+window = (nSamplesPerFrame > SoundBufferSize) ? nSamplesPerFrame : SoundBufferSize;
+/* Window Comparator for SoundBufferSize */
+if (nGeneratedSamples < window + (window >> 1))
+/* Increase emulation rate to maintain sound synchronization */
+pulse_swallowing_count = -5793 / nScreenRefreshRate;
+else
+if (nGeneratedSamples > (window << 1) + (window >> 2))
+/* Decrease emulation rate to maintain sound synchronization */
+pulse_swallowing_count = 5793 / nScreenRefreshRate;
+/* Otherwise emulation rate is unaltered. */
+}
+if (nGeneratedSamples >= len)
+{
+/* Enough samples available: Pass completed buffer to audio system
+* by write samples into sound buffer and by converting them from
+* 'signed' to 'unsigned' */
+for (i = 0; i < len; i++)
+{
+*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][0];
+*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][1];
+}
+CompleteSndBufIdx += len;
+nGeneratedSamples -= len;
+}
+else /* Not enough samples available: */
+{
+for (i = 0; i < nGeneratedSamples; i++)
+{
+*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][0];
+*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][1];
+}
+/* If the buffer is filled more than 50%, mirror sample buffer to fake the
+* missing samples */
+if (nGeneratedSamples >= len/2)
+{
+int remaining = len - nGeneratedSamples;
+memcpy(pBuffer, SNDBUF+(nGeneratedSamples-remaining)*4, remaining*4);
+}
+CompleteSndBufIdx += nGeneratedSamples;
+nGeneratedSamples = 0;
+}
+CompleteSndBufIdx = CompleteSndBufIdx % MIXBUFFER_SIZE;
+}
+#endif
+
+
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -1451,6 +1520,11 @@ void Sound_Update_VBL(void)
 {
 	Sound_Update(true);					/* generate as many samples as needed to fill this VBL */
 //fprintf ( stderr , "vbl done %d %d\n" , SamplesPerFrame , CurrentSamplesNb );
+
+#ifdef __LIBRETRO__
+memset(SNDBUF,0,1024*4);
+Retro_Audio_CallBack(CurrentSamplesNb*4);
+#endif
 
 	CurrentSamplesNb = 0;					/* VBL is complete, reset counter for next VBL */
 

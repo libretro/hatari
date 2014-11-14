@@ -728,7 +728,7 @@ void Screen_Init(void)
 		}
 	}
 	pFrameBuffer = &FrameBuffers[0];
-
+#ifndef __LIBRETRO__
 	/* Load and set icon */
 	snprintf(sIconFileName, sizeof(sIconFileName), "%s%chatari-icon.bmp",
 	         Paths_GetDataDir(), PATHSEP);
@@ -744,7 +744,7 @@ void Screen_Init(void)
 #endif
 		SDL_FreeSurface(pIconSurf);
 	}
-
+#endif
 	/* Set initial window resolution */
 	bInFullScreen = ConfigureParams.Screen.bFullScreen;
 	Screen_SetResolution();
@@ -1463,7 +1463,13 @@ static int AdjustLinePaletteRemap(int y)
 	return ScrUpdateFlag;
 }
 
-
+#ifdef __LIBRETRO__
+void reset_screen(){
+Resolution_Init();
+Screen_SetResolution();
+Screen_SetFullUpdate();
+}
+#endif
 /*-----------------------------------------------------------------------*/
 /**
  * Run updates to palette(STRGBPalette[]) until get to screen line

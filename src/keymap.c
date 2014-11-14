@@ -7,7 +7,10 @@
   Here we process a key press and the remapping of the scancodes.
 */
 const char Keymap_fileid[] = "Hatari keymap.c : " __DATE__ " " __TIME__;
-
+#ifdef __LIBRETRO__
+#include <stdint.h>
+#include "SDL.h"
+#endif
 #include <ctype.h>
 #include "main.h"
 #include "keymap.h"
