@@ -16,7 +16,7 @@
 
 #include "readcpu.h"
 #include "m68k.h"
-#include "memory.h"
+#include "emumemory.h"
 
 
 /* Possible exceptions sources for M68000_Exception() and Exception() */
