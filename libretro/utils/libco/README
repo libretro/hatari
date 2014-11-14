@@ -1,0 +1,19 @@
+A cooperative multithreading library.
+
+Has native backends for the following CPU
+architectures:
+* x86
+* x86_64 (AMD64)
+* ARM
+* PowerPC 32/64
+
+Also contains several fallback backends 
+in case a native backend is not available 
+for your CPU architecture:
+
+* SJLJ
+* POSIX ucontext
+* Windows Fibers
+
+These fallback backends are not recommended
+however for performance reasons.
