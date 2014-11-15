@@ -132,6 +132,16 @@ static int DlgAlert_ShowDlg(const char *text)
 	bool bOldMouseVisibility;
 	int nOldMouseX, nOldMouseY;
 
+	static int pauseon=0; 
+
+	if(pauseg==0){
+		//HACK fix crash if alert dialog appear before pause was set to ON or before the first co_switch in main thread. 
+		printf("set pause on!\n");
+		pauseg=1;
+		pauseon=1; 
+		gui_poll_events();
+	}
+
 	strcpy(t, text);
 	lines = DlgAlert_FormatTextToBox(t, maxlen, &len);
 	offset = (maxlen-len)/2;
@@ -173,6 +183,12 @@ static int DlgAlert_ShowDlg(const char *text)
 	SDL_UpdateRect(sdlscrn, 0,0, 0,0);
 	SDL_ShowCursor(bOldMouseVisibility);
 	Main_WarpMouse(nOldMouseX, nOldMouseY);
+
+	if(pauseon==1){
+		printf("set pause off!\n");
+		pauseg=0;
+		pauseon=0;
+	}
 
 	return (i == DLGALERT_OK);
 }
