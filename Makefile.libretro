@@ -32,10 +32,28 @@ else ifeq ($(platform), android)
    SHARED :=  -Wl,--fix-cortex-a8 -llog -lz -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
    PLATFLAGS := -DAND -DLSB_FIRST -DALIGN_DWORD  -D__LIBRETRO__
 else ifeq ($(platform), osx)
-   TARGET := libretro.dylib
+	TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD  -D__LIBRETRO__
+else ifeq ($(platform), ios)
+	TARGET := $(TARGET_NAME)_libretro_ios.dylib
+	fpic := -fPIC
+	SHARED := -dynamiclib
+
+	ifeq ($(IOSSDK),)
+		IOSSDK := $(shell xcrun -sdk iphoneos -show-sdk-path)
+	endif
+
+	CC = clang -arch armv7 -isysroot $(IOSSDK)
+	CFLAGS += -DIOS 
+	OSXVER = `sw_vers -productVersion | cut -d. -f 2`
+	OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
+	ifeq ($(OSX_LT_MAVERICKS),"YES")
+		CC += -miphoneos-version-min=5.0
+		CFLAGS += -miphoneos-version-min=5.0
+	endif
+
 else ifeq ($(platform), wii)
 	TARGET := $(TARGET_NAME)_libretro_wii.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
@@ -73,10 +91,8 @@ CFLAGS += \
 	-std=gnu99 -finline-functions -funroll-loops  -fsigned-char  \
 	-Wno-strict-prototypes -ffast-math -fomit-frame-pointer -fno-strength-reduce  -fno-builtin -finline-functions -s
 
-CXXFLAGS  +=	$(CFLAGS) -std=gnu++0x
-CPPFLAGS += $(CFLAGS)
-
-#START COMMON PART
+CXXFLAGS  += $(CFLAGS)
+CPPFLAGS  += $(CFLAGS)
 
 EMU = $(CORE_DIR)/src
 CPU = $(EMU)/uae-cpu
@@ -91,8 +107,6 @@ LIBUTILS = $(LIBRETRO_DIR)/utils
 include Makefile.common
 
 OBJECTS := $(SOURCES_C:.c=.o)
-
-#END COMMON PART 
 
 all: $(TARGET)
 
