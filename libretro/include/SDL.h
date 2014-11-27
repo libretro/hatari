@@ -16,7 +16,7 @@ extern int Reset_Warm(void);
 #include "SDL_video.h"
 
 #define SDL_GetTicks  GetTicks 
-#include <SDL_types.h>
+#include "SDL_types.h"
 
 #define RGB565(r, g, b)  (((r) << (5+6)) | ((g) << 6) | (b))
 #define SDL_MapRGB(a, r, g, b) RGB565( (r)>>3, (g)>>3, (b)>>3)

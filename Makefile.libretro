@@ -22,7 +22,7 @@ ifeq ($(platform), unix)
 	TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
    SHARED :=  -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
-   PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD  -D__LIBRETRO__
+   PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD
 else ifeq ($(platform), android)
    CC = arm-linux-androideabi-gcc
    AR = @arm-linux-androideabi-ar
@@ -30,12 +30,12 @@ else ifeq ($(platform), android)
 	TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
    SHARED :=  -Wl,--fix-cortex-a8 -llog -lz -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
-   PLATFLAGS := -DAND -DLSB_FIRST -DALIGN_DWORD  -D__LIBRETRO__
+   PLATFLAGS := -DAND -DLSB_FIRST -DALIGN_DWORD
 else ifeq ($(platform), osx)
 	TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-   PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD  -D__LIBRETRO__
+   PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD
 else ifeq ($(platform), ios)
 	TARGET := $(TARGET_NAME)_libretro_ios.dylib
 	fpic := -fPIC
@@ -63,7 +63,7 @@ else ifeq ($(platform), wii)
 	-DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) -I$(DEVKITPRO)/libogc/include \
 	-D__powerpc__ -D__POWERPC__ -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -D__ppc__
    SHARED :=   -lm -lpthread -lc
-   PLATFLAGS :=  -D__LIBRETRO__ -DALIGN_DWORD
+   PLATFLAGS :=  -DALIGN_DWORD
 else ifeq ($(platform), ps3)
 	TARGET := $(TARGET_NAME)_libretro_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
@@ -72,11 +72,11 @@ else ifeq ($(platform), ps3)
    SHARED :=   -lm -lpthread -lc
    CFLAGS += -DSDL_BYTEORDER=SDL_BIG_ENDIAN -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN  -DBYTE_ORDER=BIG_ENDIAN \
 	-D__CELLOS_LV2 -DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) 
-   PLATFLAGS :=  -D__LIBRETRO__ -DALIGN_DWORD 
+   PLATFLAGS :=  -DALIGN_DWORD 
 else
    #CC = i586-mingw32msvc-gcc
    CC = x86_64-w64-mingw32-gcc
-   PLATFLAGS :=  -D__LIBRETRO__ -DLSB_FIRST -DALIGN_DWORD -DWIN32PORT -DWIN32
+   PLATFLAGS :=  -DLSB_FIRST -DALIGN_DWORD -DWIN32PORT -DWIN32
 	TARGET := $(TARGET_NAME)_libretro.dll
    SHARED := -shared -static-libgcc -s -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined 
 endif
@@ -88,8 +88,8 @@ else
 endif
 
 CFLAGS += \
-	-std=gnu99 -finline-functions -funroll-loops  -fsigned-char  \
-	-Wno-strict-prototypes -ffast-math -fomit-frame-pointer -fno-strength-reduce  -fno-builtin -finline-functions -s
+	-std=gnu99 -finline-functions -funroll-loops  -fsigned-char -D__LIBRETRO__ \
+	-Wno-strict-prototypes -ffast-math -fomit-frame-pointer -fno-strength-reduce  -fno-builtin -finline-functions
 
 CXXFLAGS  += $(CFLAGS)
 CPPFLAGS  += $(CFLAGS)
