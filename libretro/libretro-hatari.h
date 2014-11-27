@@ -15,7 +15,7 @@
 
 extern const char SDLKeyToSTScanCode[512] ;
 
-#include "libco/libco.h"
+#include <libco.h>
 
 extern cothread_t mainThread;
 extern cothread_t emuThread;

@@ -1,4 +1,6 @@
-LIBRETRO = ./libretro
+CORE_DIR := .
+LIBRETRO_DIR = $(CORE_DIR)/libretro
+ZLIB_DIR = $(LIBRETRO_DIR)/utils/zlib
 
 ifeq ($(platform),)
 platform = unix
@@ -19,13 +21,13 @@ ifeq ($(platform), android)
    LD = @arm-linux-androideabi-g++ 
    TARGET := libretro-hatari.so
    fpic := -fPIC
-   SHARED :=  -Wl,--fix-cortex-a8 -llog -lz -shared -Wl,--version-script=$(LIBRETRO)/link.T -Wl,--no-undefined
+   SHARED :=  -Wl,--fix-cortex-a8 -llog -lz -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
    PLATFLAGS := -DAND -DLSB_FIRST -DALIGN_DWORD  -D__LIBRETRO__
 else ifeq ($(platform), unix)
    CC = gcc
    TARGET := libretro-hatari.so
    fpic := -fPIC
-   SHARED :=  -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO)/link.T -Wl,--no-undefined
+   SHARED :=  -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
    PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD  -D__LIBRETRO__
 else ifeq ($(platform), osx)
    TARGET := libretro.dylib
@@ -37,11 +39,6 @@ else ifeq ($(platform), wii)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)   
-   ZLIB_DIR = $(LIBRETRO)/utils/zlib/
-   ZLIB_OBJECTS	:= $(ZLIB_DIR)adler32.o $(ZLIB_DIR)compress.o $(ZLIB_DIR)crc32.o $(ZLIB_DIR)deflate.o \
-		$(ZLIB_DIR)gzclose.o $(ZLIB_DIR)gzlib.o $(ZLIB_DIR)gzread.o\
-		$(ZLIB_DIR)gzwrite.o $(ZLIB_DIR)infback.o $(ZLIB_DIR)inffast.o $(ZLIB_DIR)inflate.o \
-		$(ZLIB_DIR)trees.o $(ZLIB_DIR)inftrees.o $(ZLIB_DIR)uncompr.o $(ZLIB_DIR)uncompr.o $(ZLIB_DIR)zutil.o 
    CFLAGS += -DSDL_BYTEORDER=SDL_BIG_ENDIAN -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN  -DBYTE_ORDER=BIG_ENDIAN \
 	-DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) -I$(DEVKITPRO)/libogc/include \
 	-D__powerpc__ -D__POWERPC__ -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -D__ppc__
@@ -52,11 +49,6 @@ else ifeq ($(platform), ps3)
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
    CXX = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-g++.exe
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
-   ZLIB_DIR = $(LIBRETRO)/utils/zlib/
-   ZLIB_OBJECTS	:= $(ZLIB_DIR)adler32.o $(ZLIB_DIR)compress.o $(ZLIB_DIR)crc32.o $(ZLIB_DIR)deflate.o \
-		$(ZLIB_DIR)gzclose.o $(ZLIB_DIR)gzlib.o $(ZLIB_DIR)gzread.o\
-		$(ZLIB_DIR)gzwrite.o $(ZLIB_DIR)infback.o $(ZLIB_DIR)inffast.o $(ZLIB_DIR)inflate.o \
-		$(ZLIB_DIR)trees.o $(ZLIB_DIR)inftrees.o $(ZLIB_DIR)uncompr.o $(ZLIB_DIR)uncompr.o $(ZLIB_DIR)zutil.o 
    SHARED :=   -lm -lpthread -lc
    CFLAGS += -DSDL_BYTEORDER=SDL_BIG_ENDIAN -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN  -DBYTE_ORDER=BIG_ENDIAN \
 	-D__CELLOS_LV2 -DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) 
@@ -66,7 +58,7 @@ else
    CC = x86_64-w64-mingw32-gcc
    PLATFLAGS :=  -D__LIBRETRO__ -DLSB_FIRST -DALIGN_DWORD -DWIN32PORT -DWIN32
    TARGET := hatari_libretro.dll
-   SHARED := -shared -static-libgcc -s -Wl,--version-script=$(LIBRETRO)/link.T -Wl,--no-undefined 
+   SHARED := -shared -static-libgcc -s -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined 
 endif
 
 ifeq ($(DEBUG), 1)
@@ -84,163 +76,167 @@ CPPFLAGS += $(CFLAGS)
 
 #START COMMON PART
 
-EMU = src
+EMU = $(CORE_DIR)/src
 CPU = $(EMU)/uae-cpu
 FALCON = $(EMU)/falcon
 DBG = $(EMU)/debug
 FLP = $(EMU)
-GUI = $(LIBRETRO)/gui-retro
-CPU_PREGEN = $(LIBRETRO)/uae-cpu-pregen
-LIBCOOBJ = $(LIBRETRO)/utils/libco
-LIBUTILS = $(LIBRETRO)/utils
+GUI = $(LIBRETRO_DIR)/gui-retro
+CPU_PREGEN = $(LIBRETRO_DIR)/uae-cpu-pregen
+LIBCOOBJ = $(LIBRETRO_DIR)/utils/libco
+LIBUTILS = $(LIBRETRO_DIR)/utils
 
-CPUC_SRCS = \
-$(CPU_PREGEN)/cpudefs.o \
-$(CPU_PREGEN)/cpuemu.o \
-$(CPU_PREGEN)/cpustbl.o \
-$(CPU)/hatari-glue.o \
-$(CPU)/memory.o \
-$(CPU)/newcpu.o \
-$(CPU)/readcpu.o \
-$(CPU)/fpp.o
+INCFLAGS := -I$(EMU)  -I$(CPU)  -I$(FALCON) -I$(EMU)/includes -I$(DBG) -I$(FLP) \
+	-I$(LIBRETRO_DIR) -I$(LIBRETRO_DIR)/libretro-sdk/include -I$(LIBRETRO_DIR)/include -I$(LIBUTILS) -I$(CPU_PREGEN)
 
-DLG_SRCS = \
-$(GUI)/dlgAbout.o \
-$(GUI)/dlgAlert.o \
-$(GUI)/dlgDevice.o \
-$(GUI)/dlgFileSelect.o \
-$(GUI)/dlgFloppy.o \
-$(GUI)/dlgHardDisk.o \
-$(GUI)/dlgJoystick.o \
-$(GUI)/dlgKeyboard.o \
-$(GUI)/dlgMain.o \
-$(GUI)/dlgMemory.o \
-$(GUI)/dlgNewDisk.o \
-$(GUI)/dlgRom.o \
-$(GUI)/dlgScreen.o \
-$(GUI)/dlgSound.o \
-$(GUI)/dlgSystem.o \
-$(GUI)/sdlgui.o
+ZLIB_SRCS	:= $(ZLIB_DIR)/adler32.c \
+	$(ZLIB_DIR)/compress.c \
+	$(ZLIB_DIR)/crc32.c \
+	$(ZLIB_DIR)/deflate.c \
+	$(ZLIB_DIR)/gzclose.c \
+	$(ZLIB_DIR)/gzlib.c \
+	$(ZLIB_DIR)/gzread.c \
+	$(ZLIB_DIR)/gzwrite.c \
+	$(ZLIB_DIR)/infback.c \
+	$(ZLIB_DIR)/inffast.c \
+	$(ZLIB_DIR)/inflate.c \
+	$(ZLIB_DIR)/trees.c \
+	$(ZLIB_DIR)/inftrees.c \
+	$(ZLIB_DIR)/uncompr.c \
+	$(ZLIB_DIR)/zutil.c 
 
-FALC_SRCS = \
-$(FALCON)/crossbar.o \
-$(FALCON)/dsp.o \
-$(FALCON)/dsp_core.o \
-$(FALCON)/dsp_cpu.o \
-$(FALCON)/dsp_disasm.o \
-$(FALCON)/hostscreen.o \
-$(FALCON)/microphone.o \
-$(FALCON)/nvram.o \
-$(FALCON)/videl.o
+SOURCES_C += $(CPU_PREGEN)/cpudefs.c \
+$(CPU_PREGEN)/cpuemu.c \
+$(CPU_PREGEN)/cpustbl.c \
+$(CPU)/hatari-glue.c \
+$(CPU)/memory.c \
+$(CPU)/newcpu.c \
+$(CPU)/readcpu.c \
+$(CPU)/fpp.c
 
-DBG_SRCS = \
-$(DBG)/log.o \
-$(DBG)/debugui.o \
-$(DBG)/breakcond.o \
-$(DBG)/debugcpu.o \
-$(DBG)/debugInfo.o \
-$(DBG)/debugdsp.o \
-$(DBG)/evaluate.o \
-$(DBG)/history.o \
-$(DBG)/symbols.o \
-$(DBG)/profile.o \
-$(DBG)/profilecpu.o \
-$(DBG)/profiledsp.o \
-$(DBG)/natfeats.o \
-$(DBG)/console.o \
-$(DBG)/68kDisass.o
+SOURCES_C += $(GUI)/dlgAbout.c \
+$(GUI)/dlgAlert.c \
+$(GUI)/dlgDevice.c \
+$(GUI)/dlgFileSelect.c \
+$(GUI)/dlgFloppy.c \
+$(GUI)/dlgHardDisk.c \
+$(GUI)/dlgJoystick.c \
+$(GUI)/dlgKeyboard.c \
+$(GUI)/dlgMain.c \
+$(GUI)/dlgMemory.c \
+$(GUI)/dlgNewDisk.c \
+$(GUI)/dlgRom.c \
+$(GUI)/dlgScreen.c \
+$(GUI)/dlgSound.c \
+$(GUI)/dlgSystem.c \
+$(GUI)/sdlgui.c
 
-FLP_SRCS = \
-$(FLP)/createBlankImage.o \
-$(FLP)/dim.o \
-$(FLP)/msa.o \
-$(FLP)/st.o \
-$(FLP)/zip.o
+SOURCES_C += $(FALCON)/crossbar.c \
+$(FALCON)/dsp.c \
+$(FALCON)/dsp_core.c \
+$(FALCON)/dsp_cpu.c \
+$(FALCON)/dsp_disasm.c \
+$(FALCON)/hostscreen.c \
+$(FALCON)/microphone.c \
+$(FALCON)/nvram.c \
+$(FALCON)/videl.c
 
-CORE_SRCS = \
-$(EMU)/acia.o \
-$(EMU)/audio.o \
-$(EMU)/avi_record.o \
-$(EMU)/bios.o \
-$(EMU)/blitter.o \
-$(EMU)/cart.o \
-$(EMU)/cfgopts.o \
-$(EMU)/clocks_timings.o \
-$(EMU)/configuration.o \
-$(EMU)/options.o \
-$(EMU)/change.o \
-$(EMU)/control.o \
-$(EMU)/cycInt.o \
-$(EMU)/cycles.o \
-$(EMU)/dialog.o \
-$(EMU)/dmaSnd.o \
-$(EMU)/fdc.o \
-$(EMU)/file.o \
-$(EMU)/floppy.o \
-$(EMU)/floppy_ipf.o \
-$(EMU)/floppy_stx.o \
-$(EMU)/gemdos.o \
-$(EMU)/hd6301_cpu.o \
-$(EMU)/hdc.o \
-$(EMU)/ide.o \
-$(EMU)/ikbd.o \
-$(EMU)/ioMem.o \
-$(EMU)/ioMemTabST.o \
-$(EMU)/ioMemTabSTE.o \
-$(EMU)/ioMemTabTT.o \
-$(EMU)/ioMemTabFalcon.o \
-$(EMU)/joy.o \
-$(EMU)/keymap.o \
-$(EMU)/m68000.o \
-$(EMU)/main.o \
-$(EMU)/midi.o \
-$(EMU)/memorySnapShot.o \
-$(EMU)/mfp.o \
-$(EMU)/paths.o \
-$(EMU)/psg.o \
-$(EMU)/printer.o \
-$(EMU)/resolution.o \
-$(EMU)/rs232.o \
-$(EMU)/reset.o \
-$(EMU)/rtc.o \
-$(EMU)/scandir.o \
-$(EMU)/stMemory.o \
-$(EMU)/screen.o \
-$(EMU)/screenSnapShot.o \
-$(EMU)/shortcut.o \
-$(EMU)/sound.o \
-$(EMU)/spec512.o \
-$(EMU)/statusbar.o \
-$(EMU)/str.o \
-$(EMU)/tos.o \
-$(EMU)/unzip.o \
-$(EMU)/utils.o \
-$(EMU)/vdi.o \
-$(EMU)/video.o \
-$(EMU)/wavFormat.o \
-$(EMU)/xbios.o \
-$(EMU)/ymFormat.o
+SOURCES_C += $(DBG)/log.c \
+$(DBG)/debugui.c \
+$(DBG)/breakcond.c \
+$(DBG)/debugcpu.c \
+$(DBG)/debugInfo.c \
+$(DBG)/debugdsp.c \
+$(DBG)/evaluate.c \
+$(DBG)/history.c \
+$(DBG)/symbols.c \
+$(DBG)/profile.c \
+$(DBG)/profilecpu.c \
+$(DBG)/profiledsp.c \
+$(DBG)/natfeats.c \
+$(DBG)/console.c \
+$(DBG)/68kDisass.c
 
-LIBCO_SRCS = $(LIBCOOBJ)/libco.o 
+SOURCES_C += $(FLP)/createBlankImage.c \
+$(FLP)/dim.c \
+$(FLP)/msa.c \
+$(FLP)/st.c \
+$(FLP)/zip.c
 
-ifeq ($(platform),android)
-LIBCO_SRCS += $(LIBCOOBJ)/armeabi_asm.o
-else
-UNAME_M := $(shell uname -m)
-ifneq ($(filter arm%,$(UNAME_M)),)
-LIBCO_SRCS += $(LIBCOOBJ)/armeabi_asm.o	
-endif
-endif
+SOURCES_C += $(EMU)/acia.c \
+$(EMU)/audio.c \
+$(EMU)/avi_record.c \
+$(EMU)/bios.c \
+$(EMU)/blitter.c \
+$(EMU)/cart.c \
+$(EMU)/cfgopts.c \
+$(EMU)/clocks_timings.c \
+$(EMU)/configuration.c \
+$(EMU)/options.c \
+$(EMU)/change.c \
+$(EMU)/control.c \
+$(EMU)/cycInt.c \
+$(EMU)/cycles.c \
+$(EMU)/dialog.c \
+$(EMU)/dmaSnd.c \
+$(EMU)/fdc.c \
+$(EMU)/file.c \
+$(EMU)/floppy.c \
+$(EMU)/floppy_ipf.c \
+$(EMU)/floppy_stx.c \
+$(EMU)/gemdos.c \
+$(EMU)/hd6301_cpu.c \
+$(EMU)/hdc.c \
+$(EMU)/ide.c \
+$(EMU)/ikbd.c \
+$(EMU)/ioMem.c \
+$(EMU)/ioMemTabST.c \
+$(EMU)/ioMemTabSTE.c \
+$(EMU)/ioMemTabTT.c \
+$(EMU)/ioMemTabFalcon.c \
+$(EMU)/joy.c \
+$(EMU)/keymap.c \
+$(EMU)/m68000.c \
+$(EMU)/main.c \
+$(EMU)/midi.c \
+$(EMU)/memorySnapShot.c \
+$(EMU)/mfp.c \
+$(EMU)/paths.c \
+$(EMU)/psg.c \
+$(EMU)/printer.c \
+$(EMU)/resolution.c \
+$(EMU)/rs232.c \
+$(EMU)/reset.c \
+$(EMU)/rtc.c \
+$(EMU)/scandir.c \
+$(EMU)/stMemory.c \
+$(EMU)/screen.c \
+$(EMU)/screenSnapShot.c \
+$(EMU)/shortcut.c \
+$(EMU)/sound.c \
+$(EMU)/spec512.c \
+$(EMU)/statusbar.c \
+$(EMU)/str.c \
+$(EMU)/tos.c \
+$(EMU)/unzip.c \
+$(EMU)/utils.c \
+$(EMU)/vdi.c \
+$(EMU)/video.c \
+$(EMU)/wavFormat.c \
+$(EMU)/xbios.c \
+$(EMU)/ymFormat.c
 
-BUILD_APP =  $(ZLIB_OBJECTS) $(CPUC_SRCS) $(FALC_SRCS)  $(FLP_SRCS) $(DBG_SRCS)  $(CORE_SRCS) $(DLG_SRCS) $(LIBCO_SRCS)
+SOURCES_C += $(LIBRETRO_DIR)/libretro-sdk/libco/libco.c \
+				 $(LIBRETRO_DIR)/libretro.c \
+				 $(LIBRETRO_DIR)/hatari-mapper.c \
+				 $(LIBRETRO_DIR)/vkbd.c \
+				 $(LIBRETRO_DIR)/graph.c \
+				 $(LIBRETRO_DIR)/bmp.c
 
-HINCLUDES := -I./$(EMU)  -I./$(CPU)  -I./$(FALCON)  \
-	-I./$(EMU)/includes -I./$(DBG) -I./$(FLP) \
-	-I$(LIBRETRO) -I$(LIBRETRO)/include -I$(LIBUTILS) -I$(CPU_PREGEN)
+BUILD_APP =  $(ZLIB_SRCS) $(SOURCES_C)
 
 
-OBJECTS := $(LIBRETRO)/libretro.o $(LIBRETRO)/hatari-mapper.o $(LIBRETRO)/vkbd.o \
-	$(LIBRETRO)/graph.o $(LIBRETRO)/bmp.o $(BUILD_APP)
+OBJECTS := $(BUILD_APP:.c=.o)
 
 #END COMMON PART 
 
@@ -266,7 +262,7 @@ $(TARGET): $(OBJECTS)
 endif
 
 %.o: %.c
-	$(CC) $(fpic) $(CFLAGS) $(PLATFLAGS) $(HINCLUDES) -c -o $@ $<
+	$(CC) $(fpic) $(CFLAGS) $(PLATFLAGS) $(INCFLAGS) -c -o $@ $<
 
 clean:
 	rm -f $(OBJECTS) $(TARGET) 
