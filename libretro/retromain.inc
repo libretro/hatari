@@ -1,4 +1,4 @@
-#include "libco/libco.h"
+#include <libco.h>
 extern cothread_t mainThread;
 extern cothread_t emuThread;
 extern int pauseg;
