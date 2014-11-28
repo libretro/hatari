@@ -15,6 +15,8 @@ else ifneq ($(findstring win,$(shell uname -a)),)
 endif
 endif
 
+EXTERNAL_ZLIB = 0
+
 TARGET_NAME	:= hatari
 
 ifeq ($(platform), unix)
@@ -64,6 +66,7 @@ else ifeq ($(platform), wii)
 	-D__powerpc__ -D__POWERPC__ -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -D__ppc__
    SHARED :=   -lm -lpthread -lc
    PLATFLAGS :=  -DALIGN_DWORD
+   EXTERNAL_ZLIB = 1
 else ifeq ($(platform), ps3)
 	TARGET := $(TARGET_NAME)_libretro_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
@@ -73,6 +76,7 @@ else ifeq ($(platform), ps3)
    CFLAGS += -DSDL_BYTEORDER=SDL_BIG_ENDIAN -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN  -DBYTE_ORDER=BIG_ENDIAN \
 	-D__CELLOS_LV2 -DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) 
    PLATFLAGS :=  -DALIGN_DWORD 
+   EXTERNAL_ZLIB = 1
 else
    #CC = i586-mingw32msvc-gcc
    CC = x86_64-w64-mingw32-gcc
