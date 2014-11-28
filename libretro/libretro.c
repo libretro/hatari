@@ -80,12 +80,10 @@ static void update_variables(void)
       texture_init();
       //reset_screen();
    }
-
 }
 
 static void retro_wrap_emulator()
-{    
-
+{
    pre_main(RPATH);
 
    pauseg=-1;
@@ -103,8 +101,8 @@ static void retro_wrap_emulator()
    }
 }
 
-void Emu_init(){
-
+void Emu_init()
+{
 #ifdef RETRO_AND
    //you can change this after in core option if device support to setup a 832x576 res 
    retrow=640; 
@@ -125,7 +123,8 @@ void Emu_init(){
 
 }
 
-void Emu_uninit(){
+void Emu_uninit()
+{
    texture_uninit();
 }
 
@@ -251,28 +250,35 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
 void retro_run(void)
 {
    int x;
+   unsigned width = 640;
+   unsigned height = 400;
 
    bool updated = false;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables();
 
-   if(pauseg==0){
-
+   if(pauseg==0)
+   {
       update_input();
 
-      if(SND==1){
-         signed short int *p=(signed short int *)SNDBUF;
-         for(x=0;x<snd_sampler;x++)audio_cb(*p++,*p++);			
-      }	
-   }   
+      if(SND==1)
+      {
+         int16_t *p=(int16_t*)SNDBUF;
 
-   if(ConfigureParams.Screen.bAllowOverscan || SHOWKEY==1 || STATUTON==1 || pauseg==1 )video_cb(bmp,retrow,retroh, retrow<< 1);
-   // EMU ST FULLSCREEN NO BORDER
-   else video_cb(bmp,640/*retrow*/,400/*retrow-80*/,retrow << 1);
+         for(x = 0; x < snd_sampler; x++)
+            audio_cb(*p++,*p++);
+      }
+   }
+
+   if(ConfigureParams.Screen.bAllowOverscan || SHOWKEY==1 || STATUTON==1 || pauseg==1 )
+   {
+      width  = retrow;
+      height = retroh;
+   }
+   video_cb(bmp, width, height, retrow<< 1);
 
    co_switch(emuThread);
-
 }
 
 bool retro_load_game(const struct retro_game_info *info)
@@ -290,8 +296,8 @@ bool retro_load_game(const struct retro_game_info *info)
    return true;
 }
 
-void retro_unload_game(void){
-
+void retro_unload_game(void)
+{
    pauseg=0;
 }
 
