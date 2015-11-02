@@ -705,8 +705,9 @@ void input_gui(void)
    if(MOUSEMODE==1)
    {
 
-	  if(slowdown>0)return 1;
+	  if(slowdown>0)return;
 
+#if 0
       //TODO FIX THIS :(
 #if defined(__CELLOS_LV2__) 
       //Slow Joypad Mouse Emulation for PS3
@@ -717,6 +718,7 @@ void input_gui(void)
       PAS=1;
 #elif defined(GEKKO) 
       PAS=1;
+#endif
 #endif
 
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
