@@ -20,7 +20,6 @@ EXTERNAL_ZLIB = 0
 TARGET_NAME	:= hatari
 
 ifeq ($(platform), unix)
-   CC = gcc
 	TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
    SHARED :=  -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
