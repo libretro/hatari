@@ -9,63 +9,58 @@ in touch with us.
 Emulation improvements
 ----------------------
 
-- Investigate what TOS version/functionality doesn't work for programs
-  started from the DESKTOP/NEWDESK.INF and why, e.g:
+- Add fastload program header flag support to GEMDOS HD emulation
+  (If PF_FASTLOAD flag is set, clear just BSS, not heap)
+
+- Investigate what TOS version/functionality doesn't work for (Falcon)
+  programs started from the DESKTOP/NEWDESK.INF and why, e.g:
 	- Printing doesn't work with TOS versions v1.02 - v2.06
 	- Colors in 2-plane VDI resolution are not set correctly
-	- Tony Benett: Virtual City demo bombs
-	- NoCrew: Aggressive Party 2 4k demo doesn't work
-	- Running 1997 shareware version doesn't work
+	- "Running" game preview and shareware versions crash
+	- Fun's "Men at War" game or its intro don't start
+	- "Push It" and "Aazohm Krypth" games crash if auto-started
+	- NoCrew: Aggressive Party II 128k combo ("Whirlpool") bombs
+	- RG: "Sworm" & "Sky Fall" games and "Snowtro" intro
+	  want to access A: & B: when autostarted
+	- JAM packer packed version of Tony Benett' "Virtual City" demo bombs
+	- Sentry 2.2 packed version of Shadows' "Firestarter" demo bombs
+	- Hextracker v0.849 crashes with TOS v4
+	Note: at least last 3 programs can be autostarted fine with EmuTOS.
   Document that in manual (page) for the Hatari "autorun" feature.
+
+- Related to above, investigate why TOS v1.04 crashes shortly after
+  GEM programs started with autorun feature are exited.  If programs
+  are started from TOS v1.04 desktop, there's no crash.
 
 - Keyboard detection sometimes fails when --fast-forward is enabled
   while TOS boots / game is loaded (e.g. Falcon Snake game packed
   with Sentry).
 
 - Improve disk image formats support:
-	- Add support for .STT images
-	  (created with the STEEM disk image program)
 	- Support .DIM images created with the "Get sectors: used" option
 
 - Real HD 6301 (keyboard processor of the ST) emulation.
   (Current special casing is enough for all known demos using 6301)
 
-- Finish upgrading the CPU core of Hatari to the latest WinUAE
-  which has better cycle accuracy needed by some programs:
-	- Finish MMU emulation support
-	- Add Exception debugging support
-	- Instead of calling Reset_Cold()/m68k_reset()/uae_reset()
-	  directly from newcpu.c, show user a notice (dialog)
-	  about what happened and let user do the reboot
-	  (see "Emulation reset, old-UAE vs. WinUAE core" mail-thread)
-	- Make WinUAE core ST/STE emulation as good as with old UAE core
-	- Update WinUAE core to its latest (a year newer) version
-	- Document cmdline options for selecting prefetch etc
-	  once they're stable
-
 - Get the games/demos working that are marked as non-working in the manual.
 
 - Improve TT and/or Falcon emulation, especially VIDEL, e.g:
   - Palette switching during screen drawing
+  - Video timings for the Falcon Videl chip (60Hz support):
+    https://listengine.tuxfamily.org/lists.tuxfamily.org/hatari-devel/2016/07/msg00013.html
   - ST screen modes centering when Videl borders are enabled
   - Videl video register access (e.g. VIDEL_ScreenCounter_ReadByte()
     never changes the register value unless it had first specifically
     been written into):
     http://listengine.tuxfamily.org/lists.tuxfamily.org/hatari-devel/2013/02/msg00155.html
-
-- TT/FastRAM support as some demos need >14MB
+  - Emulate border color:
+    http://atari-forum.com/viewtopic.php?f=51&t=29098
 
 - Add SCSI hard disk emulation for Falcon/TT mode.
 
 - ACSI emulation doesn't work with TOS v3 (but works for TT/EmuTOS).
 
 - Add SCC serial port emulation for Falcon/TT mode.
-
-- Disable VDI mode for TOS v4 as it doesn't support it (and VDI mode
-  is redundant as Falcon's Videl allows similar resolutions)
-
-- Fix falcon sound quality (sound is sometimes noisy).
-  Sound is also toggling between nice to noise with some demos.
 
 - DSP emulation / Falcon sound matrix:
 	- Dsp SSI internal clock (is it used on falcon ?)
@@ -80,6 +75,7 @@ Emulation improvements
   For improved compatibility (e.g. the game "Yolanda") it would be better to
   skip this step, but we then run into multiple other problems, see:
   http://listengine.tuxfamily.org/lists.tuxfamily.org/hatari-devel/2011/12/msg00123.html
+  -> We should emulate the MMU memory bank configuration at $FF8001
 
 
 Programs known as not fully functional (not an exhaustive list)
@@ -150,7 +146,7 @@ Other potential Hatari functionality improvements
 
   These are more complicated ones:
 	- Monitoring reads & writes to specific address.  Hatari supports
-	  only tracing changes to values, not having breakpoints of
+	  only tracing changes to values, not having breakpoints on
 	  reading values or writing the same value.  Slow
 	- Showing breakpoints in instruction dumps.  Hatari breakpoints
 	  are more advanced than the trivial address breakpoints, so
@@ -176,7 +172,7 @@ Other potential Hatari functionality improvements
 on BerliOS hatari-devel mail thread for more info.)
 
 - MonST debugger features missing from Hatari debugger
-  (ones not mentioned in Steem features):
+  (ones not already mentioned in Steem feature list):
 	- Address breakpoints can have conditions that are evaluated
 	  only on that address
 	- Marking breakpoint types in disassembly (<count> for counted
@@ -196,23 +192,17 @@ on BerliOS hatari-devel mail thread for more info.)
 	- User variables which values can be set & used in expressions
 
 - Improved screen handling:
-	- Direct 16-bit & 32-bit support for monochrome and VDI modes
-	  (currently they're converted through 8-bit surface)
 	- Line based screen change detection/checks:
 		- blit only changed lines
 		- simpler / faster (LED) overlay handling
 	- x3 and x4 zooming routines for ST-Low resolution
 	- Include some fancy zooming routines like 2xSaI or Super-Eagle
-	- Add support for hardware accelerated zooming with
-	  SDL YUV overlays or OpenGL
 
 - Check/clean RS232 code:
 	- polls at 2/20ms intervals and reads data byte at the time.
 	  SDL_Delay()s & fgetc() could be replaced (at least on unix)
 	  with select() and fread().  Or just remove the rs232 thread
 	  and use an interrupt for it...
-	- The commented out rs232 stuff could be removed from gemdos.c
-	  (RS emulation is done at HW, not Gemdos level).
 
 - Improve directory handling:
 	- Currently screenshots & anim go always to current dir,
@@ -228,18 +218,6 @@ on BerliOS hatari-devel mail thread for more info.)
 
 Bug reports
 -----------
-
-- Hextracker freezes at start with Falcon emulation because Videl
-  screen address counter doesn't advance (its read & write are no-ops).
-
-- Atari programs can crash Hatari in Falcon mode because sound DMA code isn't robust
-  against bad register values:
-  http://listengine.tuxfamily.org/lists.tuxfamily.org/hatari-devel/2012/02/msg00082.html
-
-- When playing Tautology 2 I noticed the mod player sound goes in and out of
-  sync. fading into crackle and back. (Using Hatari 1.4 with TOS 4.04 on Mac
-  OS X 10.6.5)
-  http://developer.berlios.de/bugs/?func=detailbug&bug_id=17781&group_id=10436
 
 - Problem: On real Falcon there is a minor feature in videl. You can simply
   fade whole screen to black, if you just clear the Horizontal Border End

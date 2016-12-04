@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2014 The RetroArch team
+/* Copyright  (C) 2010-2015 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (file_list.h).
@@ -49,10 +49,10 @@ typedef struct file_list
 } file_list_t;
 
 
-void *file_list_get_userdata_at_offset(const file_list_t *list, 
+void *file_list_get_userdata_at_offset(const file_list_t *list,
       size_t index);
 
-void *file_list_get_actiondata_at_offset(const file_list_t *list, 
+void *file_list_get_actiondata_at_offset(const file_list_t *list,
       size_t index);
 
 void file_list_free(file_list_t *list);
@@ -93,6 +93,8 @@ void file_list_get_alt_at_offset(const file_list_t *list, size_t index,
       const char **alt);
 
 void file_list_sort_on_alt(file_list_t *list);
+
+void file_list_sort_on_type(file_list_t *list);
 
 bool file_list_search(const file_list_t *list, const char *needle,
       size_t *index);

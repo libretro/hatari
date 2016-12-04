@@ -18,7 +18,7 @@ const char STMemory_fileid[] = "Hatari stMemory.c : " __DATE__ " " __TIME__;
 #include "memorySnapShot.h"
 #include "tos.h"
 #include "vdi.h"
-
+#include "m68000.h"
 
 /* STRam points to our ST Ram. Unless the user enabled SMALL_MEM where we have
  * to save memory, this includes all TOS ROM and IO hardware areas for ease
@@ -58,7 +58,7 @@ bool STMemory_SafeCopy(Uint32 addr, Uint8 *src, unsigned int len, const char *na
 {
 	Uint32 end;
 
-	if (STMemory_ValidArea(addr, len))
+	if ( STMemory_CheckAreaType ( addr, len, ABFLAG_RAM ) )
 	{
 		memcpy(&STRam[addr], src, len);
 		return true;
@@ -67,7 +67,7 @@ bool STMemory_SafeCopy(Uint32 addr, Uint8 *src, unsigned int len, const char *na
 
 	for (end = addr + len; addr < end; addr++, src++)
 	{
-		if (STMemory_ValidArea(addr, 1))
+		if ( STMemory_CheckAreaType ( addr, 1, ABFLAG_RAM ) )
 			STRam[addr] = *src;
 	}
 	return false;
@@ -99,8 +99,8 @@ void STMemory_MemorySnapShot_Capture(bool bSave)
 void STMemory_SetDefaultConfig(void)
 {
 	int i;
-	int screensize;
-	int memtop;
+	int screensize, limit;
+	int memtop, phystop;
 	Uint8 nMemControllerByte;
 	Uint8 nFalcSysCntrl;
 
@@ -130,33 +130,98 @@ void STMemory_SetDefaultConfig(void)
 	STMemory_WriteLong(0x04, STMemory_ReadLong(TosAddress+4));
 
 	/* Fill in magic numbers to bypass TOS' memory tests for faster boot or
-	 * if VDI resolution is enabled or if more than 4 MB of ram are used.
+	 * if VDI resolution is enabled or if more than 4 MB of ram are used
+	 * or if TT RAM added in Falcon mode.
 	 * (for highest compatibility, those tests should not be bypassed in
 	 *  the common STF/STE cases as some programs like "Yolanda" rely on
 	 *  the RAM content after those tests) */
-	if (ConfigureParams.System.bFastBoot || bUseVDIRes
-	    || (ConfigureParams.Memory.nMemorySize > 4 && !bIsEmuTOS))
+	if ( ConfigureParams.System.bFastBoot
+	  || bUseVDIRes
+	  || ( ConfigureParams.Memory.nMemorySize > 4 && !bIsEmuTOS )
+	  || ( Config_IsMachineTT() && ConfigureParams.System.bAddressSpace24 && !bIsEmuTOS )
+	  || ( Config_IsMachineFalcon() && TTmemory && !bIsEmuTOS) )
 	{
 		/* Write magic values to sysvars to signal valid config */
 		STMemory_WriteLong(0x420, 0x752019f3);    /* memvalid */
 		STMemory_WriteLong(0x43a, 0x237698aa);    /* memval2 */
 		STMemory_WriteLong(0x51a, 0x5555aaaa);    /* memval3 */
+
+		/* If ST RAM detection is bypassed, we must also force TT RAM config if enabled */
+		if ( TTmemory )
+			STMemory_WriteLong ( 0x5a4 , 0x01000000 + TTmem_size );		/* ramtop */
+		else
+			STMemory_WriteLong ( 0x5a4 , 0 );		/* ramtop */
+		STMemory_WriteLong ( 0x5a8 , 0x1357bd13 );		/* ramvalid */
+
+		/* On Falcon, set bit6=1 at $ff8007 to simulate a warm start */
+		/* (else memory detection is not skipped after a cold start/reset) */
+		if (Config_IsMachineFalcon())
+			STMemory_WriteByte ( 0xff8007, IoMem_ReadByte(0xff8007) | 0x40 );
+
+		/* On TT, set bit0=1 at $ff8e09 to simulate a warm start */
+		/* (else memory detection is not skipped after a cold start/reset) */
+		if (Config_IsMachineTT())
+			STMemory_WriteByte ( 0xff8e09, IoMem_ReadByte(0xff8e09) | 0x01 );
+
+		/* TOS 3.0x and 4.0x check _hz200 and always do a memory test
+		 * if the machine runs less than 80 seconds */
+		if (!bIsEmuTOS && TosVersion >= 0x300)
+			STMemory_WriteLong(0x4ba, 80 * 200);
 	}
 
-	/* Set memory size, adjust for extra VDI screens if needed.
-	 * Note: TOS seems to set phys_top-0x8000 as the screen base
-	 * address - so we have to move phys_top down in VDI resolution
-	 * mode, although there is more "physical" ST RAM available. */
+	/* Set memory size, adjust for extra VDI screens if needed. */
 	screensize = VDIWidth * VDIHeight / 8 * VDIPlanes;
 	/* Use 32 kiB in normal screen mode or when the screen size is smaller than 32 kiB */
 	if (!bUseVDIRes || screensize < 0x8000)
 		screensize = 0x8000;
-	/* mem top - upper end of user memory (right before the screen memory).
-	 * Note: memtop / phystop must be dividable by 512, or TOS crashes */
+	/* mem top - upper end of user memory (right before the screen memory)
+	 * memtop / phystop must be dividable by 512 or TOS crashes */
 	memtop = (STRamEnd - screensize) & 0xfffffe00;
+	/* phys top - 32k gap causes least issues with apps & TOS
+	 * as that's the largest _common_ screen size. EmuTOS behavior
+	 * depends on machine type.
+	 *
+	 * TODO: what to do about _native_ TT & Videl resolutions
+	 * which size is >32k?  Should memtop be adapted also for
+	 * those?
+	 */
+	switch (ConfigureParams.System.nMachineType)
+	{
+	case MACHINE_FALCON:
+		/* TOS v4 doesn't work with VDI mode (yet), and
+		 * EmuTOS works with correct gap, so use that */
+		phystop = STRamEnd;
+		break;
+	case MACHINE_TT:
+		/* For correct TOS v3 memory detection, phystop should be
+		 * at the end of memory, not at memtop + 32k.
+		 *
+		 * However:
+		 * - TOS v3 crashes/hangs if phystop-memtop gap is larger
+		 *   than largest real HW screen size (150k)
+		 * - NVDI hangs if gap is larger than 32k in any other than
+		 *   monochrome mode
+		 */
+		if (VDIPlanes == 1)
+			limit = 1280*960/8;
+		else
+			limit = 0x8000;
+		if (screensize > limit)
+		{
+			phystop = memtop + limit;
+			fprintf(stderr, "WARNING: too large VDI mode for TOS v3 memory detection to work correctly!\n");
+		}
+		else
+			phystop = STRamEnd;
+		break;
+	default:
+		phystop = memtop + 0x8000;
+	}
 	STMemory_WriteLong(0x436, memtop);
-	/* phys top - This must be memtop + 0x8000 to make TOS happy */
-	STMemory_WriteLong(0x42e, memtop+0x8000);
+	STMemory_WriteLong(0x42e, phystop);
+	if (bUseVDIRes)
+		fprintf(stderr, "VDI mode memtop: 0x%x, phystop: 0x%x (screensize: %d kB, memtop->phystop: %d kB)\n",
+			memtop, phystop, (screensize+511) / 1024, (phystop-memtop+511) / 1024);
 
 	/* Set memory controller byte according to different memory sizes */
 	/* Setting per bank: %00=128k %01=512k %10=2Mb %11=reserved. - e.g. %1010 means 4Mb */
@@ -167,7 +232,7 @@ void STMemory_SetDefaultConfig(void)
 	STMemory_WriteByte(0x424, nMemControllerByte);
 	IoMem_WriteByte(0xff8001, nMemControllerByte);
 
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON)
+	if (Config_IsMachineFalcon())
 	{
 		/* Set the Falcon memory and monitor configuration register:
 
@@ -254,3 +319,158 @@ void STMemory_SetDefaultConfig(void)
 	 * NOTE: some TOS images overwrite this value, see 'OpCode_SysInit', too */
 	STMemory_WriteLong(0x4c2, ConnectedDriveMask);
 }
+
+
+/**
+ * Check that the region of 'size' starting at 'addr' is entirely inside
+ * a memory bank of the same memory type
+ */
+bool	STMemory_CheckAreaType ( Uint32 addr , int size , int mem_type )
+{
+	addrbank	*pBank;
+
+	pBank = &get_mem_bank ( addr );
+
+	if ( ( pBank->flags & mem_type ) == 0 )
+	{
+		fprintf(stderr, "pBank flags mismatch: 0x%x & 0x%x (RAM = 0x%x)\n", pBank->flags, mem_type, ABFLAG_RAM);
+		return false;
+	}
+
+	return pBank->check ( addr , size );
+}
+
+
+/**
+ * Check if an address points to a memory region that causes bus error
+ * This is used for blitter and other DMA chips that should not cause
+ * a bus error when accessing such regions (on the contrary of the CPU)
+ * Returns true if region gives bus error
+ */
+bool	STMemory_CheckRegionBusError ( Uint32 addr )
+{
+	return memory_region_bus_error ( addr );
+}
+
+
+/**
+ * Convert an address in the ST memory space to a direct pointer
+ * in the host memory.
+ *
+ * NOTE : Using this function to get a direct pointer to the memory should
+ * only be used after doing a call to valid_address or STMemory_CheckAreaType
+ * to ensure we don't try to access a non existing memory region.
+ * Basically, this function should be used only for addr in RAM or in ROM
+ */
+void	*STMemory_STAddrToPointer ( Uint32 addr )
+{
+	Uint8	*p;
+
+	if ( ConfigureParams.System.bAddressSpace24 == true )
+		addr &= 0x00ffffff;			/* Only keep the 24 lowest bits */
+
+	p = get_real_address ( addr );
+	return (void *)p;
+}
+
+
+
+/**
+ * Those functions are directly accessing the memory of the corresponding
+ * bank, without calling its dedicated access handlers (they won't generate
+ * bus errors or address errors or update IO values)
+ * They are only used for internal work of the emulation, such as debugger,
+ * log to print the content of memory, intercepting gemdos/bios calls, ...
+ *
+ * These functions are not used by the CPU emulation itself, see memory.c
+ * for the functions that emulate real memory accesses.
+ */
+
+/**
+ * Write long/word/byte into memory.
+ * NOTE - value will be converted to 68000 endian
+ */
+void	STMemory_Write ( Uint32 addr , Uint32 val , int size )
+{
+	addrbank	*pBank;
+	Uint8		*p;
+
+//printf ( "mem direct write %x %x %d\n" , addr , val , size );
+	pBank = &get_mem_bank ( addr );
+
+	if ( pBank->baseaddr == NULL )
+		return;					/* No real memory, do nothing */
+
+	addr -= pBank->start & pBank->mask;
+	addr &= pBank->mask;
+	p = pBank->baseaddr + addr;
+
+	/* We modify the memory, so we flush the instr/data caches if needed */
+	M68000_Flush_All_Caches ( addr , size );
+	
+	if ( size == 4 )
+		do_put_mem_long ( p , val );
+	else if ( size == 2 )
+		do_put_mem_word ( p , (Uint16)val );
+	else
+		*p = (Uint8)val;
+}
+
+void	STMemory_WriteLong ( Uint32 addr , Uint32 val )
+{
+	STMemory_Write ( addr , val , 4 );
+}
+
+void	STMemory_WriteWord ( Uint32 addr , Uint16 val )
+{
+	STMemory_Write ( addr , (Uint32)val , 2 );
+}
+
+void	STMemory_WriteByte ( Uint32 addr , Uint8 val )
+{
+	STMemory_Write ( addr , (Uint32)val , 1 );
+}
+
+
+/**
+ * Read long/word/byte from memory.
+ * NOTE - value will be converted to 68000 endian
+ */
+Uint32	STMemory_Read ( Uint32 addr , int size )
+{
+	addrbank	*pBank;
+	Uint8		*p;
+
+//printf ( "mem direct read %x %d\n" , addr , size );
+	pBank = &get_mem_bank ( addr );
+
+	if ( pBank->baseaddr == NULL )
+		return 0;				/* No real memory, return 0 */
+
+	addr -= pBank->start & pBank->mask;
+	addr &= pBank->mask;
+	p = pBank->baseaddr + addr;
+	
+	if ( size == 4 )
+		return do_get_mem_long ( p );
+	else if ( size == 2 )
+		return (Uint32)do_get_mem_word ( p );
+	else
+		return (Uint32)*p;
+}
+
+Uint32	STMemory_ReadLong ( Uint32 addr )
+{
+	return (Uint32) STMemory_Read ( addr , 4 );
+}
+
+Uint16	STMemory_ReadWord ( Uint32 addr )
+{
+	return (Uint16)STMemory_Read ( addr , 2 );
+}
+
+Uint8	STMemory_ReadByte ( Uint32 addr )
+{
+	return (Uint8)STMemory_Read ( addr , 1 );
+}
+

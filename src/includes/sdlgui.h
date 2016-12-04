@@ -12,8 +12,10 @@
 
 #include <SDL.h>
 
+/* object types: */
 enum
 {
+  SGSTOP = -1, /* type used at end of dialog to terminate it */
   SGBOX,
   SGTEXT,
   SGEDITFIELD,
@@ -30,7 +32,6 @@ enum
 #define SG_EXIT        2   /* Exit when mouse button has been pressed (and released) */
 #define SG_DEFAULT     4   /* Marks a default button, selectable with Enter & Return keys */
 #define SG_CANCEL      8   /* Marks a cancel button, selectable with ESC key */
-#define SG_SHORTCUT   16   /* Marks a shortcut button, selectable with masked letter */
 
 /* Object states: */
 #define SG_SELECTED    1
@@ -53,11 +54,11 @@ enum
 #define SGARROWDOWN              2
 #define SGFOLDER                 5
 
-/* Return codes: */
+/* Object matching return codes: (negative so they aren't mixed with object indeces) */
 #define SDLGUI_ERROR         -1
 #define SDLGUI_QUIT          -2
 #define SDLGUI_UNKNOWNEVENT  -3
-
+#define SDLGUI_NOTFOUND      -4
 
 typedef struct
 {
@@ -79,7 +80,7 @@ extern int SDLGui_SetScreen(SDL_Surface *pScrn);
 extern void SDLGui_GetFontSize(int *width, int *height);
 extern void SDLGui_Text(int x, int y, const char *txt);
 extern void SDLGui_DrawDialog(const SGOBJ *dlg);
-extern int SDLGui_DoDialog(SGOBJ *dlg, SDL_Event *pEventOut);
+extern int SDLGui_DoDialog(SGOBJ *dlg, SDL_Event *pEventOut, bool KeepCurrentObject);
 extern void SDLGui_CenterDlg(SGOBJ *dlg);
 extern char* SDLGui_FileSelect(const char *title, const char *path_and_name, char **zip_path, bool bAllowNew);
 extern bool SDLGui_FileConfSelect(const char *title, char *dlgname, char *confname, int maxlen, bool bAllowNew);

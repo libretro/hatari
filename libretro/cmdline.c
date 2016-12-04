@@ -42,7 +42,7 @@ int pre_main(const char *argv)
    if(Only1Arg)
    {
       Add_Option("hatari");
-      Add_Option("--disk-a");
+      Add_Option("--cfg"); //retroup
       Add_Option(RPATH/*ARGUV[0]*/);
    }
    else

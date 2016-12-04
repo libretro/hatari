@@ -8,6 +8,8 @@
 */
 const char HDC_fileid[] = "Hatari hdc.c : " __DATE__ " " __TIME__;
 
+#include <errno.h>
+
 #include "main.h"
 #include "configuration.h"
 #include "debugui.h"
@@ -44,6 +46,7 @@ const char HDC_fileid[] = "Hatari hdc.c : " __DATE__ " " __TIME__;
 
 // #define DISALLOW_HDC_WRITE
 // #define HDC_VERBOSE           /* display operations */
+#define WITH_NCR5380 0
 
 #define HDC_ReadInt16(a, i) (((unsigned) a[i] << 8) | a[i + 1])
 #define HDC_ReadInt24(a, i) (((unsigned) a[i] << 16) | ((unsigned) a[i + 1] << 8) | a[i + 2])
@@ -71,14 +74,21 @@ typedef struct {
 	Uint8 opcode;
 	bool bDmaError;
 	short int returnCode;       /* return code from the HDC operation */
+	Uint8 *resp;                /* Response buffer */
+	int respbufsize;
+	int respcnt;
+	int respidx;
 	SCSI_DEV devs[8];
 } SCSI_CTRLR;
 
 /* HDC globals */
-SCSI_CTRLR AcsiBus;
+static SCSI_CTRLR AcsiBus;
 int nAcsiPartitions = 0;
 bool bAcsiEmuOn = false;
 
+#if WITH_NCR5380
+static SCSI_CTRLR ScsiBus;
+#endif
 
 /* Our dummy INQUIRY response data */
 static unsigned char inquiry_bytes[] =
@@ -142,6 +152,24 @@ static inline Uint8 HDC_GetControl(SCSI_CTRLR *ctr)
 }
 
 /**
+ * Get pointer to response buffer, set up size indicator - and allocate
+ * a new buffer if it is not big enough
+ */
+static Uint8 *HDC_PrepRespBuf(SCSI_CTRLR *ctr, int size)
+{
+	ctr->respcnt = size;
+	ctr->respidx = 0;
+
+	if (size > ctr->respbufsize)
+	{
+		ctr->respbufsize = size;
+		ctr->resp = realloc(ctr->resp, size);
+	}
+
+	return ctr->resp;
+}
+
+/**
  * Get info string for SCSI/ACSI command packets.
  */
 static inline char *HDC_CmdInfoStr(SCSI_CTRLR *ctr)
@@ -192,37 +220,26 @@ static void HDC_Cmd_Seek(SCSI_CTRLR *ctr)
 static void HDC_Cmd_Inquiry(SCSI_CTRLR *ctr)
 {
 	SCSI_DEV *dev = &ctr->devs[ctr->target];
-	Uint32 nDmaAddr;
+	Uint8 *buf;
 	int count;
 
-	nDmaAddr = FDC_GetDMAAddress();
 	count = HDC_GetCount(ctr);
 
-	LOG_TRACE(TRACE_SCSI_CMD, "HDC: INQUIRY (%s) to 0x%x",
-	          HDC_CmdInfoStr(ctr), nDmaAddr);
+	LOG_TRACE(TRACE_SCSI_CMD, "HDC: INQUIRY (%s)", HDC_CmdInfoStr(ctr));
+
+	buf = HDC_PrepRespBuf(ctr, count);
+	memcpy(buf, inquiry_bytes, count);
 
 	if (count > (int)sizeof(inquiry_bytes))
 		count = sizeof(inquiry_bytes);
 
 	/* For unsupported LUNs set the Peripheral Qualifier and the
 	 * Peripheral Device Type according to the SCSI standard */
-	inquiry_bytes[0] = HDC_GetLUN(ctr) == 0 ? 0 : 0x7F;
+	buf[0] = HDC_GetLUN(ctr) == 0 ? 0 : 0x7F;
 
-	inquiry_bytes[4] = count - 5;
+	buf[4] = count - 5;
 
-	if (STMemory_SafeCopy(nDmaAddr, inquiry_bytes, count, "HDC DMA inquiry"))
-	{
-		LOG_TRACE(TRACE_SCSI_CMD, " -> OK\n");
-		ctr->returnCode = HD_STATUS_OK;
-	}
-	else
-	{
-		LOG_TRACE(TRACE_SCSI_CMD, " -> ERROR\n");
-		ctr->bDmaError = true;
-		ctr->returnCode = HD_STATUS_ERROR;
-	}
-
-	FDC_WriteDMAAddress(nDmaAddr + count);
+	ctr->returnCode = HD_STATUS_OK;
 
 	dev->nLastError = HD_REQSENS_OK;
 	dev->bSetLastBlockAddr = false;
@@ -235,9 +252,8 @@ static void HDC_Cmd_Inquiry(SCSI_CTRLR *ctr)
 static void HDC_Cmd_RequestSense(SCSI_CTRLR *ctr)
 {
 	SCSI_DEV *dev = &ctr->devs[ctr->target];
-	Uint32 nDmaAddr;
 	int nRetLen;
-	Uint8 retbuf[22];
+	Uint8 *retbuf;
 
 	nRetLen = HDC_GetCount(ctr);
 
@@ -258,8 +274,7 @@ static void HDC_Cmd_RequestSense(SCSI_CTRLR *ctr)
 		nRetLen = 22;
 	}
 
-	nDmaAddr = FDC_GetDMAAddress();
-
+	retbuf = HDC_PrepRespBuf(ctr, nRetLen);
 	memset(retbuf, 0, nRetLen);
 
 	if (nRetLen <= 4)
@@ -306,17 +321,7 @@ static void HDC_Cmd_RequestSense(SCSI_CTRLR *ctr)
 	fprintf(stderr,"\n");
 	*/
 
-	if (STMemory_SafeCopy(nDmaAddr, retbuf, nRetLen, "HDC request sense"))
-	{
-		ctr->returnCode = HD_STATUS_OK;
-	}
-	else
-	{
-		ctr->bDmaError = true;
-		ctr->returnCode = HD_STATUS_ERROR;
-	}
-
-	FDC_WriteDMAAddress(nDmaAddr + nRetLen);
+	ctr->returnCode = HD_STATUS_OK;
 }
 
 
@@ -327,57 +332,45 @@ static void HDC_Cmd_RequestSense(SCSI_CTRLR *ctr)
 static void HDC_Cmd_ModeSense(SCSI_CTRLR *ctr)
 {
 	SCSI_DEV *dev = &ctr->devs[ctr->target];
-	Uint32 nDmaAddr;
+	Uint8 *buf;
 
 	LOG_TRACE(TRACE_SCSI_CMD, "HDC: MODE SENSE (%s).\n", HDC_CmdInfoStr(ctr));
 
-	nDmaAddr = FDC_GetDMAAddress();
+	dev->bSetLastBlockAddr = false;
 
-	if (!STMemory_ValidArea(nDmaAddr, 16))
-	{
-		Log_Printf(LOG_WARN, "HCD mode sense uses invalid RAM range 0x%x+%i\n", nDmaAddr, 16);
-		ctr->bDmaError = true;
-		ctr->returnCode = HD_STATUS_ERROR;
-	}
-	else if (ctr->command[2] == 0 && HDC_GetCount(ctr) == 0x10)
-	{
-		size_t blocks;
-		blocks = dev->hdSize;
-
-		STRam[nDmaAddr+0] = 0;
-		STRam[nDmaAddr+1] = 0;
-		STRam[nDmaAddr+2] = 0;
-		STRam[nDmaAddr+3] = 8;
-		STRam[nDmaAddr+4] = 0;
-
-		STRam[nDmaAddr+5] = blocks >> 16;  // Number of blocks, high (?)
-		STRam[nDmaAddr+6] = blocks >> 8;   // Number of blocks, med (?)
-		STRam[nDmaAddr+7] = blocks;        // Number of blocks, low (?)
-
-		STRam[nDmaAddr+8] = 0;
-
-		STRam[nDmaAddr+9] = 0;      // Block size in bytes, high
-		STRam[nDmaAddr+10] = 2;     // Block size in bytes, med
-		STRam[nDmaAddr+11] = 0;     // Block size in bytes, low
-
-		STRam[nDmaAddr+12] = 0;
-		STRam[nDmaAddr+13] = 0;
-		STRam[nDmaAddr+14] = 0;
-		STRam[nDmaAddr+15] = 0;
-
-		FDC_WriteDMAAddress(nDmaAddr + 16);
-
-		ctr->returnCode = HD_STATUS_OK;
-		dev->nLastError = HD_REQSENS_OK;
-	}
-	else
+	if (ctr->command[2] != 0 || HDC_GetCount(ctr) != 0x10)
 	{
 		Log_Printf(LOG_TODO, "HDC: Unsupported MODE SENSE command\n");
 		ctr->returnCode = HD_STATUS_ERROR;
 		dev->nLastError = HD_REQSENS_INVARG;
+		return;
 	}
 
-	dev->bSetLastBlockAddr = false;
+	buf = HDC_PrepRespBuf(ctr, 16);
+
+	buf[0] = 0;
+	buf[1] = 0;
+	buf[2] = 0;
+	buf[3] = 8;
+	buf[4] = 0;
+
+	buf[5] = dev->hdSize >> 16;  // Number of blocks, high
+	buf[6] = dev->hdSize >> 8;   // Number of blocks, med
+	buf[7] = dev->hdSize;        // Number of blocks, low
+
+	buf[8] = 0;
+
+	buf[9] = 0;      // Block size in bytes, high
+	buf[10] = 2;     // Block size in bytes, med
+	buf[11] = 0;     // Block size in bytes, low
+
+	buf[12] = 0;
+	buf[13] = 0;
+	buf[14] = 0;
+	buf[15] = 0;
+
+	ctr->returnCode = HD_STATUS_OK;
+	dev->nLastError = HD_REQSENS_OK;
 }
 
 
@@ -404,38 +397,24 @@ static void HDC_Cmd_FormatDrive(SCSI_CTRLR *ctr)
 static void HDC_Cmd_ReadCapacity(SCSI_CTRLR *ctr)
 {
 	SCSI_DEV *dev = &ctr->devs[ctr->target];
-	Uint32 nDmaAddr = FDC_GetDMAAddress();
+	int nSectors = dev->hdSize - 1;
+	Uint8 *buf;
 
-	LOG_TRACE(TRACE_SCSI_CMD, "HDC: READ CAPACITY (%s) to 0x%x.\n",
-	          HDC_CmdInfoStr(ctr), nDmaAddr);
+	LOG_TRACE(TRACE_SCSI_CMD, "HDC: READ CAPACITY (%s)\n", HDC_CmdInfoStr(ctr));
 
-	/* seek to the position */
-	if (STMemory_ValidArea(nDmaAddr, 8))
-	{
-		int nSectors = dev->hdSize - 1;
-		STRam[nDmaAddr++] = (nSectors >> 24) & 0xFF;
-		STRam[nDmaAddr++] = (nSectors >> 16) & 0xFF;
-		STRam[nDmaAddr++] = (nSectors >> 8) & 0xFF;
-		STRam[nDmaAddr++] = (nSectors) & 0xFF;
-		STRam[nDmaAddr++] = 0x00;
-		STRam[nDmaAddr++] = 0x00;
-		STRam[nDmaAddr++] = 0x02;
-		STRam[nDmaAddr++] = 0x00;
+	buf = HDC_PrepRespBuf(ctr, 8);
 
-		/* Update DMA counter */
-		FDC_WriteDMAAddress(nDmaAddr);
+	buf[0] = (nSectors >> 24) & 0xFF;
+	buf[1] = (nSectors >> 16) & 0xFF;
+	buf[2] = (nSectors >> 8) & 0xFF;
+	buf[3] = (nSectors) & 0xFF;
+	buf[4] = 0x00;
+	buf[5] = 0x00;
+	buf[6] = 0x02;
+	buf[7] = 0x00;
 
-		ctr->returnCode = HD_STATUS_OK;
-		dev->nLastError = HD_REQSENS_OK;
-	}
-	else
-	{
-		Log_Printf(LOG_WARN, "HDC capacity read uses invalid RAM range 0x%x+%i\n", nDmaAddr, 8);
-		ctr->bDmaError = true;
-		ctr->returnCode = HD_STATUS_ERROR;
-		dev->nLastError = HD_REQSENS_NOSECTOR;
-	}
-
+	ctr->returnCode = HD_STATUS_OK;
+	dev->nLastError = HD_REQSENS_OK;
 	dev->bSetLastBlockAddr = false;
 }
 
@@ -465,7 +444,7 @@ static void HDC_Cmd_WriteSector(SCSI_CTRLR *ctr)
 	{
 		/* write - if allowed */
 #ifndef DISALLOW_HDC_WRITE
-		if (STMemory_ValidArea(nDmaAddr, 512 * HDC_GetCount(ctr)))
+		if ( STMemory_CheckAreaType ( nDmaAddr , 512 * HDC_GetCount(ctr) , ABFLAG_RAM ) )
 		{
 			n = fwrite(&STRam[nDmaAddr], 512,
 				   HDC_GetCount(ctr), dev->image_file);
@@ -505,13 +484,13 @@ static void HDC_Cmd_WriteSector(SCSI_CTRLR *ctr)
 static void HDC_Cmd_ReadSector(SCSI_CTRLR *ctr)
 {
 	SCSI_DEV *dev = &ctr->devs[ctr->target];
-	Uint32 nDmaAddr = FDC_GetDMAAddress();
+	Uint8 *buf;
 	int n;
 
 	dev->nLastBlockAddr = HDC_GetLBA(ctr);
 
-	LOG_TRACE(TRACE_SCSI_CMD, "HDC: READ SECTOR (%s) with LBA 0x%x to 0x%x",
-	          HDC_CmdInfoStr(ctr), dev->nLastBlockAddr, nDmaAddr);
+	LOG_TRACE(TRACE_SCSI_CMD, "HDC: READ SECTOR (%s) with LBA 0x%x",
+	          HDC_CmdInfoStr(ctr), dev->nLastBlockAddr);
 
 	/* seek to the position */
 	if (dev->nLastBlockAddr >= dev->hdSize ||
@@ -522,18 +501,8 @@ static void HDC_Cmd_ReadSector(SCSI_CTRLR *ctr)
 	}
 	else
 	{
-		if (STMemory_ValidArea(nDmaAddr, 512 * HDC_GetCount(ctr)))
-		{
-			n = fread(&STRam[nDmaAddr], 512,
-				   HDC_GetCount(ctr), dev->image_file);
-		}
-		else
-		{
-			Log_Printf(LOG_WARN, "HDC sector read uses invalid RAM range 0x%x+%i\n",
-				   nDmaAddr, 512 * HDC_GetCount(ctr));
-			ctr->bDmaError = true;
-			n = 0;
-		}
+		buf = HDC_PrepRespBuf(ctr, 512 * HDC_GetCount(ctr));
+		n = fread(buf, 512, HDC_GetCount(ctr), dev->image_file);
 		if (n == HDC_GetCount(ctr))
 		{
 			ctr->returnCode = HD_STATUS_OK;
@@ -544,9 +513,6 @@ static void HDC_Cmd_ReadSector(SCSI_CTRLR *ctr)
 			ctr->returnCode = HD_STATUS_ERROR;
 			dev->nLastError = HD_REQSENS_NOSECTOR;
 		}
-
-		/* Update DMA counter */
-		FDC_WriteDMAAddress(nDmaAddr + 512*n);
 	}
 	LOG_TRACE(TRACE_SCSI_CMD, " -> %s (%d)\n",
 		  ctr->returnCode == HD_STATUS_OK ? "OK" : "ERROR",
@@ -572,6 +538,8 @@ static void HDC_Cmd_TestUnitReady(SCSI_CTRLR *ctr)
 static void HDC_EmulateCommandPacket(SCSI_CTRLR *ctr)
 {
 	SCSI_DEV *dev = &ctr->devs[ctr->target];
+
+	ctr->respcnt = 0;
 
 	switch (ctr->opcode)
 	{
@@ -655,21 +623,23 @@ static void HDC_EmulateCommandPacket(SCSI_CTRLR *ctr)
  * - Support also Atari ICD (12 entries, at offset 0x156) and
  *   extended partition schemes.  Linux kernel has code for those:
  *   http://lxr.free-electrons.com/source/block/partitions/atari.c
- * - Support partition tables with other endianess
+ *   Normal and extended partition tables are described in:
+ *   http://dev-docs.atariforge.org/files/AHDI_3_RN_4-18-1990.pdf
+ * - Support partition tables with other endianness
  */
 int HDC_PartitionCount(FILE *fp, const Uint64 tracelevel)
 {
 	unsigned char *pinfo, bootsector[512];
 	Uint32 start, sectors, total = 0;
 	int i, parts = 0;
-	long offset;
+	off_t offset;
 
 	if (!fp)
 		return 0;
-	offset = ftell(fp);
+	offset = ftello(fp);
 
-	fseek(fp, 0, SEEK_SET);
-	if (fread(bootsector, sizeof(bootsector), 1, fp) != 1)
+	if (fseeko(fp, 0, SEEK_SET) != 0
+	    || fread(bootsector, sizeof(bootsector), 1, fp) != 1)
 	{
 		perror("HDC_PartitionCount");
 		return 0;
@@ -689,12 +659,12 @@ int HDC_PartitionCount(FILE *fp, const Uint64 tracelevel)
 			start = HDC_ReadInt32(pinfo, 8);
 			sectors = HDC_ReadInt32(pinfo, 12);
 			total += sectors;
-			LOG_TRACE(tracelevel, "- Partition %d: type=0x%02x, start=0x%08x, size=%d MB %s\n",
-				  i, ptype, start, sectors/2048, boot ? "(boot)" : "");
+			LOG_TRACE(tracelevel, "- Partition %d: type=0x%02x, start=0x%08x, size=%.1f MB %s%s\n",
+				  i, ptype, start, sectors/2048.0, boot ? "(boot)" : "", sectors ? "" : "(invalid)");
 			if (ptype)
 				parts++;
 		}
-		LOG_TRACE(tracelevel, "- Total size: %i MB in %d partitions\n", total/2048, parts);
+		LOG_TRACE(tracelevel, "- Total size: %.1f MB in %d partitions\n", total/2048.0, parts);
 	}
 	else
 	{
@@ -706,6 +676,7 @@ int HDC_PartitionCount(FILE *fp, const Uint64 tracelevel)
 		 */
 		char c, pid[4];
 		int j, flags;
+		bool extended;
 
 		LOG_TRACE(tracelevel, "ATARI MBR:\n");
 		pinfo = bootsector + 0x1C6;
@@ -720,69 +691,151 @@ int HDC_PartitionCount(FILE *fp, const Uint64 tracelevel)
 				pid[j] = c;
 			}
 			pid[3] = '\0';
+			extended = strcmp("XGM", pid) == 0;
 			start = HDC_ReadInt32(pinfo, 4);
 			sectors = HDC_ReadInt32(pinfo, 8);
-			LOG_TRACE(tracelevel, "- Partition %d: ID=%s, start=0x%08x, size=%d MB, flags=0x%x\n",
-				  i, pid, start, sectors/2048, flags);
+			LOG_TRACE(tracelevel,
+				  "- Partition %d: ID=%s, start=0x%08x, size=%.1f MB, flags=0x%x %s%s\n",
+				  i, pid, start, sectors/2048.0, flags,
+				  (flags & 0x80) ? "(boot)": "",
+				  extended ? "(extended)" : "");
 			if (flags & 0x1)
 				parts++;
 		}
 		total = HDC_ReadInt32(bootsector, 0x1C2);
-		LOG_TRACE(tracelevel, "- Total size: %i MB in %d partitions\n", total/2048, parts);
+		LOG_TRACE(tracelevel, "- Total size: %.1f MB in %d partitions\n", total/2048.0, parts);
 	}
 
-	fseek(fp, offset, SEEK_SET);
+	if (fseeko(fp, offset, SEEK_SET) != 0)
+		perror("HDC_PartitionCount");
 	return parts;
 }
 
+/**
+ * Check file size for sane values (non-zero, multiple of 512),
+ * and return the size
+ */
+off_t HDC_CheckAndGetSize(const char *filename)
+{
+	off_t filesize;
+	char shortname[48];
+
+	File_ShrinkName(shortname, filename, sizeof(shortname) - 1);
+
+	filesize = File_Length(filename);
+	if (filesize < 0)
+	{
+		Log_AlertDlg(LOG_ERROR, "Unable to get size of HD image file\n'%s'!",
+		             shortname);
+		if (sizeof(off_t) < 8)
+		{
+			Log_Printf(LOG_ERROR, "Note: This version of Hatari has been built"
+			                      " _without_ support for large files,\n"
+			                      "      so you can not use HD images > 2 GB.\n");
+		}
+		return -EFBIG;
+	}
+	if (filesize == 0)
+	{
+		Log_AlertDlg(LOG_ERROR, "Can not use HD image file\n'%s'\n"
+		                        "since the file is empty.",
+		             shortname);
+		return -EINVAL;
+	}
+	if ((filesize & 0x1ff) != 0)
+	{
+		Log_AlertDlg(LOG_ERROR, "Can not use the hard disk image file\n"
+		                        "'%s'\nsince its size is not a multiple"
+		                        " of 512.",
+		            shortname);
+		return -EINVAL;
+	}
+
+	return filesize;
+}
+
+/**
+ * Open a disk image file
+ */
+static int HDC_InitDevice(SCSI_DEV *dev, char *filename)
+{
+	off_t filesize;
+	FILE *fp;
+
+	dev->enabled = false;
+	Log_Printf(LOG_INFO, "Mounting hard drive image '%s'\n", filename);
+
+	/* Check size for sanity */
+	filesize = HDC_CheckAndGetSize(filename);
+	if (filesize < 0)
+		return filesize;
+
+	fp = fopen(filename, "rb+");
+	if (fp == NULL)
+	{
+		Log_Printf(LOG_ERROR, "ERROR: cannot open HD file read/write!\n");
+		return -ENOENT;
+	}
+	if (!File_Lock(fp))
+	{
+		Log_Printf(LOG_ERROR, "ERROR: cannot lock HD file for writing!\n");
+		fclose(fp);
+		return -ENOLCK;
+	}
+
+	dev->hdSize = filesize / 512;
+	dev->image_file = fp;
+	dev->enabled = true;
+
+	return 0;
+}
 
 /**
  * Open the disk image file, set partitions.
  */
 bool HDC_Init(void)
 {
-	off_t filesize;
 	int i;
 
-	memset(&AcsiBus, 0, sizeof(AcsiBus));
+	/* ACSI */
 	nAcsiPartitions = 0;
 	bAcsiEmuOn = false;
-
+	memset(&AcsiBus, 0, sizeof(AcsiBus));
+	AcsiBus.respbufsize = 512;
+	AcsiBus.resp = malloc(AcsiBus.respbufsize);
+	if (!AcsiBus.resp)
+	{
+		perror("HDC_Init");
+		return false;
+	}
 	for (i = 0; i < MAX_ACSI_DEVS; i++)
 	{
-		char *filename;
-		FILE *fp;
-
 		if (!ConfigureParams.Acsi[i].bUseDevice)
 			continue;
-		filename = ConfigureParams.Acsi[i].sDeviceFile;
-		Log_Printf(LOG_INFO, "Mounting ACSI hard drive image %s\n", filename);
-
-		/* Check size for sanity - is the length a multiple of 512? */
-		filesize = File_Length(filename);
-		if (filesize <= 0 || (filesize & 0x1ff) != 0)
+		if (HDC_InitDevice(&AcsiBus.devs[i], ConfigureParams.Acsi[i].sDeviceFile) == 0)
 		{
-			Log_Printf(LOG_ERROR, "ERROR: HD file has strange size!\n");
-			continue;
+			bAcsiEmuOn = true;
+			nAcsiPartitions += HDC_PartitionCount(AcsiBus.devs[i].image_file, TRACE_SCSI_CMD);
 		}
-
-		fp = fopen(filename, "rb+");
-		if (fp == NULL)
-		{
-			Log_Printf(LOG_ERROR, "ERROR: cannot open HD file!\n");
-			continue;
-		}
-		if (!File_Lock(fp))
-		{
-			Log_Printf(LOG_ERROR, "ERROR: cannot lock HD file for writing!\n");
-			continue;
-		}
-		nAcsiPartitions += HDC_PartitionCount(fp, TRACE_SCSI_CMD);
-		AcsiBus.devs[i].hdSize = filesize / 512;
-		AcsiBus.devs[i].image_file = fp;
-		AcsiBus.devs[i].enabled = true;
-		bAcsiEmuOn = true;
 	}
+
+	/* SCSI */
+#if WITH_NCR5380
+	memset(&ScsiBus, 0, sizeof(ScsiBus));
+	ScsiBus.respbufsize = 512;
+	ScsiBus.resp = malloc(ScsiBus.respbufsize);
+	if (!ScsiBus.resp)
+	{
+		perror("HDC_Init");
+		return bAcsiEmuOn;
+	}
+	for (i = 0; i < MAX_SCSI_DEVS; i++)
+	{
+		if (!ConfigureParams.Scsi[i].bUseDevice)
+			continue;
+		HDC_InitDevice(&ScsiBus.devs[i], ConfigureParams.Scsi[i].sDeviceFile);
+	}
+#endif
 
 	/* set number of partitions */
 	nNumDrives += nAcsiPartitions;
@@ -800,10 +853,7 @@ void HDC_UnInit(void)
 {
 	int i;
 
-	if (!bAcsiEmuOn)
-		return;
-
-	for (i = 0; i < MAX_ACSI_DEVS; i++)
+	for (i = 0; bAcsiEmuOn && i < MAX_ACSI_DEVS; i++)
 	{
 		if (!AcsiBus.devs[i].enabled)
 			continue;
@@ -812,8 +862,25 @@ void HDC_UnInit(void)
 		AcsiBus.devs[i].image_file = NULL;
 		AcsiBus.devs[i].enabled = false;
 	}
+	free(AcsiBus.resp);
+	AcsiBus.resp = NULL;
 
-	nNumDrives -= nAcsiPartitions;
+#if WITH_NCR5380
+	for (i = 0; i < MAX_SCSI_DEVS; i++)
+	{
+		if (!ScsiBus.devs[i].enabled)
+			continue;
+		File_UnLock(ScsiBus.devs[i].image_file);
+		fclose(ScsiBus.devs[i].image_file);
+		ScsiBus.devs[i].image_file = NULL;
+		ScsiBus.devs[i].enabled = false;
+	}
+	free(ScsiBus.resp);
+	ScsiBus.resp = NULL;
+#endif
+
+	if (bAcsiEmuOn)
+		nNumDrives -= nAcsiPartitions;
 	nAcsiPartitions = 0;
 	bAcsiEmuOn = false;
 }
@@ -825,23 +892,25 @@ void HDC_UnInit(void)
  */
 void HDC_ResetCommandStatus(void)
 {
-	if (ConfigureParams.System.nMachineType != MACHINE_FALCON)
+	if (!Config_IsMachineFalcon())
 		AcsiBus.returnCode = 0;
 }
 
 
 /**
  * Process HDC command packets (SCSI/ACSI) bytes.
+ * @return true if command has been executed.
  */
-static void HDC_WriteCommandPacket(SCSI_CTRLR *ctr, Uint8 b)
+static bool HDC_WriteCommandPacket(SCSI_CTRLR *ctr, Uint8 b)
 {
+	bool bDidCmd = false;
 	SCSI_DEV *dev = &ctr->devs[ctr->target];
 
 	/* Abort if the target device is not enabled */
 	if (!dev->enabled)
 	{
 		ctr->returnCode = HD_STATUS_ERROR;
-		return;
+		return false;
 	}
 
 	/* Extract ACSI/SCSI opcode */
@@ -865,6 +934,7 @@ static void HDC_WriteCommandPacket(SCSI_CTRLR *ctr, Uint8 b)
 		if (HDC_GetLUN(ctr) == 0 || ctr->opcode == HD_INQUIRY)
 		{
 			HDC_EmulateCommandPacket(ctr);
+			bDidCmd = true;
 		}
 		else
 		{
@@ -873,9 +943,14 @@ static void HDC_WriteCommandPacket(SCSI_CTRLR *ctr, Uint8 b)
 			dev->nLastError = HD_REQSENS_INVLUN;
 			/* REQUEST SENSE is still handled for invalid LUNs */
 			if (ctr->opcode == HD_REQ_SENSE)
+			{
 				HDC_Cmd_RequestSense(ctr);
+				bDidCmd = true;
+			}
 			else
+			{
 				ctr->returnCode = HD_STATUS_ERROR;
+			}
 		}
 
 		ctr->byteCount = 0;
@@ -896,6 +971,8 @@ static void HDC_WriteCommandPacket(SCSI_CTRLR *ctr, Uint8 b)
 	{
 		ctr->returnCode = HD_STATUS_OK;
 	}
+
+	return bDidCmd;
 }
 
 /*---------------------------------------------------------------------*/
@@ -920,6 +997,7 @@ void Ncr5380_Reset(void)
  */
 static void Ncr5380_WriteByte(int addr, Uint8 byte)
 {
+#if WITH_NCR5380
 	switch (addr)
 	{
 	case 0:			/* Output Data register */
@@ -943,6 +1021,7 @@ static void Ncr5380_WriteByte(int addr, Uint8 byte)
 	default:
 		fprintf(stderr, "Unexpected NCR5380 address\n");
 	}
+#endif
 }
 
 /**
@@ -950,6 +1029,7 @@ static void Ncr5380_WriteByte(int addr, Uint8 byte)
  */
 static Uint8 Ncr5380_ReadByte(int addr)
 {
+#if WITH_NCR5380
 	switch (addr)
 	{
 	case 0:			/* Current SCSI Data register */
@@ -985,6 +1065,7 @@ static Uint8 Ncr5380_ReadByte(int addr)
 	default:
 		fprintf(stderr, "Unexpected NCR5380 address\n");
 	}
+#endif
 
 	return 0;
 }
@@ -992,6 +1073,9 @@ static Uint8 Ncr5380_ReadByte(int addr)
 
 static void Acsi_WriteCommandByte(int addr, Uint8 byte)
 {
+	/* Clear IRQ initially (will be set again if byte has been accepted) */
+	FDC_ClearHdcIRQ();
+
 	/* When the A1 pin is pushed to 0, we want to start a new command.
 	 * We ignore the pin for the second byte in the packet since this
 	 * seems to happen on real hardware too (some buggy driver relies
@@ -1015,18 +1099,25 @@ static void Acsi_WriteCommandByte(int addr, Uint8 byte)
 	else
 	{
 		/* Process normal command byte */
-		HDC_WriteCommandPacket(&AcsiBus, byte);
+		bool bDidCmd = HDC_WriteCommandPacket(&AcsiBus, byte);
+		if (bDidCmd && AcsiBus.returnCode == HD_STATUS_OK && AcsiBus.respcnt)
+		{
+			/* DMA transfer necessary */
+			Uint32 nDmaAddr = FDC_GetDMAAddress();
+			if (!STMemory_SafeCopy(nDmaAddr, AcsiBus.resp, AcsiBus.respcnt, "ACSI DMA"))
+			{
+				AcsiBus.bDmaError = true;
+				AcsiBus.returnCode = HD_STATUS_ERROR;
+			}
+			FDC_WriteDMAAddress(nDmaAddr + AcsiBus.respcnt);
+			AcsiBus.respcnt = 0;
+		}
 	}
 
 	if (AcsiBus.devs[AcsiBus.target].enabled)
 	{
 		FDC_SetDMAStatus(AcsiBus.bDmaError);	/* Mark DMA error */
 		FDC_SetIRQ(FDC_IRQ_SOURCE_HDC);
-	}
-	else
-	{
-		/* If there's no target, the interrupt line stays high */
-		MFP_GPIP |= 0x20;
 	}
 }
 
@@ -1038,7 +1129,7 @@ void HDC_WriteCommandByte(int addr, Uint8 byte)
 {
 	// fprintf(stderr, "HDC: Write cmd byte addr=%i, byte=%02x\n", addr, byte);
 
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON)
+	if (Config_IsMachineFalcon())
 		Ncr5380_WriteByte(addr, byte);
 	else if (bAcsiEmuOn)
 		Acsi_WriteCommandByte(addr, byte);
@@ -1050,7 +1141,7 @@ void HDC_WriteCommandByte(int addr, Uint8 byte)
 short int HDC_ReadCommandByte(int addr)
 {
 	Uint16 ret;
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON)
+	if (Config_IsMachineFalcon())
 		ret = Ncr5380_ReadByte(addr);
 	else
 		ret = AcsiBus.returnCode;	/* ACSI status */

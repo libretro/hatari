@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2014 The RetroArch team
+/* Copyright  (C) 2010-2015 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (config_file.c).
@@ -31,6 +31,7 @@
 #include <compat/msvc.h>
 #include <file/file_path.h>
 #include <retro_miscellaneous.h>
+#include <string/string_list.h>
 
 #if !defined(_WIN32) && !defined(__CELLOS_LV2__) && !defined(_XBOX)
 #include <sys/param.h> /* PATH_MAX */
@@ -78,7 +79,7 @@ static char *getaline(FILE *file)
       in = getc(file);
    }
    newline[idx] = '\0';
-   return newline; 
+   return newline;
 }
 
 static char *extract_value(char *line, bool is_value)
@@ -152,7 +153,7 @@ static void add_child_list(config_file_t *parent, config_file_t *child)
    /* Rebase tail. */
    if (parent->entries)
    {
-      struct config_entry_list *head = 
+      struct config_entry_list *head =
          (struct config_entry_list*)parent->entries;
 
       while (head->next)
@@ -186,7 +187,7 @@ static void add_include_list(config_file_t *conf, const char *path)
 
 static void add_sub_conf(config_file_t *conf, char *line)
 {
-   char real_path[PATH_MAX];
+   char real_path[PATH_MAX_LENGTH];
    config_file_t *sub_conf = NULL;
    char *path = extract_value(line, false);
    if (!path)
@@ -432,7 +433,7 @@ config_file_t *config_file_new_from_string(const char *from_string)
 
    conf->path = NULL;
    conf->include_depth = 0;
-   
+
    lines = string_split(from_string, "\n");
    if (!lines)
       return conf;
@@ -767,7 +768,7 @@ void config_set_path(config_file_t *conf, const char *entry, const char *val)
 #if defined(RARCH_CONSOLE)
    config_set_string(conf, entry, val);
 #else
-   char buf[PATH_MAX];
+   char buf[PATH_MAX_LENGTH];
    fill_pathname_abbreviate_special(buf, val, sizeof(buf));
    config_set_string(conf, entry, buf);
 #endif

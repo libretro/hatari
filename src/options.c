@@ -67,6 +67,7 @@ enum {
 	OPT_GRAB,
 	OPT_FRAMESKIPS,
 	OPT_SLOWDOWN,
+	OPT_MOUSE_WARP,
 	OPT_STATUSBAR,
 	OPT_DRIVE_LED,
 	OPT_MAXWIDTH,
@@ -76,6 +77,7 @@ enum {
 	OPT_RESOLUTION_ST,
 	OPT_SPEC512,
 	OPT_ZOOM,
+	OPT_VIDEO_TIMING,
 	OPT_RESOLUTION,		/* TT/Falcon display options */
 	OPT_FORCE_MAX,
 	OPT_ASPECT,
@@ -86,6 +88,7 @@ enum {
 	OPT_SCREEN_CROP,        /* screen capture options */
 	OPT_AVIRECORD,
 	OPT_AVIRECORD_VCODEC,
+	OPT_AVI_PNG_LEVEL,
 	OPT_AVIRECORD_FPS,
 	OPT_AVIRECORD_FILE,
 	OPT_JOYSTICK,		/* device options */
@@ -104,19 +107,24 @@ enum {
 	OPT_DRIVEB,
 	OPT_DRIVEA_HEADS,
 	OPT_DRIVEB_HEADS,
+	OPT_CFG,
 	OPT_DISKA,
 	OPT_DISKB,
 	OPT_SLOWFLOPPY,
 	OPT_FASTFLOPPY,
 	OPT_WRITEPROT_FLOPPY,
-	OPT_WRITEPROT_HD,
 	OPT_HARDDRIVE,
+	OPT_WRITEPROT_HD,
 	OPT_GEMDOS_CASE,
+	OPT_GEMDOS_CONVERT,
 	OPT_GEMDOS_DRIVE,
 	OPT_ACSIHDIMAGE,
 	OPT_IDEMASTERHDIMAGE,
 	OPT_IDESLAVEHDIMAGE,
 	OPT_MEMSIZE,		/* memory options */
+#if ENABLE_WINUAE_CPU
+	OPT_TT_RAM,
+#endif
 	OPT_MEMSTATE,
 	OPT_TOS,		/* ROM options */
 	OPT_PATCHTOS,
@@ -128,7 +136,7 @@ enum {
 	OPT_CPU_CYCLE_EXACT,	/* WinUAE CPU/FPU/bus options */
 	OPT_CPU_ADDR24,
 	OPT_FPU_TYPE,
-	OPT_FPU_COMPATIBLE,
+/*	OPT_FPU_JIT_COMPAT, */
 	OPT_MMU,
 #endif
 	OPT_MACHINE,		/* system options */
@@ -136,7 +144,6 @@ enum {
 	OPT_DSP,
 	OPT_TIMERD,
 	OPT_FASTBOOT,
-	OPT_RTC,
 	OPT_MICROPHONE,		/* sound options */
 	OPT_SOUND,
 	OPT_SOUNDBUFFERSIZE,
@@ -205,6 +212,8 @@ static const opt_t HatariOptions[] = {
 	  "<x>", "Skip <x> frames after each shown frame (0=off, >4=auto/max)" },
 	{ OPT_SLOWDOWN, NULL, "--slowdown",
 	  "<x>", "VBL wait time multiplier (1-8, default 1)" },
+	{ OPT_MOUSE_WARP, NULL, "--mousewarp",
+	  "<bool>", "Center host mouse on reset & resolution changes" },
 	{ OPT_STATUSBAR, NULL, "--statusbar",
 	  "<bool>", "Show statusbar (floppy leds etc)" },
 	{ OPT_DRIVE_LED,   NULL, "--drive-led",
@@ -214,7 +223,7 @@ static const opt_t HatariOptions[] = {
 	{ OPT_MAXHEIGHT, NULL, "--max-height",
 	  "<x>", "Maximum window height for borders & zooming" },
 	{ OPT_FORCEBPP, NULL, "--bpp",
-	  "<x>", "Force internal bitdepth (x = 8/15/16/32, 0=disable)" },
+	  "<x>", "Force internal bitdepth (x = 15/16/32, 0=disable)" },
 
 	{ OPT_HEADER, NULL, NULL, NULL, "ST/STE specific display" },
 	{ OPT_BORDERS, NULL, "--borders",
@@ -225,6 +234,8 @@ static const opt_t HatariOptions[] = {
 	  "<x>", "Spec512 palette threshold (0 <= x <= 512, 0=disable)" },
 	{ OPT_ZOOM, "-z", "--zoom",
 	  "<x>", "Double small resolutions (1=no, 2=yes)" },
+	{ OPT_VIDEO_TIMING,   NULL, "--video-timing",
+	  "<x>", "Wakeup State for MMU/GLUE (x=ws1/ws2/ws3/ws4/random, default ws3)" },
 
 	{ OPT_HEADER, NULL, NULL, NULL, "TT/Falcon specific display" },
 	{ OPT_RESOLUTION, NULL, "--desktop",
@@ -250,11 +261,13 @@ static const opt_t HatariOptions[] = {
 	{ OPT_AVIRECORD, NULL, "--avirecord",
 	  NULL, "Start AVI recording" },
 	{ OPT_AVIRECORD_VCODEC, NULL, "--avi-vcodec",
-	  "<x>", "Select avi video codec (x = bmp/png)" },
+	  "<x>", "Select AVI video codec (x = bmp/png)" },
+	{ OPT_AVI_PNG_LEVEL, NULL, "--png-level",
+	  "<x>", "Select AVI PNG compression level (x = 0-9)" },
 	{ OPT_AVIRECORD_FPS, NULL, "--avi-fps",
-	  "<x>", "Force avi frame rate (x = 50/60/71/...)" },
+	  "<x>", "Force AVI frame rate (x = 50/60/71/...)" },
 	{ OPT_AVIRECORD_FILE, NULL, "--avi-file",
-	  "<file>", "Use <file> to record avi" },
+	  "<file>", "Use <file> to record AVI" },
 
 	{ OPT_HEADER, NULL, NULL, NULL, "Devices" },
 	{ OPT_JOYSTICK,  "-j", "--joystick",
@@ -287,7 +300,7 @@ static const opt_t HatariOptions[] = {
 	{ OPT_RS232_OUT, NULL, "--rs232-out",
 	  "<file>", "Enable serial port and use <file> as the output device" },
 	
-	{ OPT_HEADER, NULL, NULL, NULL, "Disk" },
+	{ OPT_HEADER, NULL, NULL, NULL, "Floppy drive" },
 	{ OPT_DRIVEA, NULL, "--drive-a",
 	  "<bool>", "Enable/disable drive A (default is on)" },
 	{ OPT_DRIVEB, NULL, "--drive-b",
@@ -296,26 +309,30 @@ static const opt_t HatariOptions[] = {
 	  "<x>", "Set number of heads for drive A (1=single sided, 2=double sided)" },
 	{ OPT_DRIVEB_HEADS, NULL, "--drive-b-heads",
 	  "<x>", "Set number of heads for drive B (1=single sided, 2=double sided)" },
+	{ OPT_CFG, NULL, "--cfg",
+	  "<file>", "Set CFG" },
 	{ OPT_DISKA, NULL, "--disk-a",
 	  "<file>", "Set disk image for floppy drive A" },
 	{ OPT_DISKB, NULL, "--disk-b",
 	  "<file>", "Set disk image for floppy drive B" },
-	{ OPT_SLOWFLOPPY,   NULL, "--slowfdc",
-	  "<bool>", "Slow down floppy disk access emulation (deprecated, use --fastfdc)" },
 	{ OPT_FASTFLOPPY,   NULL, "--fastfdc",
 	  "<bool>", "Speed up floppy disk access emulation (can break some programs)" },
 	{ OPT_WRITEPROT_FLOPPY, NULL, "--protect-floppy",
 	  "<x>", "Write protect floppy image contents (on/off/auto)" },
-	{ OPT_WRITEPROT_HD, NULL, "--protect-hd",
-	  "<x>", "Write protect harddrive <dir> contents (on/off/auto)" },
+
+	{ OPT_HEADER, NULL, NULL, NULL, "Hard drive" },
 	{ OPT_HARDDRIVE, "-d", "--harddrive",
 	  "<dir>", "Emulate harddrive partition(s) with <dir> contents" },
+	{ OPT_WRITEPROT_HD, NULL, "--protect-hd",
+	  "<x>", "Write protect harddrive <dir> contents (on/off/auto)" },
 	{ OPT_GEMDOS_CASE, NULL, "--gemdos-case",
 	  "<x>", "Forcibly up/lowercase new GEMDOS dir/filenames (off/upper/lower)" },
+	{ OPT_GEMDOS_CONVERT, NULL, "--gemdos-conv",
+	  "<bool>", "Atari GEMDOS <-> host (UTF-8) file name conversion" },
 	{ OPT_GEMDOS_DRIVE, NULL, "--gemdos-drive",
 	  "<drive>", "Assign GEMDOS HD <dir> to drive letter <drive> (C-Z, skip)" },
 	{ OPT_ACSIHDIMAGE,   NULL, "--acsi",
-	  "<file>", "Emulate an ACSI harddrive with an image <file>" },
+	  "<id>=<file>", "Emulate an ACSI harddrive (0-7) with an image <file>" },
 	{ OPT_IDEMASTERHDIMAGE,   NULL, "--ide-master",
 	  "<file>", "Emulate an IDE master harddrive with an image <file>" },
 	{ OPT_IDESLAVEHDIMAGE,   NULL, "--ide-slave",
@@ -324,6 +341,10 @@ static const opt_t HatariOptions[] = {
 	{ OPT_HEADER, NULL, NULL, NULL, "Memory" },
 	{ OPT_MEMSIZE,   "-s", "--memsize",
 	  "<x>", "ST RAM size (x = size in MiB from 0 to 14, 0 = 512KiB)" },
+#if ENABLE_WINUAE_CPU
+	{ OPT_TT_RAM,   NULL, "--ttram",
+	  "<x>", "TT RAM size (x = size in MiB from 0 to 256)" },
+#endif
 	{ OPT_MEMSTATE,   NULL, "--memstate",
 	  "<file>", "Load memory snap-shot <file>" },
 
@@ -335,31 +356,33 @@ static const opt_t HatariOptions[] = {
 	{ OPT_CARTRIDGE, NULL, "--cartridge",
 	  "<file>", "Use ROM cartridge image <file>" },
 
+#if ENABLE_WINUAE_CPU
+	{ OPT_HEADER, NULL, NULL, NULL, "CPU/FPU/bus" },
+#else
 	{ OPT_HEADER, NULL, NULL, NULL, "CPU" },
+#endif
 	{ OPT_CPULEVEL,  NULL, "--cpulevel",
 	  "<x>", "Set the CPU type (x => 680x0) (EmuTOS/TOS 2.06 only!)" },
 	{ OPT_CPUCLOCK,  NULL, "--cpuclock",
 	  "<x>", "Set the CPU clock (x = 8/16/32)" },
 	{ OPT_COMPATIBLE, NULL, "--compatible",
 	  "<bool>", "Use a more compatible (but slower) 68000 CPU mode" },
-
 #if ENABLE_WINUAE_CPU
-	{ OPT_HEADER, NULL, NULL, NULL, "WinUAE CPU/FPU/bus" },
 	{ OPT_CPU_CYCLE_EXACT, NULL, "--cpu-exact",
 	  "<bool>", "Use cycle exact CPU emulation" },
 	{ OPT_CPU_ADDR24, NULL, "--addr24",
 	  "<bool>", "Use 24-bit instead of 32-bit addressing mode" },
-	{ OPT_FPU_TYPE, NULL, "--fpu-type",
+	{ OPT_FPU_TYPE, NULL, "--fpu",
 	  "<x>", "FPU type (x=none/68881/68882/internal)" },
-	{ OPT_FPU_COMPATIBLE, NULL, "--fpu-compatible",
-	  "<bool>", "Use more compatible, but slower FPU emulation" },
+	/*{ OPT_FPU_JIT_COMPAT, NULL, "--fpu-compatible",
+	  "<bool>", "Use more compatible, but slower FPU JIT emulation" },*/
 	{ OPT_MMU, NULL, "--mmu",
 	  "<bool>", "Use MMU emulation" },
 #endif
 
 	{ OPT_HEADER, NULL, NULL, NULL, "Misc system" },
 	{ OPT_MACHINE,   NULL, "--machine",
-	  "<x>", "Select machine type (x = st/ste/tt/falcon)" },
+	  "<x>", "Select machine type (x = st/megast/ste/megaste/tt/falcon)" },
 	{ OPT_BLITTER,   NULL, "--blitter",
 	  "<bool>", "Use blitter emulation (ST only)" },
 	{ OPT_DSP,       NULL, "--dsp",
@@ -368,8 +391,6 @@ static const opt_t HatariOptions[] = {
 	  "<bool>", "Patch Timer-D (about doubles ST emulation speed)" },
 	{ OPT_FASTBOOT, NULL, "--fast-boot",
 	  "<bool>", "Patch TOS and memvalid system variables for faster boot" },
-	{ OPT_RTC,    NULL, "--rtc",
-	  "<bool>", "Enable real-time clock" },
 
 	{ OPT_HEADER, NULL, NULL, NULL, "Sound" },
 	{ OPT_MICROPHONE,   NULL, "--mic",
@@ -609,6 +630,28 @@ static bool Opt_ShowError(unsigned int optid, const char *value, const char *err
 
 
 /**
+ * Return given value after constraining it within "min" and "max" values
+ * and making it evenly divisable by "align"
+ */
+int Opt_ValueAlignMinMax(int value, int align, int min, int max)
+{
+	value = (value/align)*align;
+	if (value > max)
+	{
+		/* align down */
+		return (max/align)*align;
+	}
+	if (value < min)
+	{
+		/* align up */
+		min += align-1;
+		return (min/align)*align;
+	}
+	return value;
+}
+
+
+/**
  * If 'conf' given, set it:
  * - true if given option 'arg' is y/yes/on/true/1
  * - false if given option 'arg' is n/no/off/false/0
@@ -683,6 +726,10 @@ static int Opt_CheckBracketValue(const opt_t *opt, const char *str)
 	}
 	digit = str[offset] - '0';
 	if (digit < 0 || digit > 9)
+	{
+		return OPT_CONTINUE;
+	}
+	if (str[offset+1])
 	{
 		return OPT_CONTINUE;
 	}
@@ -808,6 +855,26 @@ Uint32 Opt_GetNoParachuteFlag(void)
 
 
 /**
+ * Return true if given path points to an Atari program, false otherwise.
+ */
+bool Opt_IsAtariProgram(const char *path)
+{
+	bool ret = false;
+	Uint8 test[2];
+	FILE *fp;
+
+	if (File_Exists(path) && (fp = fopen(path, "rb"))) {
+		/* file starts with GEMDOS magic? */
+		if (fread(test, 1, 2, fp) == 2 &&
+		    test[0] == 0x60 && test[1] == 0x1A) {
+			ret = true;
+		}
+		fclose(fp);
+	}
+	return ret;
+}
+
+/**
  * Handle last (non-option) argument.  It can be a path or filename.
  * Filename can be a disk image or Atari program.
  * Return false if it's none of these.
@@ -815,32 +882,25 @@ Uint32 Opt_GetNoParachuteFlag(void)
 static bool Opt_HandleArgument(const char *path)
 {
 	char *dir = NULL;
-	Uint8 test[2];
-	FILE *fp;
 
 	/* Atari program? */
-	if (File_Exists(path) && (fp = fopen(path, "rb"))) {
-
-		/* file starts with GEMDOS magic? */
-		if (fread(test, 1, 2, fp) == 2 &&
-		    test[0] == 0x60 && test[1] == 0x1A) {
-
-			const char *prgname = strrchr(path, PATHSEP);
-			if (prgname) {
-				dir = strdup(path);
-				dir[prgname-path] = '\0';
-				prgname++;
-			} else {
-				dir = strdup(Paths_GetWorkingDir());
-				prgname = path;
-			}
-			/* after above, dir should point to valid dir,
-			 * then make sure that given program from that
-			 * dir will be started.
-			 */
-			TOS_AutoStart(prgname);
+	if (Opt_IsAtariProgram(path)) {
+		const char *prgname = strrchr(path, PATHSEP);
+		if (prgname) {
+			dir = strdup(path);
+			dir[prgname-path] = '\0';
+			prgname++;
+		} else {
+			dir = strdup(Paths_GetWorkingDir());
+			prgname = path;
 		}
-		fclose(fp);
+		Log_Printf(LOG_INFO, "ARG = autostart program: %s\n", prgname);
+
+		/* after above, dir should point to valid dir,
+		 * then make sure that given program from that
+		 * dir will be started.
+		 */
+		TOS_AutoStart(prgname);
 	}
 	if (dir) {
 		path = dir;
@@ -848,6 +908,7 @@ static bool Opt_HandleArgument(const char *path)
 
 	/* GEMDOS HDD directory (as argument, or for the Atari program)? */
 	if (File_DirExists(path)) {
+		Log_Printf(LOG_INFO, "ARG = GEMDOS HD dir: %s\n", path);
 		if (Opt_StrCpy(OPT_HARDDRIVE, false, ConfigureParams.HardDisk.szHardDiskDirectories[0],
 			       path, sizeof(ConfigureParams.HardDisk.szHardDiskDirectories[0]),
 			       &ConfigureParams.HardDisk.bUseHardDiskDirectories)
@@ -872,6 +933,7 @@ static bool Opt_HandleArgument(const char *path)
 	/* disk image? */
 	if (Floppy_SetDiskFileName(0, path, NULL))
 	{
+		Log_Printf(LOG_INFO, "ARG = floppy image: %s\n", path);
 		ConfigureParams.HardDisk.bBootFromHardDisk = false;
 		bLoadAutoSave = false;
 		return true;
@@ -886,8 +948,8 @@ static bool Opt_HandleArgument(const char *path)
  */
 bool Opt_ParseParameters(int argc, const char * const argv[])
 {
-	int ncpu, skips, zoom, planes, cpuclock, threshold, memsize, port, freq, temp;
-	const char *errstr;
+	int ncpu, skips, zoom, planes, cpuclock, threshold, memsize, port, freq, temp, drive;
+	const char *errstr, *str;
 	int i, ok = true;
 	int val;
 
@@ -1000,6 +1062,10 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 			}
 			break;
 
+		case OPT_MOUSE_WARP:
+			ok = Opt_Bool(argv[++i], OPT_MOUSE_WARP, &ConfigureParams.Screen.bMouseWarp);
+			break;
+
 		case OPT_STATUSBAR:
 			ok = Opt_Bool(argv[++i], OPT_STATUSBAR, &ConfigureParams.Screen.bShowStatusbar);
 			break;
@@ -1015,7 +1081,6 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 			case 32:
 			case 16:
 			case 15:
-			case 8:
 				break;       /* supported */
 			case 24:
 				planes = 32; /* We do not support 24 bpp (yet) */
@@ -1033,7 +1098,12 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 			break;
 
 		case OPT_RESOLUTION_ST:
+#if WITH_SDL2
+			fprintf(stderr, "The --desktop-st option is not supported in this version (with SDL2)!\n");
+			i++;
+#else
 			ok = Opt_Bool(argv[++i], OPT_RESOLUTION_ST, &ConfigureParams.Screen.bKeepResolutionST);
+#endif
 			break;
 			
 		case OPT_SPEC512:
@@ -1061,6 +1131,23 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 				ConfigureParams.Screen.nMaxHeight *= 2;
 			}
 			ConfigureParams.Screen.nMaxHeight += STATUSBAR_MAX_HEIGHT;
+			break;
+
+		case OPT_VIDEO_TIMING:
+			i += 1;
+			if (strcasecmp(argv[i], "random") == 0)
+				ConfigureParams.System.VideoTimingMode = VIDEO_TIMING_MODE_RANDOM;
+			else if (strcasecmp(argv[i], "ws1") == 0)
+				ConfigureParams.System.VideoTimingMode = VIDEO_TIMING_MODE_WS1;
+			else if (strcasecmp(argv[i], "ws2") == 0)
+				ConfigureParams.System.VideoTimingMode = VIDEO_TIMING_MODE_WS2;
+			else if (strcasecmp(argv[i], "ws3") == 0)
+				ConfigureParams.System.VideoTimingMode = VIDEO_TIMING_MODE_WS3;
+			else if (strcasecmp(argv[i], "ws4") == 0)
+				ConfigureParams.System.VideoTimingMode = VIDEO_TIMING_MODE_WS4;
+			else
+				return Opt_ShowError(OPT_VIDEO_TIMING, argv[i], "Unknown video timing mode");
+			fprintf(stderr, "\nvideo-timing : Work in progress, this option has no effect at the moment\n\n");
 			break;
 
 			/* Falcon/TT display options */
@@ -1107,6 +1194,12 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 			{
 				return Opt_ShowError(OPT_AVIRECORD_VCODEC, argv[i], "Unknown video codec");
 			}
+			break;
+
+		case OPT_AVI_PNG_LEVEL:
+			i += 1;
+			if (!Avi_SetCompressionLevel(argv[i]))
+				return Opt_ShowError(OPT_AVI_PNG_LEVEL, argv[i], "Invalid compression level");
 			break;
 
 		case OPT_AVIRECORD_FPS:
@@ -1185,7 +1278,10 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 		case OPT_JOYSTICK4:
 		case OPT_JOYSTICK5:
 			port = argv[i][strlen(argv[i])-1] - '0';
-			assert(port >= 0 && port < JOYSTICK_COUNT);
+			if (port < 0 || port >= JOYSTICK_COUNT)
+			{
+				return Opt_ShowError(OPT_JOYSTICK0, argv[i], "Invalid joystick port");
+			}
 			i += 1;
 			if (strcasecmp(argv[i], "none") == 0)
 			{
@@ -1278,7 +1374,6 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 			else
 				return Opt_ShowError(OPT_ERROR, argv[i], "Not a disk image");
 			break;
-
 		case OPT_DISKB:
 			i += 1;
 			if (Floppy_SetDiskFileName(1, argv[i], NULL))
@@ -1332,20 +1427,24 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 				return Opt_ShowError(OPT_GEMDOS_CASE, argv[i], "Unknown option value");
 			break;
 
+		case OPT_GEMDOS_CONVERT:
+			ok = Opt_Bool(argv[++i], OPT_GEMDOS_CONVERT, &ConfigureParams.HardDisk.bFilenameConversion);
+			break;
+
 		case OPT_GEMDOS_DRIVE:
 			i += 1;
 			if (strcasecmp(argv[i], "skip") == 0)
 			{
-				ConfigureParams.HardDisk.nHardDiskDrive = DRIVE_SKIP;
+				ConfigureParams.HardDisk.nGemdosDrive = DRIVE_SKIP;
 				break;
 			}
 			else if (strlen(argv[i]) == 1)
 			{
-				int drive = toupper(argv[i][0]);
+				drive = toupper(argv[i][0]);
 				if (drive >= 'C' && drive <= 'Z')
 				{
 					drive = drive - 'C' + DRIVE_C;
-					ConfigureParams.HardDisk.nHardDiskDrive = drive;
+					ConfigureParams.HardDisk.nGemdosDrive = drive;
 					break;
 				}
 			}
@@ -1371,9 +1470,21 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 
 		case OPT_ACSIHDIMAGE:
 			i += 1;
-			ok = Opt_StrCpy(OPT_ACSIHDIMAGE, true, ConfigureParams.Acsi[0].sDeviceFile,
-					argv[i], sizeof(ConfigureParams.Acsi[0].sDeviceFile),
-					&ConfigureParams.Acsi[0].bUseDevice);
+			str = argv[i];
+			if (strlen(str) > 2 && isdigit(str[0]) && str[1] == '=')
+			{
+				drive = str[0] - '0';
+				if (drive < 0 || drive > 7)
+					return Opt_ShowError(OPT_ACSIHDIMAGE, str, "Invalid ACSI drive <id>, must be 0-7");
+				str += 2;
+			}
+			else
+			{
+				drive = 0;
+			}
+			ok = Opt_StrCpy(OPT_ACSIHDIMAGE, true, ConfigureParams.Acsi[drive].sDeviceFile,
+					str, sizeof(ConfigureParams.Acsi[drive].sDeviceFile),
+					&ConfigureParams.Acsi[drive].bUseDevice);
 			if (ok)
 			{
 				bLoadAutoSave = false;
@@ -1412,6 +1523,14 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 			ConfigureParams.Memory.nMemorySize = memsize;
 			bLoadAutoSave = false;
 			break;
+
+#if ENABLE_WINUAE_CPU
+		case OPT_TT_RAM:
+			memsize = atoi(argv[++i]);
+			ConfigureParams.Memory.nTTRamSize = Opt_ValueAlignMinMax(memsize+3, 4, 0, 256);
+			bLoadAutoSave = false;
+			break;
+#endif
 
 		case OPT_TOS:
 			i += 1;
@@ -1455,10 +1574,16 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 		case OPT_CPULEVEL:
 			/* UAE core uses cpu_level variable */
 			ncpu = atoi(argv[++i]);
+#if ENABLE_WINUAE_CPU
+			if(ncpu < 0 || ncpu == 5 || ncpu > 6)
+#else
 			if(ncpu < 0 || ncpu > 4)
+#endif
 			{
 				return Opt_ShowError(OPT_CPULEVEL, argv[i], "Invalid CPU level");
 			}
+			if ( ncpu == 6 )			/* Special case for 68060, nCpuLevel should be 5 */
+				ncpu = 5;
 			ConfigureParams.System.nCpuLevel = ncpu;
 			bLoadAutoSave = false;
 			break;
@@ -1515,11 +1640,11 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 			}
 			bLoadAutoSave = false;
 			break;
-
-		case OPT_FPU_COMPATIBLE:
+/*
+		case OPT_FPU_JIT_COMPAT:
 			ok = Opt_Bool(argv[++i], OPT_FPU_COMPATIBLE, &ConfigureParams.System.bCompatibleFPU);
 			break;
-
+*/
 		case OPT_MMU:
 			ok = Opt_Bool(argv[++i], OPT_MMU, &ConfigureParams.System.bMMU);
 			bLoadAutoSave = false;
@@ -1535,11 +1660,23 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 				ConfigureParams.System.nCpuLevel = 0;
 				ConfigureParams.System.nCpuFreq = 8;
 			}
+			else if (strcasecmp(argv[i], "megast") == 0)
+			{
+				ConfigureParams.System.nMachineType = MACHINE_MEGA_ST;
+				ConfigureParams.System.nCpuLevel = 0;
+				ConfigureParams.System.nCpuFreq = 8;
+			}
 			else if (strcasecmp(argv[i], "ste") == 0)
 			{
 				ConfigureParams.System.nMachineType = MACHINE_STE;
 				ConfigureParams.System.nCpuLevel = 0;
 				ConfigureParams.System.nCpuFreq = 8;
+			}
+			else if (strcasecmp(argv[i], "megaste") == 0)
+			{
+				ConfigureParams.System.nMachineType = MACHINE_MEGA_STE;
+				ConfigureParams.System.nCpuLevel = 0;
+				ConfigureParams.System.nCpuFreq = 16;
 			}
 			else if (strcasecmp(argv[i], "tt") == 0)
 			{
@@ -1561,17 +1698,18 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 				return Opt_ShowError(OPT_MACHINE, argv[i], "Unknown machine type");
 			}
 #if ENABLE_WINUAE_CPU
-			if (ConfigureParams.System.nMachineType == MACHINE_ST ||
-			    ConfigureParams.System.nMachineType == MACHINE_STE)
+			if (Config_IsMachineST() || Config_IsMachineSTE())
 			{
 				ConfigureParams.System.bMMU = false;
 				ConfigureParams.System.bAddressSpace24 = true;
 			}
-			if (ConfigureParams.System.nMachineType == MACHINE_TT)
+			if (Config_IsMachineTT())
 			{
 				ConfigureParams.System.bCompatibleFPU = true;
 				ConfigureParams.System.n_FPUType = FPU_68882;
-			} else {
+			}
+			else
+			{
 				ConfigureParams.System.n_FPUType = FPU_NONE;	/* TODO: or leave it as-is? */
 			}
 #endif
@@ -1591,10 +1729,6 @@ bool Opt_ParseParameters(int argc, const char * const argv[])
 			break;
 		case OPT_FASTBOOT:
 			ok = Opt_Bool(argv[++i], OPT_FASTBOOT, &ConfigureParams.System.bFastBoot);
-			break;
-
-		case OPT_RTC:
-			ok = Opt_Bool(argv[++i], OPT_RTC, &ConfigureParams.System.bRealTimeClock);
 			break;
 
 		case OPT_DSP:
@@ -1873,7 +2007,7 @@ char *Opt_MatchOption(const char *text, int state)
 		i = 0;
 	}
 	/* next match */
-	while (i < ARRAYSIZE(HatariOptions)) {
+	while (i < ARRAY_SIZE(HatariOptions)) {
 		name = HatariOptions[i++].str;
 		if (name && strncasecmp(name, text, len) == 0)
 			return (strdup(name));

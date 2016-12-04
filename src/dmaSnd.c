@@ -150,8 +150,8 @@ struct dma_s {
 	Sint16 FrameRight;
 };
 
-Sint64	frameCounter_float = 0;
-bool	DmaInitSample = false;
+static Sint64	frameCounter_float = 0;
+static bool	DmaInitSample = false;
 
 
 struct microwire_s {
@@ -292,6 +292,12 @@ void DmaSnd_MemorySnapShot_Capture(bool bSave)
  * when 2 bytes or more are missing.
  * When end of frame is reached, we continue with a new frame if loop mode
  * is on, else we stop DMA Audio.
+ *
+ * NOTE : as verified on real STE, if frameEndAddr == frameStartAddr and
+ * repeat is ON, then frame counter is increased anyway and end of frame
+ * interrupt is not generated. In that case, the FIFO is updated
+ * and sound should be played (this will be the same as playing a 2^24 bytes
+ * sample) (eg 'A Little Bit Insane' demo by Lazer)
  */
 static void DmaSnd_FIFO_Refill(void)
 {
@@ -299,13 +305,6 @@ static void DmaSnd_FIFO_Refill(void)
 	if ( ( nDmaSoundControl & DMASNDCTRL_PLAY ) == 0)
 		return;
 
-	/* If End Address == Start Address, don't update the FIFO */
-	if (dma.frameEndAddr == dma.frameStartAddr)
-	{
-		DmaSnd_EndOfFrameReached();			/* Stop dma audio if loop mode is off */
-		return;
-	}
-	
 	/* Refill the whole FIFO */
 	while ( DMASND_FIFO_SIZE - dma.FIFO_NbBytes >= 2 )
 	{
@@ -414,6 +413,10 @@ static int DmaSnd_DetectSampleRate(void)
  * This function is called when a new sound frame is started.
  * It copies the start and end address from the I/O registers and set
  * the frame counter addr to the start of this new frame.
+ *
+ * NOTE : as verified on real STE, if frameEndAddr == frameStartAddr and
+ * repeat is OFF, then DMA sound is turned off immediately and end of frame
+ * interrupt is not generated (eg 'Amberstar cracktro' by DNT Crew / Fuzion)
  */
 static void DmaSnd_StartNewFrame(void)
 {
@@ -423,6 +426,12 @@ static void DmaSnd_StartNewFrame(void)
 	dma.frameCounterAddr = dma.frameStartAddr;
 
 	LOG_TRACE(TRACE_DMASND, "DMA snd new frame start=%x end=%x\n", dma.frameStartAddr, dma.frameEndAddr);
+
+	if ( ( dma.frameStartAddr == dma.frameEndAddr ) && ( ( nDmaSoundControl & DMASNDCTRL_PLAYLOOP ) == 0 ) )
+	{
+		nDmaSoundControl &= ~DMASNDCTRL_PLAY;
+		LOG_TRACE(TRACE_DMASND, "DMA snd stopped because new frame start=end=%x and repeat=off\n", dma.frameStartAddr);
+	}
 }
 
 
@@ -512,6 +521,12 @@ void DmaSnd_GenerateSamples(int nMixBufIdx, int nSamplesToGenerate)
 
 		return;
 	}
+
+	/* DMA Anti-alias filter */
+	if (DmaSnd_DetectSampleRate() >  nAudioFrequency)
+		DmaSnd_LowPass = true;
+	else
+		DmaSnd_LowPass = false;
 
 
 	/* DMA Audio ON or FIFO not empty yet */
@@ -659,10 +674,8 @@ static void DmaSnd_Apply_LMC(int nMixBufIdx, int nSamplesToGenerate)
  */
 void DmaSnd_STE_HBL_Update(void)
 {
-	if ( ( ConfigureParams.System.nMachineType != MACHINE_STE )
-	  && ( ConfigureParams.System.nMachineType != MACHINE_MEGA_STE ) )
+	if (!Config_IsMachineSTE())
 		return;
-
 
 	/* The DMA starts refilling the FIFO when display is OFF (eg cycle 376 in low res 50 Hz) */
 	DmaSnd_FIFO_Refill ();
@@ -721,7 +734,7 @@ void DmaSnd_SoundControl_ReadWord(void)
  */
 void DmaSnd_SoundControl_WriteWord(void)
 {
-	Uint16 nNewSndCtrl;
+	Uint16 DMASndCtrl_old;
 
 	if(LOG_TRACE_LEVEL(TRACE_DMASND))
 	{
@@ -735,21 +748,20 @@ void DmaSnd_SoundControl_WriteWord(void)
         /* Before starting/stopping DMA sound, create samples up until this point with current values */
 	Sound_Update(false);
 
-	nNewSndCtrl = IoMem_ReadWord(0xff8900) & 3;
+	DMASndCtrl_old = nDmaSoundControl;
+	nDmaSoundControl = IoMem_ReadWord(0xff8900) & 3;
 
-	if (!(nDmaSoundControl & DMASNDCTRL_PLAY) && (nNewSndCtrl & DMASNDCTRL_PLAY))
+	if (!(DMASndCtrl_old & DMASNDCTRL_PLAY) && (nDmaSoundControl & DMASNDCTRL_PLAY))
 	{
 		LOG_TRACE(TRACE_DMASND, "DMA snd control write: starting dma sound output\n");
 		DmaInitSample = true;
 		frameCounter_float = 0;
-		DmaSnd_StartNewFrame();
+		DmaSnd_StartNewFrame();			/* this can clear DMASNDCTRL_PLAY */
 	}
-	else if ((nDmaSoundControl & DMASNDCTRL_PLAY) && !(nNewSndCtrl & DMASNDCTRL_PLAY))
+	else if ((DMASndCtrl_old & DMASNDCTRL_PLAY) && !(nDmaSoundControl & DMASNDCTRL_PLAY))
 	{
 		LOG_TRACE(TRACE_DMASND, "DMA snd control write: stopping dma sound output\n");
 	}
-
-	nDmaSoundControl = nNewSndCtrl;
 }
 
 
@@ -797,6 +809,9 @@ void DmaSnd_FrameStartHigh_WriteByte(void)
 			IoMem_ReadByte(0xff8903) , dma.frameCounterAddr - dma.frameStartAddr , dma.frameEndAddr - dma.frameStartAddr  ,
 			FrameCycles, LineCycles, HblCounterVideo, M68000_GetPC(), CurrentInstrCycles);
 	}
+
+	/* On STF/STE machines with <= 4MB of RAM, DMA addresses are limited to $3fffff */
+	IoMem[ 0xff8903 ] &= DMA_MaskAddressHigh();
 }
 
 void DmaSnd_FrameStartMed_WriteByte(void)
@@ -821,6 +836,9 @@ void DmaSnd_FrameStartLow_WriteByte(void)
 			IoMem_ReadByte(0xff8907) , dma.frameCounterAddr - dma.frameStartAddr , dma.frameEndAddr - dma.frameStartAddr  ,
 			FrameCycles, LineCycles, HblCounterVideo, M68000_GetPC(), CurrentInstrCycles);
 	}
+
+	/* DMA address must be word-aligned, bit 0 at $ff8907 is always 0 */
+	IoMem[ 0xff8907 ] &= 0xfe;
 }
 
 void DmaSnd_FrameCountHigh_WriteByte(void)
@@ -833,6 +851,9 @@ void DmaSnd_FrameCountHigh_WriteByte(void)
 			IoMem_ReadByte(0xff8909) , dma.frameCounterAddr - dma.frameStartAddr , dma.frameEndAddr - dma.frameStartAddr  ,
 			FrameCycles, LineCycles, HblCounterVideo, M68000_GetPC(), CurrentInstrCycles);
 	}
+
+	/* On STF/STE machines with <= 4MB of RAM, DMA addresses are limited to $3fffff */
+	IoMem[ 0xff8909 ] &= DMA_MaskAddressHigh();
 }
 
 void DmaSnd_FrameCountMed_WriteByte(void)
@@ -869,6 +890,9 @@ void DmaSnd_FrameEndHigh_WriteByte(void)
 			IoMem_ReadByte(0xff890f) , dma.frameCounterAddr - dma.frameStartAddr , dma.frameEndAddr - dma.frameStartAddr  ,
 			FrameCycles, LineCycles, HblCounterVideo, M68000_GetPC(), CurrentInstrCycles);
 	}
+
+	/* On STF/STE machines with <= 4MB of RAM, DMA addresses are limited to $3fffff */
+	IoMem[ 0xff890f ] &= DMA_MaskAddressHigh();
 }
 
 void DmaSnd_FrameEndMed_WriteByte(void)
@@ -893,6 +917,9 @@ void DmaSnd_FrameEndLow_WriteByte(void)
 			IoMem_ReadByte(0xff8913) , dma.frameCounterAddr - dma.frameStartAddr , dma.frameEndAddr - dma.frameStartAddr  ,
 			FrameCycles, LineCycles, HblCounterVideo, M68000_GetPC(), CurrentInstrCycles);
 	}
+
+	/* DMA address must be word-aligned, bit 0 at $ff8613 is always 0 */
+	IoMem[ 0xff8913 ] &= 0xfe;
 }
 
 
@@ -961,13 +988,18 @@ void DmaSnd_InterruptHandler_Microwire(void)
 	int	cmd_len;
 
 	/* If emulated computer is the Falcon, let's the crossbar Microwire code do the job. */
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON) {
+	if (Config_IsMachineFalcon())
+	{
 		Crossbar_InterruptHandler_Microwire();
 		return;
 	}
 	
 	/* How many cycle was this sound interrupt delayed (>= 0) */
+#ifdef OLD_CPU_SHIFT
 	microwire.pendingCyclesOver += -INT_CONVERT_FROM_INTERNAL ( PendingInterruptCount , INT_CPU_CYCLE );
+#else
+	microwire.pendingCyclesOver += -INT_CONVERT_FROM_INTERNAL ( PendingInterruptCount , INT_CPU8_CYCLE );
+#endif
 	/* Remove this interrupt from list and re-order */
 	CycInt_AcknowledgeInterrupt();
 
@@ -990,7 +1022,11 @@ void DmaSnd_InterruptHandler_Microwire(void)
 	{
 		/* No ==> start a new internal interrupt to continue to transfer the data */
 		microwire.pendingCyclesOver = 8 - microwire.pendingCyclesOver;
+#ifdef OLD_CPU_SHIFT
 		CycInt_AddRelativeInterrupt(microwire.pendingCyclesOver, INT_CPU_CYCLE, INTERRUPT_DMASOUND_MICROWIRE);
+#else
+		CycInt_AddRelativeInterrupt(microwire.pendingCyclesOver, INT_CPU8_CYCLE, INTERRUPT_DMASOUND_MICROWIRE);
+#endif
 	}
 	else 
 	{
@@ -1119,7 +1155,11 @@ void DmaSnd_MicrowireData_WriteWord(void)
 		/* Start shifting events to simulate a microwire transfer */
 		microwire.mwTransferSteps = 16;
 		microwire.pendingCyclesOver = 8;
+#ifdef OLD_CPU_SHIFT
 		CycInt_AddRelativeInterrupt(microwire.pendingCyclesOver, INT_CPU_CYCLE, INTERRUPT_DMASOUND_MICROWIRE);
+#else
+		CycInt_AddRelativeInterrupt(microwire.pendingCyclesOver, INT_CPU8_CYCLE, INTERRUPT_DMASOUND_MICROWIRE);
+#endif
 	}
 
 	if(LOG_TRACE_LEVEL(TRACE_DMASND))
@@ -1236,16 +1276,14 @@ static Sint16 DmaSnd_LowPassFilterLeft(Sint16 in)
 	static	Sint16	out = 0;
 
 	if (DmaSnd_LowPass)
-	{
 		out = lowPassFilter[0] + (lowPassFilter[1]<<1) + in;
-		lowPassFilter[0] = lowPassFilter[1];
-		lowPassFilter[1] = in;
+	else
+		out = lowPassFilter[1] << 2;
 
-		return out; /* Filter Gain = 4 */
-	}else
-	{
-		return in << 2;
-	}
+	lowPassFilter[0] = lowPassFilter[1];
+	lowPassFilter[1] = in;
+
+	return out; /* Filter Gain = 4 */
 }
 
 /**
@@ -1257,16 +1295,14 @@ static Sint16 DmaSnd_LowPassFilterRight(Sint16 in)
 	static	Sint16	out = 0;
 
 	if (DmaSnd_LowPass)
-	{
 		out = lowPassFilter[0] + (lowPassFilter[1]<<1) + in;
-		lowPassFilter[0] = lowPassFilter[1];
-		lowPassFilter[1] = in;
+	else
+		out = lowPassFilter[1] << 2;
 
-		return out; /* Filter Gain = 4 */
-	}else
-	{
-		return in << 2;
-	}
+	lowPassFilter[0] = lowPassFilter[1];
+	lowPassFilter[1] = in;
+
+	return out; /* Filter Gain = 4 */
 }
 
 /**
@@ -1381,10 +1417,4 @@ void DmaSnd_Init_Bass_and_Treble_Tables(void)
 	/* Initialize IIR Filter Gain and use as a Volume Control */
 	lmc1992.left_gain = (microwire.leftVolume * (Uint32)microwire.masterVolume) * (2.0/(65536.0*65536.0));
 	lmc1992.right_gain = (microwire.rightVolume * (Uint32)microwire.masterVolume) * (2.0/(65536.0*65536.0));
-
-	/* Anti-alias filter is not required when nAudioFrequency == 50066 Hz */
-	if (nAudioFrequency>50000 && nAudioFrequency<50100)
-		DmaSnd_LowPass = false;
-	else
-		DmaSnd_LowPass = true;
 }

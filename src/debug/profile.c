@@ -1,7 +1,7 @@
 /*
  * Hatari - profile.c
  * 
- * Copyright (C) 2010-2013 by Eero Tamminen
+ * Copyright (C) 2010-2015 by Eero Tamminen
  *
  * This file is distributed under the GNU General Public License, version 2
  * or at your option any later version. Read the file gpl.txt for details.
@@ -72,9 +72,10 @@ static bool output_counter_info(FILE *fp, counters_t *counter)
 	 */
 	fprintf(fp, " %"PRIu64"/%"PRIu64"/%"PRIu64"",
 		counter->calls, counter->count, counter->cycles);
-	if (counter->misses) {
+	if (counter->i_misses) {
 		/* these are only with specific WinUAE CPU core */
-		fprintf(fp, "/%"PRIu64"", counter->misses);
+		fprintf(fp, "/%"PRIu64"/%"PRIu64"",
+			counter->i_misses, counter->d_hits);
 	}
 	return true;
 }
@@ -90,7 +91,7 @@ static void output_caller_info(FILE *fp, caller_t *info, Uint32 *typeaddr)
 	if (info->flags) {	/* calltypes supported? */
 		fputc(' ', fp);
 		typecount = 0;
-		for (k = 0; k < ARRAYSIZE(flaginfo); k++) {
+		for (k = 0; k < ARRAY_SIZE(flaginfo); k++) {
 			if (info->flags & flaginfo[k].bit) {
 				fputc(flaginfo[k].chr, fp);
 				typecount++;
@@ -127,10 +128,10 @@ void Profile_ShowCallers(FILE *fp, int sites, callee_t *callsite, const char * (
 	/* legend */
 	fputs("# <callee>: <caller1> = <calls> <types>[ <inclusive/totals>[ <exclusive/totals>]], <caller2> ..., <callee name>", fp);
 	fputs("\n# types: ", fp);
-	for (i = 0; i < ARRAYSIZE(flaginfo); i++) {
+	for (i = 0; i < ARRAY_SIZE(flaginfo); i++) {
 		fprintf(fp, "%c = %s, ", flaginfo[i].chr, flaginfo[i].info);
 	}
-	fputs("\n# totals: calls/instructions/cycles/misses\n", fp);
+	fputs("\n# totals: calls/instructions/cycles/i-misses/d-hits\n", fp);
 
 	countdiff = 0;
 	countissues = 0;
@@ -189,7 +190,8 @@ static void add_counter_costs(counters_t *dst, counters_t *src)
 	dst->calls += src->calls;
 	dst->count += src->count;
 	dst->cycles += src->cycles;
-	dst->misses += src->misses;
+	dst->i_misses += src->i_misses;
+	dst->d_hits += src->d_hits;
 }
 
 /**
@@ -200,7 +202,8 @@ static void set_counter_diff(counters_t *dst, counters_t *ref)
 	dst->calls = ref->calls - dst->calls;
 	dst->count = ref->count - dst->count;
 	dst->cycles = ref->cycles - dst->cycles;
-	dst->misses = ref->misses - dst->misses;
+	dst->i_misses = ref->i_misses - dst->i_misses;
+	dst->d_hits = ref->d_hits - dst->d_hits;
 }
 
 /**
@@ -496,10 +499,10 @@ void Profile_FreeCallinfo(callinfo_t *callinfo)
 char *Profile_Match(const char *text, int state)
 {
 	static const char *names[] = {
-		"addresses", "callers", "counts", "cycles", "loops", "misses",
-		"off", "on", "save", "stack", "stats", "symbols"
+		"addresses", "callers", "caches", "counts", "cycles", "d-hits", "i-misses",
+		"loops", "off", "on", "save", "stack", "stats", "symbols"
 	};
-	return DebugUI_MatchHelper(names, ARRAYSIZE(names), text, state);
+	return DebugUI_MatchHelper(names, ARRAY_SIZE(names), text, state);
 }
 
 const char Profile_Description[] =
@@ -510,10 +513,12 @@ const char Profile_Description[] =
 	"\t- off\n"
 	"\t- counts [count]\n"
 	"\t- cycles [count]\n"
-	"\t- misses [count]\n"
+	"\t- i-misses [count]\n"
+	"\t- d-hits [count]\n"
 	"\t- symbols [count]\n"
 	"\t- addresses [address]\n"
 	"\t- callers\n"
+	"\t- caches\n"
 	"\t- stack\n"
 	"\t- stats\n"
 	"\t- save <file>\n"
@@ -524,9 +529,11 @@ const char Profile_Description[] =
 	"\tstatistics ('stats') summary.\n"
 	"\n"
 	"\tThen you can ask for list of the PC addresses, sorted either by\n"
-	"\texecution 'counts', used 'cycles' or cache 'misses'. First can\n"
-	"\tbe limited just to named addresses with 'symbols'.  Optional\n"
-	"\tcount will limit how many items will be shown.\n"
+	"\texecution 'counts', used 'cycles', i-cache misses or d-cache hits.\n"
+	"\tFirst can be limited just to named addresses with 'symbols'.\n"
+	"\tOptional count will limit how many items will be shown.\n"
+	"\n"
+	"\t'caches' shows histogram of CPU cache usage.\n"
 	"\n"
 	"\t'addresses' lists the profiled addresses in order, with the\n"
 	"\tinstructions (currently) residing at them.  By default this\n"
@@ -691,11 +698,23 @@ int Profile_Command(int nArgc, char *psArgs[], bool bForDsp)
 		} else {
 			Profile_CpuShowStats();
 		}
-	} else if (strcmp(psArgs[1], "misses") == 0) {
+	} else if (strcmp(psArgs[1], "i-misses") == 0) {
 		if (bForDsp) {
-			fprintf(stderr, "Cache misses are recorded only for CPU, not DSP.\n");
+			fprintf(stderr, "Cache information is recorded only for CPU, not DSP.\n");
 		} else {
-			Profile_CpuShowMisses(show);
+			Profile_CpuShowInstrMisses(show);
+		}
+	} else if (strcmp(psArgs[1], "d-hits") == 0) {
+		if (bForDsp) {
+			fprintf(stderr, "Cache information is recorded only for CPU, not DSP.\n");
+		} else {
+			Profile_CpuShowDataHits(show);
+		}
+	} else if (strcmp(psArgs[1], "caches") == 0) {
+		if (bForDsp) {
+			fprintf(stderr, "Cache information is recorded only for CPU, not DSP.\n");
+		} else {
+			Profile_CpuShowCaches();
 		}
 	} else if (strcmp(psArgs[1], "cycles") == 0) {
 		if (bForDsp) {

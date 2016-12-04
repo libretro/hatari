@@ -6,10 +6,12 @@
 #include "SDL_keysym.h"
 
 typedef struct{
-  Uint8 scancode;
+
+  unsigned char scancode;
   SDLKey sym;
   SDLMod mod;
-  Uint16 unicode;
+  unsigned short unicode;
+
 } SDL_keysym;
 
 #endif

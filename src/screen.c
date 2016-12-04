@@ -28,25 +28,24 @@ const char Screen_fileid[] = "Hatari screen.c : " __DATE__ " " __TIME__;
 
 #include <SDL.h>
 #include <SDL_endian.h>
+#include <assert.h>
 
 #include "main.h"
 #include "configuration.h"
 #include "avi_record.h"
-#include "ikbd.h"
 #include "log.h"
-#include "m68000.h"
 #include "paths.h"
+#include "options.h"
 #include "screen.h"
+#include "screenConvert.h"
 #include "control.h"
 #include "convert/routines.h"
 #include "resolution.h"
-#include "sound.h"
 #include "spec512.h"
 #include "statusbar.h"
 #include "vdi.h"
 #include "video.h"
 #include "falcon/videl.h"
-#include "falcon/hostscreen.h"
 
 #define DEBUG 0
 
@@ -60,9 +59,9 @@ const char Screen_fileid[] = "Hatari screen.c : " __DATE__ " " __TIME__;
 SDL_Surface *sdlscrn = NULL;                /* The SDL screen surface */
 int nScreenZoomX, nScreenZoomY;             /* Zooming factors, used for scaling mouse motions */
 int nBorderPixelsLeft, nBorderPixelsRight;  /* Pixels in left and right border */
-int nBorderPixelsTop, nBorderPixelsBottom;  /* Lines in top and bottom border */
+static int nBorderPixelsTop, nBorderPixelsBottom;  /* Lines in top and bottom border */
 
-/* extern for shortcuts and falcon/hostscreen.c */
+/* extern for shortcuts etc. */
 bool bGrabMouse = false;      /* Grab the mouse cursor in the window */
 bool bInFullScreen = false;   /* true if in full screen */
 
@@ -90,16 +89,14 @@ static int STScreenLineOffset[NUM_VISIBLE_LINES];  /* Offsets for ST screen line
 static Uint16 HBLPalette[16], PrevHBLPalette[16];  /* Current palette for line, also copy of first line */
 
 static void (*ScreenDrawFunctionsNormal[3])(void); /* Screen draw functions */
-static void (*ScreenDrawFunctionsVDI[3])(void) =
-{
-	ConvertVDIRes_16Colour,
-	ConvertVDIRes_4Colour,
-	ConvertVDIRes_2Colour
-};
 
 static bool bScreenContentsChanged;     /* true if buffer changed and requires blitting */
 static bool bScrDoubleY;                /* true if double on Y */
 static int ScrUpdateFlag;               /* Bit mask of how to update screen */
+
+/* These are used for the generic screen conversion functions */
+static int genconv_width_req, genconv_height_req, genconv_bpp;
+static bool genconv_do_update;          /* HW surface is available -> the SDL need not to update the surface after ->pixel access */
 
 
 static bool Screen_DrawFrame(bool bForceFlip);
@@ -112,24 +109,10 @@ static SDL_Texture *sdlTexture;
 
 void SDL_UpdateRects(SDL_Surface *screen, int numrects, SDL_Rect *rects)
 {
-	if (sdlscrn->format->BitsPerPixel == 8)
-	{
-		sdlTexture = SDL_CreateTextureFromSurface(sdlRenderer, screen);
-	}
-	else
-	{
-		SDL_UpdateTexture(sdlTexture, NULL, screen->pixels, screen->pitch);
-	}
-
+	SDL_UpdateTexture(sdlTexture, NULL, screen->pixels, screen->pitch);
 	SDL_RenderClear(sdlRenderer);
 	SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
 	SDL_RenderPresent(sdlRenderer);
-
-	if (sdlscrn->format->BitsPerPixel == 8)
-	{
-		SDL_DestroyTexture(sdlTexture);
-		sdlTexture = NULL;
-	}
 }
 
 void SDL_UpdateRect(SDL_Surface *screen, Sint32 x, Sint32 y, Sint32 w, Sint32 h)
@@ -184,120 +167,23 @@ static void Screen_SetupRGBTable(void)
 }
 
 
-/*-----------------------------------------------------------------------*/
 /**
- * Create new palette for display.
+ * Convert 640x400 monochrome screen
  */
-static void Screen_CreatePalette(void)
+static void Screen_ConvertHighRes(void)
 {
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-	static const int endiantable[16] = {0,2,1,3,8,10,9,11,4,6,5,7,12,14,13,15};
-#endif
-	SDL_Color sdlColors[16];
-	int i, j;
+	int linewidth = 640 / 16;
 
-	if (bUseHighRes)
-	{
-		/* Colors for monochrome screen mode emulation */
-		if (HBLPalettes[0])
-		{
-			sdlColors[0].r = sdlColors[0].g = sdlColors[0].b = 255;
-			sdlColors[1].r = sdlColors[1].g = sdlColors[1].b = 0;
-		}
-		else
-		{
-			sdlColors[0].r = sdlColors[0].g = sdlColors[0].b = 0;
-			sdlColors[1].r = sdlColors[1].g = sdlColors[1].b = 255;
-		}
-		SDL_SetColors(sdlscrn, sdlColors, 10, 2);
-		/*SDL_SetColors(sdlscrn, sdlColors, 0, 2);*/
-	}
-	else
-	{
-		int r, g, b;
-		/* Colors for STe color screen mode emulation */
-		for (i = 0; i < 16; i++)
-		{
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-			j = endiantable[i];
-#else
-			j = i;
-#endif
-			/* normalize all to 0x1e0 */
-			r = HBLPalettes[i] >> 3;
-			g = HBLPalettes[i] << 1;
-			b = HBLPalettes[i] << 5;
-			/* move top bit of 0x1e0 to lowest in 0xf0 */
-			r = (r & 0xe0) | ((r & 0x100) >> 4);
-			g = (g & 0xe0) | ((g & 0x100) >> 4);
-			b = (b & 0xe0) | ((b & 0x100) >> 4);
-			/* Set color in table */
-			sdlColors[j].r = r | (r >> 4);
-			sdlColors[j].g = g | (g >> 4);
-			sdlColors[j].b = b | (b >> 4);
-		}
-		SDL_SetColors(sdlscrn, sdlColors, 10, 16);
-	}
+	Screen_GenConvert(pSTScreen, 640, 400, 1, linewidth, 0, 0, 0, 0, 0);
+	bScreenContentsChanged = true;
 }
 
-
-/*-----------------------------------------------------------------------*/
-/**
- * Create 8-Bit palette for display if needed.
- */
-static void Screen_Handle8BitPalettes(void)
-{
-	bool bPaletteChanged = false;
-	int i;
-
-	/* Do need to check for 8-Bit palette change? Ie, update whole screen */
-	/* VDI screens and monochrome modes are ALL 8-Bit at the moment! */
-	if (sdlscrn->format->BitsPerPixel == 8)
-	{
-		/* If using HiRes palette update with full update flag */
-		if (!bUseHighRes)
-		{
-			/* Check if palette of 16 colours changed from previous frame */
-			for (i = 0; i < 16 && !bPaletteChanged; i++)
-			{
-				/* Check with first line palette (stored in 'Screen_ComparePaletteMask') */
-				if (HBLPalettes[i] != PrevHBLPalette[i])
-					bPaletteChanged = true;
-			}
-		}
-
-		/* Did palette change or do we require a full update? */
-		if (bPaletteChanged || pFrameBuffer->bFullUpdate)
-		{
-			/* Create palette, for Full-Screen of Window */
-			Screen_CreatePalette();
-			/* Make sure update whole screen */
-			pFrameBuffer->bFullUpdate = true;
-		}
-	}
-
-	/* Copy old palette for 8-Bit compare as this routine writes over it */
-	memcpy(PrevHBLPalette,HBLPalettes, sizeof(Uint16)*16);
-}
-
-
-/*-----------------------------------------------------------------------*/
 /**
  * Set screen draw functions.
  */
 static void Screen_SetDrawFunctions(int nBitCount, bool bDoubleLowRes)
 {
-	if (nBitCount == 8)
-	{
-		/* Low color */
-		if (bDoubleLowRes)
-			ScreenDrawFunctionsNormal[ST_LOW_RES] = ConvertLowRes_640x8Bit;
-		else
-			ScreenDrawFunctionsNormal[ST_LOW_RES] = ConvertLowRes_320x8Bit;
-		ScreenDrawFunctionsNormal[ST_MEDIUM_RES] = ConvertMediumRes_640x8Bit;
-		ScreenDrawFunctionsNormal[ST_HIGH_RES] = ConvertHighRes_640x8Bit;
-	}
-	else if (nBitCount <= 16)
+	if (nBitCount <= 16)
 	{
 		/* High color */
 		if (bDoubleLowRes)
@@ -305,7 +191,6 @@ static void Screen_SetDrawFunctions(int nBitCount, bool bDoubleLowRes)
 		else
 			ScreenDrawFunctionsNormal[ST_LOW_RES] = ConvertLowRes_320x16Bit;
 		ScreenDrawFunctionsNormal[ST_MEDIUM_RES] = ConvertMediumRes_640x16Bit;
-		ScreenDrawFunctionsNormal[ST_HIGH_RES] = ConvertHighRes_640x8Bit;
 	}
 	else /* Assume 32 bit drawing functions */
 	{
@@ -315,7 +200,6 @@ static void Screen_SetDrawFunctions(int nBitCount, bool bDoubleLowRes)
 		else
 			ScreenDrawFunctionsNormal[ST_LOW_RES] = ConvertLowRes_320x32Bit;
 		ScreenDrawFunctionsNormal[ST_MEDIUM_RES] = ConvertMediumRes_640x32Bit;
-		ScreenDrawFunctionsNormal[ST_HIGH_RES] = ConvertHighRes_640x8Bit;
 	}
 }
 
@@ -326,12 +210,8 @@ static void Screen_SetDrawFunctions(int nBitCount, bool bDoubleLowRes)
  */
 static void Screen_SetBorderPixels(int leftX, int leftY)
 {
-	/* All screen widths need to be aligned to 16-bits.
-	 * 
-	 * TODO: Change VDI_Limit() to generic function and check
-	 * the limits when config values are set or changed
-	 */
-	nBorderPixelsLeft = VDI_Limit(leftX/2, 16, 0, 48);
+	/* All screen widths need to be aligned to 16-bits */
+	nBorderPixelsLeft = Opt_ValueAlignMinMax(leftX/2, 16, 0, 48);
 	nBorderPixelsRight = nBorderPixelsLeft;
 
 	/* assertain assumption of code below */
@@ -372,6 +252,28 @@ static void Screen_SetSTScreenOffsets(void)
 	}
 }
 
+/**
+ * Return true if Falcon/TT/VDI generic screen convert functions
+ * need to be used instead of the ST/STE functions.
+ */
+static bool Screen_UseGenConvScreen(void)
+{
+	return Config_IsMachineFalcon() || Config_IsMachineTT()
+		|| bUseHighRes || bUseVDIRes;
+}
+
+static bool Screen_WantToKeepResolution(void)
+{
+#if WITH_SDL2
+	return ConfigureParams.Screen.bKeepResolution;
+#else
+	if (Screen_UseGenConvScreen())
+		return ConfigureParams.Screen.bKeepResolution;
+	else
+		return ConfigureParams.Screen.bKeepResolutionST;
+#endif
+}
+
 #if WITH_SDL2
 static void Screen_FreeSDL2Resources(void)
 {
@@ -390,11 +292,6 @@ static void Screen_FreeSDL2Resources(void)
 		SDL_DestroyRenderer(sdlRenderer);
 		sdlRenderer = NULL;
 	}
-	if (sdlWindow)
-	{
-		SDL_DestroyWindow(sdlWindow);
-		sdlWindow = NULL;
-	}
 }
 #endif
 
@@ -402,20 +299,22 @@ static void Screen_FreeSDL2Resources(void)
  * Change the SDL video mode.
  * @return true if mode has been changed, false if change was not necessary
  */
-bool Screen_SetSDLVideoSize(int width, int height, int bitdepth)
+bool Screen_SetSDLVideoSize(int width, int height, int bitdepth, bool bForceChange)
 {
-	static bool bWasInFullScreen = false;
 	Uint32 sdlVideoFlags;
-
 #if WITH_SDL2
+	static int nPrevRenderScaleQuality = 0;
+	static bool bPrevUseVsync = false;
+	static bool bPrevInFullScreen;
+	int win_width, win_height;
+
 	if (bitdepth == 0 || bitdepth == 24)
 		bitdepth = 32;
 #endif
 
 	/* Check if we really have to change the video mode: */
 	if (sdlscrn != NULL && sdlscrn->w == width && sdlscrn->h == height
-	    && sdlscrn->format->BitsPerPixel == bitdepth
-	    && bInFullScreen == bWasInFullScreen)
+	    && sdlscrn->format->BitsPerPixel == bitdepth && !bForceChange)
 		return false;
 
 	/* We can not continue recording with a different resolution */
@@ -434,54 +333,83 @@ bool Screen_SetSDLVideoSize(int width, int height, int bitdepth)
 		Control_ReparentWindow(width, height, bInFullScreen);
 	}
 
-	bWasInFullScreen = bInFullScreen;
-
 #if WITH_SDL2
 
 	/* SDL Video attributes: */
+	win_width = width;
+	win_height = height;
 	if (bInFullScreen)
 	{
-		sdlVideoFlags  = SDL_WINDOW_FULLSCREEN_DESKTOP;
+		sdlVideoFlags = SDL_WINDOW_BORDERLESS | SDL_WINDOW_INPUT_GRABBED;
+		if (ConfigureParams.Screen.bKeepResolution)
+			sdlVideoFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+		else
+			sdlVideoFlags |= SDL_WINDOW_FULLSCREEN;
 	}
 	else
 	{
-		sdlVideoFlags  = 0;
+		int deskw, deskh;
+		sdlVideoFlags  = SDL_WINDOW_RESIZABLE;
+		/* Make sure that window is not bigger than current desktop */
+		Resolution_GetDesktopSize(&deskw, &deskh);
+		if (win_width > deskw)
+			win_width = deskw;
+		if (win_height > deskh)
+			win_height = deskh;
 	}
 
 	Screen_FreeSDL2Resources();
+	if (((bInFullScreen && !ConfigureParams.Screen.bKeepResolution)
+	     || bPrevInFullScreen != bInFullScreen) && sdlWindow)
+	{
+		SDL_DestroyWindow(sdlWindow);
+		sdlWindow = NULL;
+	}
+	bPrevInFullScreen = bInFullScreen;
+
+	/* Set SDL2 video hints */
+	if (nPrevRenderScaleQuality != ConfigureParams.Screen.nRenderScaleQuality)
+	{
+		char hint[2] = { '0' + ConfigureParams.Screen.nRenderScaleQuality, 0 };
+		SDL_SetHintWithPriority(SDL_HINT_RENDER_SCALE_QUALITY, hint, SDL_HINT_OVERRIDE);
+		nPrevRenderScaleQuality = ConfigureParams.Screen.nRenderScaleQuality;
+	}
+	if (bPrevUseVsync != ConfigureParams.Screen.bUseVsync)
+	{
+		char hint[2] = { '0' + ConfigureParams.Screen.bUseVsync, 0 };
+		SDL_SetHintWithPriority(SDL_HINT_RENDER_VSYNC, hint, SDL_HINT_OVERRIDE);
+		bPrevUseVsync = ConfigureParams.Screen.bUseVsync;
+	}
 
 	/* Set new video mode */
 	DEBUGPRINT(("SDL screen request: %d x %d @ %d (%s)\n", width, height,
 	        bitdepth, bInFullScreen?"fullscreen":"windowed"));
 
-	sdlWindow = SDL_CreateWindow("Hatari", SDL_WINDOWPOS_UNDEFINED,
-	                             SDL_WINDOWPOS_UNDEFINED, width, height,
-	                             sdlVideoFlags);
+	if (sdlWindow)
+	{
+		if ((SDL_GetWindowFlags(sdlWindow) & SDL_WINDOW_MAXIMIZED) == 0)
+			SDL_SetWindowSize(sdlWindow, win_width, win_height);
+	}
+	else
+	{
+		sdlWindow = SDL_CreateWindow("Hatari", SDL_WINDOWPOS_UNDEFINED,
+		                             SDL_WINDOWPOS_UNDEFINED,
+		                             win_width, win_height, sdlVideoFlags);
+	}
 	sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
 	if (!sdlWindow || !sdlRenderer)
 	{
-		fprintf(stderr,"Failed to create window or renderer!\n");
+		fprintf(stderr,"Failed to create %dx%d window or renderer!\n",
+		       win_width, win_height);
 		exit(-1);
-	}
-	SDL_RenderSetLogicalSize(sdlRenderer, width, height);
-	if (bitdepth == 8)
-	{
-		SDL_Color cols[] = {	/* Colors for the sdl-gui */
-			{ 0, 0, 0, 255 }, { 64, 64, 64, 255 },
-			{ 128, 128, 128, 255 }, { 160, 160, 160, 255 },
-			{ 196, 196, 196, 255 }, { 255, 255, 255, 255 },
-			{ 0x00, 0x40, 0x00, 255 }, { 0x00, 0xc0, 0x00, 255 },
-			{ 0x00, 0xe0, 0x00, 255 }
-		};
-		sdlscrn = SDL_CreateRGBSurface(0, width, height, bitdepth,
-		                               0, 0, 0, 0);
-		if (sdlscrn)
-			SDL_SetPaletteColors(sdlscrn->format->palette, cols,
-			                     128, ARRAYSIZE(cols));
 	}
 	else
 	{
 		int rm, bm, gm, pfmt;
+
+		if (bInFullScreen)
+			SDL_RenderSetLogicalSize(sdlRenderer, width, height);
+
 		if (bitdepth == 16)
 		{
 			rm = 0xF800;
@@ -503,7 +431,8 @@ bool Screen_SetSDLVideoSize(int width, int height, int bitdepth)
 		                               width, height);
 		if (!sdlTexture)
 		{
-			fprintf(stderr,"Failed to create texture!\n");
+			fprintf(stderr,"Failed to create %dx%d@%d texture!\n",
+			       width, height, bitdepth);
 			exit(-3);
 		}
 	}
@@ -522,13 +451,10 @@ bool Screen_SetSDLVideoSize(int width, int height, int bitdepth)
 	{
 		sdlVideoFlags  = SDL_SWSURFACE;
 	}
-	if (bitdepth <= 8)
-	{
-		sdlVideoFlags |= SDL_HWPALETTE;
-	}
 
 	/* Set new video mode */
-	DEBUGPRINT(("SDL screen request: %d x %d @ %d (%s)\n", width, h, bitdepth, bInFullScreen?"fullscreen":"windowed"));
+	DEBUGPRINT(("SDL screen request: %d x %d @ %d (%s)\n", width, height, bitdepth,
+	            bInFullScreen?"fullscreen":"windowed"));
 	sdlscrn = SDL_SetVideoMode(width, height, bitdepth, sdlVideoFlags);
 
 	/* By default ConfigureParams.Screen.nForceBpp and therefore
@@ -568,24 +494,17 @@ bool Screen_SetSDLVideoSize(int width, int height, int bitdepth)
 	return true;
 }
 
-/*-----------------------------------------------------------------------*/
+
 /**
- * Initialize SDL screen surface / set resolution.
+ * Initialize ST/STE screen resolution.
  */
-static void Screen_SetResolution(void)
+static void Screen_SetSTResolution(bool bForceChange)
 {
 	int Width, Height, nZoom, SBarHeight, BitCount, maxW, maxH;
 	bool bDoubleLowRes = false;
 
 	/* Bits per pixel */
-	if (STRes == ST_HIGH_RES || bUseVDIRes)
-	{
-		BitCount = 8;
-	}
-	else
-	{
-		BitCount = ConfigureParams.Screen.nForceBpp;
-	}
+	BitCount = ConfigureParams.Screen.nForceBpp;
 
 	nBorderPixelsTop = nBorderPixelsBottom = 0;
 	nBorderPixelsLeft = nBorderPixelsRight = 0;
@@ -593,69 +512,60 @@ static void Screen_SetResolution(void)
 	nScreenZoomX = 1;
 	nScreenZoomY = 1;
 
-	/* Determine which resolution to use */
-	if (bUseVDIRes)
+	if (STRes == ST_LOW_RES)
 	{
-		Width = VDIWidth;
-		Height = VDIHeight;
+		Width = 320;
+		Height = 200;
+		nZoom = 1;
 	}
-	else
+	else    /* else use 640x400, also for med-rez */
 	{
-		if (STRes == ST_LOW_RES)
- 		{
- 			Width = 320;
- 			Height = 200;
-			nZoom = 1;
- 		}
-		else    /* else use 640x400, also for med-rez */
- 		{
- 			Width = 640;
- 			Height = 400;
-			nZoom = 2;
- 		}
+		Width = 640;
+		Height = 400;
+		nZoom = 2;
+	}
 
-		/* Statusbar height for doubled screen size */
-		SBarHeight = Statusbar_GetHeightForSize(640, 400);
+	/* Statusbar height for doubled screen size */
+	SBarHeight = Statusbar_GetHeightForSize(640, 400);
 
-		Resolution_GetLimits(&maxW, &maxH, &BitCount, ConfigureParams.Screen.bKeepResolutionST);
-		
-		/* Zoom if necessary, factors used for scaling mouse motions */
-		if (STRes == ST_LOW_RES &&
-		    2*Width <= maxW && 2*Height+SBarHeight <= maxH)
-		{
-			nZoom = 2;
-			Width *= 2;
-			Height *= 2;
-			nScreenZoomX = 2;
-			nScreenZoomY = 2;
-			bDoubleLowRes = true;
-		}
-		else if (STRes == ST_MEDIUM_RES)
-		{
-			/* med-rez conversion functions want always
-			 * to double vertically, they don't support
-			 * skipping that (only leaving doubled lines
-			 * black for the TV mode).
-			 */
-			nScreenZoomX = 1;
-			nScreenZoomY = 2;
- 		}
+	Resolution_GetLimits(&maxW, &maxH, &BitCount, Screen_WantToKeepResolution());
 
-		/* Adjust width/height for overscan borders, if mono or VDI we have no overscan */
-		if (ConfigureParams.Screen.bAllowOverscan && !bUseHighRes)
-		{
-			int leftX = maxW - Width;
-			int leftY = maxH - (Height + Statusbar_GetHeightForSize(Width, Height));
+	/* Zoom if necessary, factors used for scaling mouse motions */
+	if (STRes == ST_LOW_RES &&
+	    2*Width <= maxW && 2*Height+SBarHeight <= maxH)
+	{
+		nZoom = 2;
+		Width *= 2;
+		Height *= 2;
+		nScreenZoomX = 2;
+		nScreenZoomY = 2;
+		bDoubleLowRes = true;
+	}
+	else if (STRes == ST_MEDIUM_RES)
+	{
+		/* med-rez conversion functions want always
+		 * to double vertically, they don't support
+		 * skipping that (only leaving doubled lines
+		 * black for the TV mode).
+		 */
+		nScreenZoomX = 1;
+		nScreenZoomY = 2;
+	}
 
-			Screen_SetBorderPixels(leftX/nZoom, leftY/nZoom);
-			DEBUGPRINT(("resolution limit:\n\t%d x %d\nlimited resolution:\n\t", maxW, maxH));
-			DEBUGPRINT(("%d * (%d + %d + %d) x (%d + %d + %d)\n", nZoom,
-				    nBorderPixelsLeft, Width/nZoom, nBorderPixelsRight,
-				    nBorderPixelsTop, Height/nZoom, nBorderPixelsBottom));
-			Width += (nBorderPixelsRight + nBorderPixelsLeft)*nZoom;
-			Height += (nBorderPixelsTop + nBorderPixelsBottom)*nZoom;
-			DEBUGPRINT(("\t= %d x %d (+ statusbar)\n", Width, Height));
-		}
+	/* Adjust width/height for overscan borders, if mono or VDI we have no overscan */
+	if (ConfigureParams.Screen.bAllowOverscan && !bUseHighRes)
+	{
+		int leftX = maxW - Width;
+		int leftY = maxH - (Height + Statusbar_GetHeightForSize(Width, Height));
+
+		Screen_SetBorderPixels(leftX/nZoom, leftY/nZoom);
+		DEBUGPRINT(("resolution limit:\n\t%d x %d\nlimited resolution:\n\t", maxW, maxH));
+		DEBUGPRINT(("%d * (%d + %d + %d) x (%d + %d + %d)\n", nZoom,
+			    nBorderPixelsLeft, Width/nZoom, nBorderPixelsRight,
+			    nBorderPixelsTop, Height/nZoom, nBorderPixelsBottom));
+		Width += (nBorderPixelsRight + nBorderPixelsLeft)*nZoom;
+		Height += (nBorderPixelsTop + nBorderPixelsBottom)*nZoom;
+		DEBUGPRINT(("\t= %d x %d (+ statusbar)\n", Width, Height));
 	}
 
 	Screen_SetSTScreenOffsets();  
@@ -664,6 +574,7 @@ static void Screen_SetResolution(void)
 	PCScreenOffsetX = PCScreenOffsetY = 0;
 
 	/* Video attributes: */
+#if !WITH_SDL2
 	if (bInFullScreen && ConfigureParams.Screen.bKeepResolutionST)
 	{
 		/* use desktop resolution */
@@ -678,17 +589,13 @@ static void Screen_SetResolution(void)
 		Height = maxH;
 		Width = maxW;
 	}
+#endif
 
-	if (Screen_SetSDLVideoSize(Width, Height, BitCount))
+	if (Screen_SetSDLVideoSize(Width, Height, BitCount, bForceChange))
 	{
-		/* Re-init screen palette: */
-		if (sdlscrn->format->BitsPerPixel == 8)
-			Screen_Handle8BitPalettes();    /* Initialize new 8 bit palette */
-		else
-			Screen_SetupRGBTable();         /* Create color conversion table */
-
+		Screen_SetupRGBTable();         /* Create color conversion table */
 		Statusbar_Init(sdlscrn);
-		
+
 		/* screen area without the statusbar */
 		STScreenRect.x = 0;
 		STScreenRect.y = 0;
@@ -700,6 +607,56 @@ static void Screen_SetResolution(void)
 	Screen_SetDrawFunctions(sdlscrn->format->BitsPerPixel, bDoubleLowRes);
 
 	Screen_SetFullUpdate();           /* Cause full update of screen */
+}
+
+
+/**
+ * Change resolution, according to the machine and display type
+ * that we're currently emulating.
+ */
+static void Screen_ChangeResolution(bool bForceChange)
+{
+	int hbpp = ConfigureParams.Screen.nForceBpp;
+
+	if (bUseVDIRes)
+	{
+		Screen_SetGenConvSize(VDIWidth, VDIHeight, hbpp, bForceChange);
+	}
+	else if (Config_IsMachineFalcon())
+	{
+		VIDEL_ZoomModeChanged(bForceChange);
+	}
+	else if (Config_IsMachineTT())
+	{
+		int width, height, bpp;
+		Video_GetTTRes(&width, &height, &bpp);
+		Screen_SetGenConvSize(width, height, hbpp, bForceChange);
+	}
+	else if (bUseHighRes)
+	{
+		Screen_SetGenConvSize(640, 400, hbpp, bForceChange);
+	}
+	else
+	{
+		Screen_SetSTResolution(bForceChange);
+	}
+
+	if (bInFullScreen || bGrabMouse)
+		SDL_WM_GrabInput(SDL_GRAB_ON);
+	else
+		SDL_WM_GrabInput(SDL_GRAB_OFF);
+}
+
+
+/**
+ * Change the resolution - but only if it was already initialized before
+ */
+void Screen_ModeChanged(bool bForceChange)
+{
+	if (sdlscrn)	/* Do it only if we're already up and running */
+	{
+		Screen_ChangeResolution(bForceChange);
+	}
 }
 
 
@@ -728,7 +685,7 @@ void Screen_Init(void)
 		}
 	}
 	pFrameBuffer = &FrameBuffers[0];
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__	/* RETRO HACK */
 	/* Load and set icon */
 	snprintf(sIconFileName, sizeof(sIconFileName), "%s%chatari-icon.bmp",
 	         Paths_GetDataDir(), PATHSEP);
@@ -744,13 +701,11 @@ void Screen_Init(void)
 #endif
 		SDL_FreeSurface(pIconSurf);
 	}
-#endif
+#endif	/* RETRO HACK */
 	/* Set initial window resolution */
 	bInFullScreen = ConfigureParams.Screen.bFullScreen;
-	Screen_SetResolution();
-
-	if (bGrabMouse)
-		SDL_WM_GrabInput(SDL_GRAB_ON);
+	Screen_SetSTResolution(false);
+	ScreenDrawFunctionsNormal[ST_HIGH_RES] = Screen_ConvertHighRes;
 
 	Video_SetScreenRasters();                       /* Set rasters ready for first screen */
 
@@ -776,6 +731,11 @@ void Screen_UnInit(void)
 
 #if WITH_SDL2
 	Screen_FreeSDL2Resources();
+	if (sdlWindow)
+	{
+		SDL_DestroyWindow(sdlWindow);
+		sdlWindow = NULL;
+	}
 #endif
 }
 
@@ -805,7 +765,7 @@ void Screen_Reset(void)
 		}
 	}
 	/* Cause full update */
-	Screen_ModeChanged();
+	Screen_ModeChanged(false);
 }
 
 
@@ -836,38 +796,29 @@ static void Screen_ClearScreen(void)
 
 /*-----------------------------------------------------------------------*/
 /**
- * Return true if (falcon/tt) hostscreen functions need to be used
- * instead of the (st/ste) functions here.
- */
-static bool Screen_UseHostScreen(void)
-{
-	return ((ConfigureParams.System.nMachineType == MACHINE_FALCON
-		 || ConfigureParams.System.nMachineType == MACHINE_TT)
-		&& !bUseVDIRes);
-}
-
-/*-----------------------------------------------------------------------*/
-/**
  * Force screen redraw.  Does the right thing regardless of whether
  * we're in ST/STe, Falcon or TT mode.  Needed when switching modes
  * while emulation is paused.
  */
 static void Screen_Refresh(void)
 {
-	if (!bUseVDIRes)
+	if (bUseVDIRes)
 	{
-		if (ConfigureParams.System.nMachineType == MACHINE_FALCON)
-		{
-			VIDEL_renderScreen();
-			return;
-		}
-		else if (ConfigureParams.System.nMachineType == MACHINE_TT)
-		{
-			Video_RenderTTScreen();
-			return;
-		}
+		Screen_GenDraw(VideoBase, VDIWidth, VDIHeight, VDIPlanes,
+		               VDIWidth * VDIPlanes / 16, 0, 0, 0, 0);
 	}
-	Screen_DrawFrame(true);
+	else if (Config_IsMachineFalcon())
+	{
+		VIDEL_renderScreen();
+	}
+	else if (Config_IsMachineTT())
+	{
+		Video_RenderTTScreen();
+	}
+	else
+	{
+		Screen_DrawFrame(true);
+	}
 }
 
 
@@ -885,18 +836,25 @@ void Screen_EnterFullScreen(void)
 		bWasRunning = Main_PauseEmulation(false);
 		bInFullScreen = true;
 
-		if (Screen_UseHostScreen())
+		if (Screen_UseGenConvScreen())
 		{
-			HostScreen_toggleFullScreen();
+			Screen_SetGenConvSize(genconv_width_req, genconv_height_req,
+			                      genconv_bpp, true);
+			/* force screen redraw */
+			Screen_GenConvUpdate(NULL, true);
 		}
 		else
 		{
-			Screen_SetResolution();
+			Screen_SetSTResolution(true);
 			Screen_ClearScreen();       /* Black out screen bitmap as will be invalid when return */
 		}
 
-		SDL_Delay(20);                  /* To give monitor time to change to new resolution */
-		
+		if (!Screen_WantToKeepResolution())
+		{
+			/* Give monitor time to change to new resolution */
+			SDL_Delay(20);
+		}
+
 		if (bWasRunning)
 		{
 			/* And off we go... */
@@ -925,15 +883,23 @@ void Screen_ReturnFromFullScreen(void)
 		bWasRunning = Main_PauseEmulation(false);
 		bInFullScreen = false;
 
-		if (Screen_UseHostScreen())
+		if (Screen_UseGenConvScreen())
 		{
-			HostScreen_toggleFullScreen();
+			Screen_SetGenConvSize(genconv_width_req, genconv_height_req,
+			                      genconv_bpp, true);
+			/* force screen redraw */
+			Screen_GenConvUpdate(NULL, true);
 		}
 		else
 		{
-			Screen_SetResolution();
+			Screen_SetSTResolution(true);
 		}
-		SDL_Delay(20);                /* To give monitor time to switch resolution */
+
+		if (!Screen_WantToKeepResolution())
+		{
+			/* Give monitor time to switch resolution */
+			SDL_Delay(20);
+		}
 
 		if (bWasRunning)
 		{
@@ -963,53 +929,17 @@ static void Screen_DidResolutionChange(int new_res)
 	if (new_res != STRes)
 	{
 		STRes = new_res;
-		Screen_ModeChanged();
+		Screen_ModeChanged(false);
 	}
 	else
 	{
 		/* Did change overscan mode? Causes full update */
-		if (pFrameBuffer->OverscanModeCopy != OverscanMode)
+		if (pFrameBuffer->VerticalOverscanCopy != VerticalOverscan)
 			pFrameBuffer->bFullUpdate = true;
 	}
 }
 
 
-/*-----------------------------------------------------------------------*/
-/**
- * Force things associated with changing between low/medium/high res.
- */
-void Screen_ModeChanged(void)
-{
-	if (!sdlscrn)
-	{
-		/* screen not yet initialized */
-		return;
-	}
-	/* Don't run this function if Videl emulation is running! */
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON && !bUseVDIRes)
-	{
-		VIDEL_ZoomModeChanged();
-	}
-	else if (ConfigureParams.System.nMachineType == MACHINE_TT && !bUseVDIRes)
-	{
-		int width, height, bpp;
-		Video_GetTTRes(&width, &height, &bpp);
-		HostScreen_setWindowSize(width, height, 8);
-	}
-	else
-	{
-		/* Set new display mode, if differs from current */
-		Screen_SetResolution();
-		Screen_SetFullUpdate();
-	}
-	if (bInFullScreen || bGrabMouse)
-		SDL_WM_GrabInput(SDL_GRAB_ON);
-	else
-		SDL_WM_GrabInput(SDL_GRAB_OFF);
-}
-
-
-/*-----------------------------------------------------------------------*/
 /**
  * Compare current resolution on line with previous, and set 'UpdateLine' accordingly
  * Return if swap between low/medium resolution
@@ -1081,9 +1011,9 @@ static int Screen_ComparePaletteMask(int res)
 	/* Set for monochrome? */
 	if (bUseHighRes)
 	{
-		OverscanMode = OVERSCANMODE_NONE;
+		VerticalOverscan = V_OVERSCAN_NONE;
 
-		/* Just copy mono colours, 0x777 checked also in convert/vdi2.c */
+		/* Just copy mono colors */
 		if (HBLPalettes[0] & 0x777)
 		{
 			HBLPalettes[0] = 0x777;
@@ -1104,27 +1034,7 @@ static int Screen_ComparePaletteMask(int res)
 			ScrUpdateFlag = PALETTEMASK_UPDATEFULL;
 		else
 			ScrUpdateFlag = 0x00000000;
-	}
 
-	/* Use VDI resolution? */
-	if (bUseVDIRes)
-	{
-		/* Force to VDI resolution screen, without overscan */
-		res = VDIRes;
-
-		/* Colors changed? */
-		if (HBLPalettes[0] != PrevHBLPalette[0])
-			pFrameBuffer->bFullUpdate = true;
-
-		/* Set bit to flag 'full update' */
-		if (pFrameBuffer->bFullUpdate)
-			ScrUpdateFlag = PALETTEMASK_UPDATEFULL;
-		else
-			ScrUpdateFlag = 0x00000000;
-	}
-	/* Are in Mono? Force to monochrome and no overscan */
-	else if (bUseHighRes)
-	{
 		/* Force to standard hi-resolution screen, without overscan */
 		res = ST_HIGH_RES;
 	}
@@ -1151,6 +1061,9 @@ static int Screen_ComparePaletteMask(int res)
 		if (bLowMedMix || (res & ST_MEDIUM_RES_BIT))
 			res = ST_MEDIUM_RES;
 	}
+
+	/* Copy old palette for compare */
+	memcpy(PrevHBLPalette, HBLPalettes, sizeof(Uint16)*16);
 
 	return res;
 }
@@ -1189,42 +1102,31 @@ static void Screen_SetConvertDetails(void)
 	/* Not in TV-Mode? Then double up on Y: */
 	bScrDoubleY = !(ConfigureParams.Screen.nMonitorType == MONITOR_TYPE_TV);
 
-	if (bUseVDIRes)
+	if (ConfigureParams.Screen.bAllowOverscan)  /* Use borders? */
 	{
-		/* Select screen draw for standard or VDI display */
-		STScreenLeftSkipBytes = 0;
-		STScreenWidthBytes = VDIWidth * VDIPlanes / 8;
-		STScreenStartHorizLine = 0;
-		STScreenEndHorizLine = VDIHeight;
-	}
-	else
-	{
-		if (ConfigureParams.Screen.bAllowOverscan)  /* Use borders? */
-		{
-			/* Always draw to WHOLE screen including ALL borders */
-			STScreenLeftSkipBytes = 0;              /* Number of bytes to skip on ST screen for left (border) */
+		/* Always draw to WHOLE screen including ALL borders */
+		STScreenLeftSkipBytes = 0;              /* Number of bytes to skip on ST screen for left (border) */
 
-			if (bUseHighRes)
-			{
-				pFrameBuffer->OverscanModeCopy = OverscanMode = OVERSCANMODE_NONE;
-				STScreenStartHorizLine = 0;
-				STScreenEndHorizLine = 400;
-			}
-			else
-			{
-				STScreenWidthBytes = SCREENBYTES_LINE;  /* Number of horizontal bytes in our ST screen */
-				STScreenStartHorizLine = OVERSCAN_TOP - nBorderPixelsTop;
-				STScreenEndHorizLine = OVERSCAN_TOP + 200 + nBorderPixelsBottom;
-			}
+		if (bUseHighRes)
+		{
+				pFrameBuffer->VerticalOverscanCopy = VerticalOverscan = V_OVERSCAN_NONE;
+			STScreenStartHorizLine = 0;
+			STScreenEndHorizLine = 400;
 		}
 		else
 		{
-			/* Only draw main area and centre on Y */
-			STScreenLeftSkipBytes = SCREENBYTES_LEFT;
-			STScreenWidthBytes = SCREENBYTES_MIDDLE;
-			STScreenStartHorizLine = OVERSCAN_TOP;
-			STScreenEndHorizLine = OVERSCAN_TOP + (bUseHighRes ? 400 : 200);
+			STScreenWidthBytes = SCREENBYTES_LINE;  /* Number of horizontal bytes in our ST screen */
+			STScreenStartHorizLine = OVERSCAN_TOP - nBorderPixelsTop;
+			STScreenEndHorizLine = OVERSCAN_TOP + 200 + nBorderPixelsBottom;
 		}
+	}
+	else
+	{
+		/* Only draw main area and centre on Y */
+		STScreenLeftSkipBytes = SCREENBYTES_LEFT;
+		STScreenWidthBytes = SCREENBYTES_MIDDLE;
+		STScreenStartHorizLine = OVERSCAN_TOP;
+		STScreenEndHorizLine = OVERSCAN_TOP + (bUseHighRes ? 400 : 200);
 	}
 }
 
@@ -1233,7 +1135,7 @@ static void Screen_SetConvertDetails(void)
 /**
  * Lock full-screen for drawing
  */
-static bool Screen_Lock(void)
+bool Screen_Lock(void)
 {
 	if (SDL_MUSTLOCK(sdlscrn))
 	{
@@ -1251,7 +1153,7 @@ static bool Screen_Lock(void)
 /**
  * UnLock full-screen
  */
-static void Screen_UnLock(void)
+void Screen_UnLock(void)
 {
 	if ( SDL_MUSTLOCK(sdlscrn) )
 		SDL_UnlockSurface(sdlscrn);
@@ -1312,10 +1214,10 @@ static bool Screen_DrawFrame(bool bForceFlip)
 	static bool bPrevFrameWasSpec512 = false;
 	SDL_Rect *sbar_rect;
 
+	assert(!bUseVDIRes);
+
 	/* Scan palette/resolution masks for each line and build up palette/difference tables */
 	new_res = Screen_ComparePaletteMask(STRes);
-	/* Do require palette? Check if changed and update */
-	Screen_Handle8BitPalettes();
 	/* Did we change resolution this frame - allocate new screen if did so */
 	Screen_DidResolutionChange(new_res);
 	/* Is need full-update, tag as such */
@@ -1334,45 +1236,38 @@ static bool Screen_DrawFrame(bool bForceFlip)
 
 		/* Set details */
 		Screen_SetConvertDetails();
-		
+
 		/* Clear screen on full update to clear out borders and also interleaved lines */
-		if (pFrameBuffer->bFullUpdate && !bUseVDIRes)
+		if (pFrameBuffer->bFullUpdate)
 			Screen_ClearScreen();
 		
 		/* Call drawing for full-screen */
-		if (bUseVDIRes)
+		pDrawFunction = ScreenDrawFunctionsNormal[STRes];
+		/* Check if is Spec512 image */
+		if (Spec512_IsImage())
 		{
-			pDrawFunction = ScreenDrawFunctionsVDI[VDIRes];
+			bPrevFrameWasSpec512 = true;
+			/* What mode were we in? Keep to 320xH or 640xH */
+			if (pDrawFunction==ConvertLowRes_320x16Bit)
+				pDrawFunction = ConvertLowRes_320x16Bit_Spec;
+			else if (pDrawFunction==ConvertLowRes_640x16Bit)
+				pDrawFunction = ConvertLowRes_640x16Bit_Spec;
+			else if (pDrawFunction==ConvertLowRes_320x32Bit)
+				pDrawFunction = ConvertLowRes_320x32Bit_Spec;
+			else if (pDrawFunction==ConvertLowRes_640x32Bit)
+				pDrawFunction = ConvertLowRes_640x32Bit_Spec;
+			else if (pDrawFunction==ConvertMediumRes_640x32Bit)
+				pDrawFunction = ConvertMediumRes_640x32Bit_Spec;
+			else if (pDrawFunction==ConvertMediumRes_640x16Bit)
+				pDrawFunction = ConvertMediumRes_640x16Bit_Spec;
 		}
-		else
+		else if (bPrevFrameWasSpec512)
 		{
-			pDrawFunction = ScreenDrawFunctionsNormal[STRes];
-			/* Check if is Spec512 image */
-			if (Spec512_IsImage())
-			{
-				bPrevFrameWasSpec512 = true;
-				/* What mode were we in? Keep to 320xH or 640xH */
-				if (pDrawFunction==ConvertLowRes_320x16Bit)
-					pDrawFunction = ConvertLowRes_320x16Bit_Spec;
-				else if (pDrawFunction==ConvertLowRes_640x16Bit)
-					pDrawFunction = ConvertLowRes_640x16Bit_Spec;
-				else if (pDrawFunction==ConvertLowRes_320x32Bit)
-					pDrawFunction = ConvertLowRes_320x32Bit_Spec;
-				else if (pDrawFunction==ConvertLowRes_640x32Bit)
-					pDrawFunction = ConvertLowRes_640x32Bit_Spec;
-				else if (pDrawFunction==ConvertMediumRes_640x32Bit)
-					pDrawFunction = ConvertMediumRes_640x32Bit_Spec;
-				else if (pDrawFunction==ConvertMediumRes_640x16Bit)
-					pDrawFunction = ConvertMediumRes_640x16Bit_Spec;
-			}
-			else if (bPrevFrameWasSpec512)
-			{
-				/* If we switch back from Spec512 mode to normal
-				 * screen rendering, we have to make sure to do
-				 * a full update of the screen. */
-				Screen_SetFullUpdateMask();
-				bPrevFrameWasSpec512 = false;
-			}
+			/* If we switch back from Spec512 mode to normal
+			 * screen rendering, we have to make sure to do
+			 * a full update of the screen. */
+			Screen_SetFullUpdateMask();
+			bPrevFrameWasSpec512 = false;
 		}
 
 		if (pDrawFunction)
@@ -1387,7 +1282,7 @@ static bool Screen_DrawFrame(bool bForceFlip)
 		
 		/* Clear flags, remember type of overscan as if change need screen full update */
 		pFrameBuffer->bFullUpdate = false;
-		pFrameBuffer->OverscanModeCopy = OverscanMode;
+		pFrameBuffer->VerticalOverscanCopy = VerticalOverscan;
 
 		/* And show to user */
 		if (bScreenContentsChanged || bForceFlip || sbar_rect)
@@ -1408,15 +1303,189 @@ static bool Screen_DrawFrame(bool bForceFlip)
  */
 bool Screen_Draw(void)
 {
-	if (!bQuitProgram && VideoBase)
+	if (bQuitProgram)
 	{
-		/* And draw (if screen contents changed) */
-		return Screen_DrawFrame(false);
+		return false;
 	}
 
-	return false;
+	/* And draw (if screen contents changed) */
+	return Screen_DrawFrame(false);
 }
 
+/**
+ * This is used to set the size of the SDL screen
+ * when we're using the generic conversion functions.
+ */
+void Screen_SetGenConvSize(int width, int height, int bpp, bool bForceChange)
+{
+	const bool keep = ConfigureParams.Screen.bKeepResolution;
+	int screenwidth, screenheight, maxw, maxh;
+	int scalex, scaley, sbarheight;
+
+	if (bpp == 24)
+		bpp = 32;
+
+	/* constrain size request to user's desktop size */
+	Resolution_GetDesktopSize(&maxw, &maxh);
+#if !WITH_SDL2
+	scalex = scaley = 1;
+	while (width > maxw*scalex) {
+		scalex *= 2;
+	}
+	while (height > maxh*scaley) {
+		scaley *= 2;
+	}
+	if (scalex * scaley > 1) {
+		fprintf(stderr, "WARNING: too large screen size %dx%d -> divided by %dx%d!\n",
+			width, height, scalex, scaley);
+		width /= scalex;
+		height /= scaley;
+	}
+#endif
+
+	Resolution_GetLimits(&maxw, &maxh, &bpp, keep);
+	nScreenZoomX = nScreenZoomY = 1;
+
+	if (ConfigureParams.Screen.bAspectCorrect) {
+		/* Falcon (and TT) pixel scaling factors seem to 2^x
+		 * (quarter/half pixel, interlace/double line), so
+		 * do aspect correction as 2's exponent.
+		 */
+		while (nScreenZoomX*width < height &&
+		       2*nScreenZoomX*width < maxw) {
+			nScreenZoomX *= 2;
+		}
+		while (2*nScreenZoomY*height < width &&
+		       2*nScreenZoomY*height < maxh) {
+			nScreenZoomY *= 2;
+		}
+		if (nScreenZoomX*nScreenZoomY > 2) {
+			fprintf(stderr, "WARNING: strange screen size %dx%d -> aspect corrected by %dx%d!\n",
+				width, height, nScreenZoomX, nScreenZoomY);
+		}
+	}
+
+	/* then select scale as close to target size as possible
+	 * without having larger size than it
+	 */
+	scalex = maxw/(nScreenZoomX*width);
+	scaley = maxh/(nScreenZoomY*height);
+	if (scalex > 1 && scaley > 1) {
+		/* keep aspect ratio */
+		if (scalex < scaley) {
+			nScreenZoomX *= scalex;
+			nScreenZoomY *= scalex;
+		} else {
+			nScreenZoomX *= scaley;
+			nScreenZoomY *= scaley;
+		}
+	}
+
+	genconv_width_req = width;
+	genconv_height_req = height;
+	width *= nScreenZoomX;
+	height *= nScreenZoomY;
+
+	/* get statusbar size for this screen size */
+	sbarheight = Statusbar_GetHeightForSize(width, height);
+	screenheight = height + sbarheight;
+	screenwidth = width;
+
+#if !WITH_SDL2
+	/* get resolution corresponding to these */
+	Resolution_Search(&screenwidth, &screenheight, &bpp, keep);
+#endif
+	/* re-calculate statusbar height for this resolution */
+	sbarheight = Statusbar_SetHeight(screenwidth, screenheight-sbarheight);
+
+	genconv_bpp = bpp;
+	/* screen area without the statusbar */
+	STScreenRect.x = STScreenRect.y = 0;
+	STScreenRect.w = screenwidth;
+	STScreenRect.h = screenheight - sbarheight;
+
+	if (!Screen_SetSDLVideoSize(screenwidth, screenheight, bpp, bForceChange))
+	{
+		/* same host screen size despite Atari resolution change,
+		 * -> no time consuming host video mode change needed
+		 */
+		if (screenwidth > width || screenheight > height+sbarheight) {
+			/* Atari screen smaller than host -> clear screen */
+			Screen_ClearScreen();
+			/* re-calculate variables in case height + statusbar height
+			 * don't anymore match SDL surface size (there's an assert
+			 * for that)
+			 */
+			Statusbar_Init(sdlscrn);
+		}
+#if WITH_SDL2
+		genconv_do_update = true;
+#else
+		genconv_do_update = ( sdlscrn->flags & SDL_HWSURFACE ) == 0;
+#endif
+		return;
+	}
+
+	// In case surface format changed, remap the native palette
+	Screen_RemapPalette();
+
+	// redraw statusbar
+	Statusbar_Init(sdlscrn);
+
+	DEBUGPRINT(("Surface Pitch = %d, width = %d, height = %d\n", sdlscrn->pitch, sdlscrn->w, sdlscrn->h));
+	DEBUGPRINT(("Must Lock? %s\n", SDL_MUSTLOCK(sdlscrn) ? "YES" : "NO"));
+
+#if WITH_SDL2
+	genconv_do_update = true;
+#else
+	// is the SDL_update needed?
+	genconv_do_update = ( sdlscrn->flags & SDL_HWSURFACE ) == 0;
+#endif
+
+	DEBUGPRINT(("Pixel format:bitspp=%d, tmasks r=%04x g=%04x b=%04x"
+			", tshifts r=%d g=%d b=%d"
+			", tlosses r=%d g=%d b=%d\n",
+			sdlscrn->format->BitsPerPixel,
+			sdlscrn->format->Rmask, sdlscrn->format->Gmask, sdlscrn->format->Bmask,
+			sdlscrn->format->Rshift, sdlscrn->format->Gshift, sdlscrn->format->Bshift,
+			sdlscrn->format->Rloss, sdlscrn->format->Gloss, sdlscrn->format->Bloss));
+
+	Main_WarpMouse(sdlscrn->w/2,sdlscrn->h/2, false);
+}
+
+void Screen_GenConvUpdate(SDL_Rect *extra, bool forced)
+{
+	SDL_Rect rects[2];
+	int count = 1;
+
+	if (!forced && !genconv_do_update) // the HW surface is available
+		return;
+
+	rects[0] = STScreenRect;
+	if (extra) {
+		rects[1] = *extra;
+		count = 2;
+	}
+	SDL_UpdateRects(sdlscrn, count, rects);
+}
+
+Uint32 Screen_GetGenConvWidth(void)
+{
+	return STScreenRect.w;
+}
+
+Uint32 Screen_GetGenConvHeight(void)
+{
+	return STScreenRect.h;
+}
+
+#ifdef __LIBRETRO__	/* RETRO HACK */
+void reset_screen(){
+	Resolution_Init();
+	Screen_SetSTResolution(true);
+	Screen_SetFullUpdate();
+}
+#endif	/* RETRO HACK */
 
 /* -------------- screen conversion routines --------------------------------
   Screen conversion routines. We have a number of routines to convert ST screen
@@ -1463,13 +1532,7 @@ static int AdjustLinePaletteRemap(int y)
 	return ScrUpdateFlag;
 }
 
-#ifdef __LIBRETRO__
-void reset_screen(){
-Resolution_Init();
-Screen_SetResolution();
-Screen_SetFullUpdate();
-}
-#endif
+
 /*-----------------------------------------------------------------------*/
 /**
  * Run updates to palette(STRGBPalette[]) until get to screen line
@@ -1489,11 +1552,6 @@ static void Convert_StartFrame(void)
 
 /* Conversion routines */
 
-#include "convert/low320x8.c"		/* LowRes To 320xH x 8-bit color */
-#include "convert/low640x8.c"		/* LowRes To 640xH x 8-bit color */
-#include "convert/med640x8.c"		/* MediumRes To 640xH x 8-bit color */
-#include "convert/high640x8.c"		/* HighRes To 640xH x 8-bit color */
-
 #include "convert/low320x16.c"		/* LowRes To 320xH x 16-bit color */
 #include "convert/low640x16.c"		/* LowRes To 640xH x 16-bit color */
 #include "convert/med640x16.c"		/* MediumRes To 640xH x 16-bit color */
@@ -1507,7 +1565,3 @@ static void Convert_StartFrame(void)
 #include "convert/low320x32_spec.c"	/* LowRes Spectrum 512 To 320xH x 32-bit color */
 #include "convert/low640x32_spec.c"	/* LowRes Spectrum 512 To 640xH x 32-bit color */
 #include "convert/med640x32_spec.c"	/* MediumRes Spectrum 512 To 640xH x 32-bit color */
-
-#include "convert/vdi16.c"		/* VDI x 16 color */
-#include "convert/vdi4.c"		/* VDI x 4 color */
-#include "convert/vdi2.c"		/* VDI x 2 color */

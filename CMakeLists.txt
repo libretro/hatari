@@ -30,7 +30,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 # Conditional build features
 # ##########################
 
-set(ENABLE_SDL2 0
+set(ENABLE_SDL2 1
     CACHE BOOL "Enable building with libSDL2 instead of v1.2")
 set(ENABLE_DSP_EMU 1
     CACHE BOOL "Enable DSP 56k emulator for Falcon mode")
@@ -38,8 +38,8 @@ set(ENABLE_TRACING 1
     CACHE BOOL "Enable tracing messages for debugging")
 set(ENABLE_SMALL_MEM 0
     CACHE BOOL "Enable to use less memory - at the expense of emulation speed")
-set(ENABLE_WINUAE_CPU 0
-    CACHE BOOL "Enable WinUAE CPU core (experimental!)")
+set(ENABLE_WINUAE_CPU 1
+    CACHE BOOL "Enable WinUAE CPU core")
 
 # Run-time checks with GCC "mudflap" etc features:
 # - stack protection
@@ -86,19 +86,21 @@ endif(APPLE)
 # ####################
 
 if(ENABLE_SDL2)
-	find_package(SDL2 REQUIRED)
-	if(NOT SDL2_FOUND)
-		message(FATAL_ERROR "SDL2 library not found!")
-	endif(NOT SDL2_FOUND)
+	find_package(SDL2)
+	#if(NOT SDL2_FOUND)
+	#	message(FATAL_ERROR "SDL2 library not found!")
+	#endif(NOT SDL2_FOUND)
 	set(SDL_INCLUDE_DIR ${SDL2_INCLUDE_DIR})
 	set(SDL_LIBRARY ${SDL2_LIBRARY})
 	set(SDLMAIN_LIBRARY ${SDL2MAIN_LIBRARY})
-else(ENABLE_SDL2)
-	find_package(SDL REQUIRED)
+endif(ENABLE_SDL2)
+
+if(NOT SDL2_FOUND)
+	find_package(SDL)
 	if(NOT SDL_FOUND)
 		message(FATAL_ERROR "SDL library not found!")
 	endif(NOT SDL_FOUND)
-endif(ENABLE_SDL2)
+endif(NOT SDL2_FOUND)
 
 find_package(Math)
 
@@ -135,6 +137,11 @@ if(CAPSIMAGE_FOUND)
 	set(HAVE_CAPSIMAGE 1)
 endif(CAPSIMAGE_FOUND)
 
+find_package(Udev)
+if(UDEV_FOUND)
+	set(HAVE_UDEV 1)
+endif(UDEV_FOUND)
+
 # ################
 # CPP Definitions:
 # ################
@@ -149,16 +156,16 @@ if(DETECTED_LFS_CFLAGS)
 endif(DETECTED_LFS_CFLAGS)
 
 # Additional CFLAGS suggested by the SDL library:
-if(ENABLE_SDL2)
+if(SDL2_FOUND)
 	add_definitions(-DWITH_SDL2)
 	execute_process(COMMAND pkg-config --cflags-only-other sdl2
 			OUTPUT_VARIABLE DETECTED_SDL_CFLAGS
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-else(ENABLE_SDL2)
+else(SDL2_FOUND)
 	execute_process(COMMAND pkg-config --cflags-only-other sdl
 			OUTPUT_VARIABLE DETECTED_SDL_CFLAGS
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-endif(ENABLE_SDL2)
+endif(SDL2_FOUND)
 if(DETECTED_SDL_CFLAGS)
 	add_definitions(${DETECTED_SDL_CFLAGS})
 	# message(STATUS "Additional CFLAGS of SDL: ${DETECTED_SDL_CFLAGS}")
@@ -167,10 +174,10 @@ endif(DETECTED_SDL_CFLAGS)
 if(ENABLE_OSX_BUNDLE)
 	# Use OSX native alert windows
 	add_definitions(-DALERT_HOOKS=1)
-	if(ENABLE_SDL2)
+	if(SDL2_FOUND)
 		# We still want to use our SDLMain.m with SDL2
 		add_definitions(-DSDL_MAIN_NEEDED=1)
-	endif(ENABLE_SDL2)
+	endif(SDL2_FOUND)
 endif(ENABLE_OSX_BUNDLE)
 
 # ###########################
@@ -181,7 +188,10 @@ check_include_files(termios.h HAVE_TERMIOS_H)
 check_include_files(strings.h HAVE_STRINGS_H)
 check_include_files(malloc.h HAVE_MALLOC_H)
 check_include_files(${SDL_INCLUDE_DIR}/SDL_config.h HAVE_SDL_CONFIG_H)
+check_include_files(sys/time.h HAVE_SYS_TIME_H)
 check_include_files(sys/times.h HAVE_SYS_TIMES_H)
+check_include_files(utime.h HAVE_UTIME_H)
+check_include_files(sys/utime.h HAVE_SYS_UTIME_H)
 check_include_files("sys/socket.h;sys/un.h" HAVE_UNIX_DOMAIN_SOCKETS)
 
 # #############################
@@ -191,8 +201,6 @@ check_include_files("sys/socket.h;sys/un.h" HAVE_UNIX_DOMAIN_SOCKETS)
 check_function_exists(cfmakeraw HAVE_CFMAKERAW)
 check_function_exists(setenv HAVE_SETENV)
 check_function_exists(select HAVE_SELECT)
-check_function_exists(posix_memalign HAVE_POSIX_MEMALIGN)
-check_function_exists(memalign HAVE_MEMALIGN)
 check_function_exists(gettimeofday HAVE_GETTIMEOFDAY)
 check_function_exists(nanosleep HAVE_NANOSLEEP)
 check_function_exists(alphasort HAVE_ALPHASORT)
@@ -201,6 +209,7 @@ check_function_exists(statvfs HAVE_STATVFS)
 check_function_exists(fseeko HAVE_FSEEKO)
 check_function_exists(ftello HAVE_FTELLO)
 check_function_exists(flock HAVE_FLOCK)
+check_function_exists(strlcpy HAVE_LIBC_STRLCPY)
 check_struct_has_member("struct dirent" d_type dirent.h HAVE_DIRENT_D_TYPE)
 
 # #############
@@ -355,6 +364,19 @@ else()
   message( "  - capsimage :\tv${CAPSIMAGE_VERSION} not found, install it to use .IPF, .RAW and .CTR disk images" )
 endif(CAPSIMAGE_FOUND)
 
+if(UDEV_FOUND)
+  message( "  - udev :\tfound, required for media change detection in NatFeats SCSI" )
+  message( "          \tdevices on udev-based systems (Linux)" )
+else()
+  if(UNIX AND NOT APPLE AND NOT CYGWIN)
+    message( "  - udev :\tnot found, install it to enable media change detection in" )
+    message( "          \tNatFeats SCSI devices on udev-based systems (Linux)" )
+  endif()
+endif(UDEV_FOUND)
+
+if(NOT HAVE_SYS_TIMES_H)
+  message("\n  Note: times() function is missing (sys/times.h is not available)")
+  message("        ==> using inaccurate SDL_GetTicks() instead")
+endif()
+
 message( "" )
-
-

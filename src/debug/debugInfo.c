@@ -41,13 +41,13 @@ const char DebugInfo_fileid[] = "Hatari debuginfo.c : " __DATE__ " " __TIME__;
 #include "newcpu.h"
 #include "68kDisass.h"
 
-
 /* ------------------------------------------------------------------
  * TOS information
  */
 #define OS_SYSBASE 0x4F2
 #define OS_HEADER_SIZE 0x30
 
+#define OS_PHYSTOP 0x42E
 #define COOKIE_JAR 0x5A0
 
 #define BASEPAGE_SIZE 0x100
@@ -64,25 +64,32 @@ const char DebugInfo_fileid[] = "Hatari debuginfo.c : " __DATE__ " " __TIME__;
 
 /**
  * DebugInfo_GetSysbase: get and validate system base
+ * If warnings is set, output warnings if no valid system base
  * return on success sysbase address (+ set rombase), on failure return zero
  */
-static Uint32 DebugInfo_GetSysbase(Uint32 *rombase)
+static Uint32 DebugInfo_GetSysbase(Uint32 *rombase, bool warnings)
 {
 	Uint32 sysbase = STMemory_ReadLong(OS_SYSBASE);
 
-	if (!STMemory_ValidArea(sysbase, OS_HEADER_SIZE)) {
-		fprintf(stderr, "Invalid TOS sysbase RAM address (0x%x)!\n", sysbase);
+	if ( !STMemory_CheckAreaType (sysbase, OS_HEADER_SIZE, ABFLAG_RAM | ABFLAG_ROM ) ) {
+		if (warnings) {
+			fprintf(stderr, "Invalid TOS sysbase RAM address (0x%x)!\n", sysbase);
+		}
 		return 0;
 	}
 	/* under TOS, sysbase = os_beg = TosAddress, but not under MiNT -> use os_beg */
 	*rombase = STMemory_ReadLong(sysbase+0x08);
-	if (!STMemory_ValidArea(*rombase, OS_HEADER_SIZE)) {
-		fprintf(stderr, "Invalid TOS sysbase ROM address (0x%x)!\n", *rombase);
+	if ( !STMemory_CheckAreaType (*rombase, OS_HEADER_SIZE, ABFLAG_RAM | ABFLAG_ROM ) ) {
+		if (warnings) {
+			fprintf(stderr, "Invalid TOS sysbase ROM address (0x%x)!\n", *rombase);
+		}
 		return 0;
 	}
 	if (*rombase != TosAddress) {
-		fprintf(stderr, "os_beg (0x%x) != TOS address (0x%x), header in RAM not set up yet?\n",
-			*rombase, TosAddress);
+		if (warnings) {
+			fprintf(stderr, "os_beg (0x%x) != TOS address (0x%x), header in RAM not set up yet?\n",
+				*rombase, TosAddress);
+		}
 		return 0;
 	}
 	return sysbase;
@@ -91,15 +98,17 @@ static Uint32 DebugInfo_GetSysbase(Uint32 *rombase)
 /**
  * DebugInfo_CurrentBasepage: get and validate currently running program basepage.
  * if given sysbase is zero, use system sysbase.
+ * If warnings is set, output warnings if no valid basepage
+ * return on success basepage address, on failure return zero
  */
-static Uint32 DebugInfo_CurrentBasepage(Uint32 sysbase)
+static Uint32 DebugInfo_CurrentBasepage(Uint32 sysbase, bool warnings)
 {
 	Uint32 basepage;
 	Uint16 osversion, osconf;
 
 	if (!sysbase) {
 		Uint32 rombase;
-		sysbase = DebugInfo_GetSysbase(&rombase);
+		sysbase = DebugInfo_GetSysbase(&rombase, warnings);
 		if (!sysbase) {
 			return 0;
 		}
@@ -115,10 +124,12 @@ static Uint32 DebugInfo_CurrentBasepage(Uint32 sysbase)
 			basepage = 0x602C;
 		}
 	}
-	if (STMemory_ValidArea(basepage, 4)) {
+	if ( STMemory_CheckAreaType ( basepage, 4, ABFLAG_RAM ) ) {
 		return STMemory_ReadLong(basepage);
 	}
-	fprintf(stderr, "Pointer 0x%06x to basepage address is invalid!\n", basepage);
+	if (warnings) {
+		fprintf(stderr, "Pointer 0x%06x to basepage address is invalid!\n", basepage);
+	}
 	return 0;
 }
 
@@ -129,13 +140,12 @@ static Uint32 DebugInfo_CurrentBasepage(Uint32 sysbase)
  */
 static Uint32 GetBasepageValue(unsigned offset)
 {
-	Uint32 basepage = DebugInfo_CurrentBasepage(0);
+	Uint32 basepage = DebugInfo_CurrentBasepage(0, false);
 	if (!basepage) {
 		return 0;
 	}
-	if (!STMemory_ValidArea(basepage, BASEPAGE_SIZE) ||
+	if ( !STMemory_CheckAreaType ( basepage, BASEPAGE_SIZE, ABFLAG_RAM ) ||
 	    STMemory_ReadLong(basepage) != basepage) {
-		fprintf(stderr, "Basepage address 0x%06x is invalid!\n", basepage);
 		return 0;
 	}
 	return STMemory_ReadLong(basepage+offset);
@@ -177,141 +187,176 @@ Uint32 DebugInfo_GetBSS(void)
 {
 	return GetBasepageValue(0x18);
 }
+/**
+ * DebugInfo_GetBASEPAGE: return current basepage address.
+ */
+Uint32 DebugInfo_GetBASEPAGE(void)
+{
+	return DebugInfo_CurrentBasepage(0, false);
+}
 
+
+/**
+ * output nil-terminated string from any Atari memory type
+ */
+static Uint32 print_mem_str(Uint32 addr, Uint32 end)
+{
+	Uint8 chr;
+	while (addr < end && (chr = STMemory_ReadByte(addr++))) {
+		fputc(chr, stderr);
+	}
+	return addr;
+}
 
 /**
  * DebugInfo_Basepage: show TOS process basepage information
  * at given address.
  */
-static void DebugInfo_Basepage(Uint32 basepage)
+static void DebugInfo_Basepage(FILE *fp, Uint32 basepage)
 {
 	Uint8 cmdlen;
-	Uint32 env;
+	Uint32 addr;
 
 	if (!basepage) {
 		/* default to current process basepage */
-		basepage = DebugInfo_CurrentBasepage(0);
+		basepage = DebugInfo_CurrentBasepage(0, true);
 		if (!basepage) {
 			return;
 		}
 	}
-	fprintf(stderr, "Process basepage information:\n");
-	if (!STMemory_ValidArea(basepage, BASEPAGE_SIZE) ||
+	fprintf(fp, "Process basepage (0x%x) information:\n", basepage);
+	if ( !STMemory_CheckAreaType ( basepage, BASEPAGE_SIZE, ABFLAG_RAM ) ||
 	    STMemory_ReadLong(basepage) != basepage) {
-		fprintf(stderr, "- address 0x%06x is invalid!\n", basepage);
+		fprintf(fp, "- address 0x%06x is invalid!\n", basepage);
 		return;
 	}
-	fprintf(stderr, "- TPA start      : 0x%06x\n", STMemory_ReadLong(basepage));
-	fprintf(stderr, "- TPA end +1     : 0x%06x\n", STMemory_ReadLong(basepage+0x04));
-	fprintf(stderr, "- Text segment   : 0x%06x\n", STMemory_ReadLong(basepage+0x08));
-	fprintf(stderr, "- Text size      : 0x%x\n",   STMemory_ReadLong(basepage+0x0C));
-	fprintf(stderr, "- Data segment   : 0x%06x\n", STMemory_ReadLong(basepage+0x10));
-	fprintf(stderr, "- Data size      : 0x%x\n",   STMemory_ReadLong(basepage+0x14));
-	fprintf(stderr, "- BSS segment    : 0x%06x\n", STMemory_ReadLong(basepage+0x18));
-	fprintf(stderr, "- BSS size       : 0x%x\n",   STMemory_ReadLong(basepage+0x1C));
-	fprintf(stderr, "- Process DTA    : 0x%06x\n", STMemory_ReadLong(basepage+0x20));
-	fprintf(stderr, "- Parent basepage: 0x%06x\n", STMemory_ReadLong(basepage+0x24));
+	fprintf(fp, "- TPA start      : 0x%06x\n", STMemory_ReadLong(basepage));
+	fprintf(fp, "- TPA end +1     : 0x%06x\n", STMemory_ReadLong(basepage+0x04));
+	fprintf(fp, "- Text segment   : 0x%06x\n", STMemory_ReadLong(basepage+0x08));
+	fprintf(fp, "- Text size      : 0x%x\n",   STMemory_ReadLong(basepage+0x0C));
+	fprintf(fp, "- Data segment   : 0x%06x\n", STMemory_ReadLong(basepage+0x10));
+	fprintf(fp, "- Data size      : 0x%x\n",   STMemory_ReadLong(basepage+0x14));
+	fprintf(fp, "- BSS segment    : 0x%06x\n", STMemory_ReadLong(basepage+0x18));
+	fprintf(fp, "- BSS size       : 0x%x\n",   STMemory_ReadLong(basepage+0x1C));
+	fprintf(fp, "- Process DTA    : 0x%06x\n", STMemory_ReadLong(basepage+0x20));
+	fprintf(fp, "- Parent basepage: 0x%06x\n", STMemory_ReadLong(basepage+0x24));
 
-	env = STMemory_ReadLong(basepage+0x2C);
-	fprintf(stderr, "- Environment    : 0x%06x\n", env);
-	if (STMemory_ValidArea(env, 4096)) {
-		Uint32 end = env + 4096;
-		while (env < end && *(STRam+env)) {
-			fprintf(stderr, "'%s'\n", STRam+env);
-			env += strlen((const char *)(STRam+env)) + 1;
+	addr = STMemory_ReadLong(basepage+0x2C);
+	fprintf(fp, "- Environment    : 0x%06x\n", addr);
+	if ( STMemory_CheckAreaType ( addr, 4096, ABFLAG_RAM ) ) {
+		Uint32 end = addr + 4096;
+		while (addr < end && STMemory_ReadByte(addr)) {
+			fprintf(fp, "  '");
+			addr = print_mem_str(addr, end);
+			addr = print_mem_str(addr, end);
+			fprintf(fp, "'\n");
 		}
 	}
-	cmdlen = STMemory_ReadByte(basepage+0x80);
-	fprintf(stderr, "- Command argslen: %d\n", cmdlen);
+	addr = basepage+0x80;
+	cmdlen = STMemory_ReadByte(addr++);
+	fprintf(fp, "- Command argslen: %d (at 0x%06x)\n", cmdlen, addr);
 	if (cmdlen) {
-		int offset = 0;
-		while (offset < cmdlen) {
-			fprintf(stderr, " '%s'", STRam+basepage+0x81+offset);
-			offset += strlen((const char *)(STRam+basepage+0x81+offset)) + 1;
+		Uint32 end = addr + cmdlen;
+		fprintf(fp, "  '");
+		for (;;) {
+			addr = print_mem_str(addr, end);
+			if (addr >= end) {
+				break;
+			}
+			fputc(' ', fp);
 		}
-		fprintf(stderr, "\n");
+		fprintf(fp, "'\n");
 	}
 }
+
 
 /**
  * DebugInfo_PrintOSHeader: output OS Header information
  */
-static void DebugInfo_PrintOSHeader(Uint32 sysbase)
+static void DebugInfo_PrintOSHeader(FILE *fp, Uint32 sysbase)
 {
 	Uint32 gemblock, basepage;
-	Uint16 osversion, osconf, langbits;
+	Uint16 osversion, datespec, osconf, langbits;
 	const char *lang;
 	static const char langs[][3] = {
 		"us", "de", "fr", "uk", "es", "it", "se", "ch" /* fr */, "ch" /* de */,
 		"tr", "fi", "no", "dk", "sa", "nl", "cs", "hu"
 	};
 
-	osversion = STMemory_ReadWord(sysbase+0x02);
-	fprintf(stderr, "OS base addr : 0x%06x\n", sysbase);
-	fprintf(stderr, "OS RAM end+1 : 0x%06x\n", STMemory_ReadLong(sysbase+0x0C));
-	fprintf(stderr, "TOS version  : 0x%x\n", osversion);
+	/* first more technical info */
 
-	fprintf(stderr, "Reset handler: 0x%06x\n", STMemory_ReadLong(sysbase+0x04));
-	fprintf(stderr, "Reset vector : 0x%06x\n", STMemory_ReadLong(RESET_VECTOR));
-	fprintf(stderr, "Reset valid  : 0x%x (valid=0x%x)\n", STMemory_ReadLong(RESET_VALID), RESET_MAGIC);
+	osversion = STMemory_ReadWord(sysbase+0x02);
+	fprintf(fp, "OS base addr : 0x%06x\n", sysbase);
+	fprintf(fp, "OS RAM end+1 : 0x%06x\n", STMemory_ReadLong(sysbase+0x0C));
+
+	fprintf(fp, "Reset handler: 0x%06x\n", STMemory_ReadLong(sysbase+0x04));
+	fprintf(fp, "Reset vector : 0x%06x\n", STMemory_ReadLong(RESET_VECTOR));
+	fprintf(fp, "Reset valid  : 0x%x (valid=0x%x)\n", STMemory_ReadLong(RESET_VALID), RESET_MAGIC);
 
 	gemblock = STMemory_ReadLong(sysbase+0x14);
-	fprintf(stderr, "GEM Memory Usage Parameter Block:\n");
-	if (STMemory_ValidArea(gemblock, GEM_MUPB_SIZE)) {
-		fprintf(stderr, "- Block addr : 0x%06x\n", gemblock);
-		fprintf(stderr, "- GEM magic  : 0x%x (valid=0x%x)\n", STMemory_ReadLong(gemblock), GEM_MAGIC);
-		fprintf(stderr, "- GEM entry  : 0x%06x\n", STMemory_ReadLong(gemblock+4));
-		fprintf(stderr, "- GEM end    : 0x%06x\n", STMemory_ReadLong(gemblock+8));
+	fprintf(fp, "GEM Memory Usage Parameter Block:\n");
+	if ( STMemory_CheckAreaType ( gemblock, GEM_MUPB_SIZE, ABFLAG_RAM | ABFLAG_ROM ) ) {
+		fprintf(fp, "- Block addr : 0x%06x\n", gemblock);
+		fprintf(fp, "- GEM magic  : 0x%x (valid=0x%x)\n", STMemory_ReadLong(gemblock), GEM_MAGIC);
+		fprintf(fp, "- GEM entry  : 0x%06x\n", STMemory_ReadLong(gemblock+4));
+		fprintf(fp, "- GEM end    : 0x%06x\n", STMemory_ReadLong(gemblock+8));
 	} else {
-		fprintf(stderr, "- is at INVALID 0x%06x address.\n", gemblock);
+		fprintf(fp, "- is at INVALID 0x%06x address.\n", gemblock);
 	}
 
-	fprintf(stderr, "OS date      : 0x%x\n", STMemory_ReadLong(sysbase+0x14));
-	fprintf(stderr, "OS DOS date  : 0x%x\n", STMemory_ReadLong(sysbase+0x1E));
+	if (osversion >= 0x0102) {
+		/* last 3 OS header fields are only available as of TOS 1.02 */
+		fprintf(fp, "Memory pool  : 0x%06x\n", STMemory_ReadLong(sysbase+0x20));
+		fprintf(fp, "Kbshift addr : 0x%06x\n", STMemory_ReadLong(sysbase+0x24));
+	} else {
+		/* TOS 1.0 */
+		fprintf(fp, "Memory pool  : 0x0056FA\n");
+		fprintf(fp, "Kbshift addr : 0x000E1B\n");
+	}
+	basepage = DebugInfo_CurrentBasepage(sysbase, true);
+	if (basepage) {
+		fprintf(fp, "Basepage     : 0x%06x\n", basepage);
+	}
+
+	/* and then basic TOS information */
+
+	fputs("\n", fp);
+	fprintf(fp, "TOS version  : 0x%x%s\n", osversion, bIsEmuTOS ? " (EmuTOS)" : "");
+	/* Bits: 0-4 = day (1-31), 5-8 = month (1-12), 9-15 = years (since 1980) */
+	datespec = STMemory_ReadWord(sysbase+0x1E);
+	fprintf(fp, "Build date   : %04d-%02d-%02d\n", (datespec >> 9) + 1980,
+	       (datespec & 0x1E0) >> 5, datespec & 0x1f);
 
 	osconf = STMemory_ReadWord(sysbase+0x1C);
 	langbits = osconf >> 1;
 	if (langbits == 127) {
 		lang = "all";
-	} else if (langbits < ARRAYSIZE(langs)) {
+	} else if (langbits < ARRAY_SIZE(langs)) {
 		lang = langs[langbits];
 	} else {
 		lang = "unknown";
 	}
-	fprintf(stderr, "OS Conf bits : 0x%04x (%s, %s)\n", osconf, lang, osconf&1 ? "PAL":"NTSC");
-
-	if (osversion >= 0x0102) {
-		/* last 3 OS header fields are only available as of TOS 1.02 */
-		fprintf(stderr, "Memory pool  : 0x%06x\n", STMemory_ReadLong(sysbase+0x20));
-		fprintf(stderr, "Kbshift addr : 0x%06x\n", STMemory_ReadLong(sysbase+0x24));
-	} else {
-		/* TOS 1.0 */
-		fprintf(stderr, "Memory pool  : 0x0056FA\n");
-		fprintf(stderr, "Kbshift addr : 0x000E1B\n");
-	}
-	basepage = DebugInfo_CurrentBasepage(sysbase);
-	if (basepage) {
-		fprintf(stderr, "Basepage     : 0x%06x\n", basepage);
-	}
+	fprintf(fp, "OS config    : %s, %s (0x%x)\n", lang, osconf&1 ? "PAL":"NTSC", osconf);
+	fprintf(fp, "Phystop      : %d KB\n", (STMemory_ReadLong(OS_PHYSTOP) + 511) / 1024);
 }
 
 /**
  * DebugInfo_OSHeader: display TOS OS Header and RAM one
  * if their addresses differ
  */
-static void DebugInfo_OSHeader(Uint32 dummy)
+static void DebugInfo_OSHeader(FILE *fp, Uint32 dummy)
 {
 	Uint32 sysbase, rombase;
 
-	sysbase = DebugInfo_GetSysbase(&rombase);
+	sysbase = DebugInfo_GetSysbase(&rombase, false);
 	if (!sysbase) {
 		return;
 	}
-	fprintf(stderr, "OS header information:\n");
-	DebugInfo_PrintOSHeader(sysbase);
+	fprintf(fp, "OS header information:\n");
+	DebugInfo_PrintOSHeader(fp, sysbase);
 	if (sysbase != rombase) {
-		fprintf(stderr, "\nROM TOS OS header information:\n");
-		DebugInfo_PrintOSHeader(rombase);
+		fprintf(fp, "\nROM TOS OS header information:\n");
+		DebugInfo_PrintOSHeader(fp, rombase);
 		return;
 	}
 }
@@ -319,26 +364,27 @@ static void DebugInfo_OSHeader(Uint32 dummy)
 /**
  * DebugInfo_Cookiejar: display TOS Cookiejar content
  */
-static void DebugInfo_Cookiejar(Uint32 dummy)
+static void DebugInfo_Cookiejar(FILE *fp, Uint32 dummy)
 {
 	int items;
 
 	Uint32 jar = STMemory_ReadLong(COOKIE_JAR);
 	if (!jar) {
-		fprintf(stderr, "Cookiejar is empty.\n");
+		fprintf(fp, "Cookiejar is empty.\n");
 		return;
 	}
 
-	fprintf(stderr, "Cookiejar contents:\n");
+	fprintf(fp, "Cookiejar contents:\n");
 	items = 0;
-	while (STMemory_ValidArea(jar, 8) && STMemory_ReadLong(jar)) {
-		fprintf(stderr, "%c%c%c%c = 0x%08x\n",
-			STRam[jar], STRam[jar+1], STRam[jar+2], STRam[jar+3],
+	while ( STMemory_CheckAreaType (jar, 8, ABFLAG_RAM ) && STMemory_ReadLong(jar)) {
+		fprintf(fp, "%c%c%c%c = 0x%08x\n",
+			STMemory_ReadByte(jar+0), STMemory_ReadByte(jar+1),
+			STMemory_ReadByte(jar+2), STMemory_ReadByte(jar+3),
 			STMemory_ReadLong(jar+4));
 		jar += 8;
 		items++;
 	}
-	fprintf(stderr, "%d items at 0x%06x.\n", items, STMemory_ReadLong(COOKIE_JAR));
+	fprintf(fp, "%d items at 0x%06x.\n", items, STMemory_ReadLong(COOKIE_JAR));
 }
 
 
@@ -364,31 +410,31 @@ static void DebugInfo_CallCommand(int (*func)(int, char* []), const char *comman
 	func(argc, argv);
 }
 
-static void DebugInfo_CpuRegister(Uint32 arg)
+static void DebugInfo_CpuRegister(FILE *fp, Uint32 arg)
 {
 	DebugInfo_CallCommand(DebugCpu_Register, "register", arg);
 }
-static void DebugInfo_CpuDisAsm(Uint32 arg)
+static void DebugInfo_CpuDisAsm(FILE *fp, Uint32 arg)
 {
 	DebugInfo_CallCommand(DebugCpu_DisAsm, "disasm", arg);
 }
-static void DebugInfo_CpuMemDump(Uint32 arg)
+static void DebugInfo_CpuMemDump(FILE *fp, Uint32 arg)
 {
 	DebugInfo_CallCommand(DebugCpu_MemDump, "memdump", arg);
 }
 
 #if ENABLE_DSP_EMU
 
-static void DebugInfo_DspRegister(Uint32 arg)
+static void DebugInfo_DspRegister(FILE *fp, Uint32 arg)
 {
 	DebugInfo_CallCommand(DebugDsp_Register, "dspreg", arg);
 }
-static void DebugInfo_DspDisAsm(Uint32 arg)
+static void DebugInfo_DspDisAsm(FILE *fp, Uint32 arg)
 {
 	DebugInfo_CallCommand(DebugDsp_DisAsm, "dspdisasm", arg);
 }
 
-static void DebugInfo_DspMemDump(Uint32 arg)
+static void DebugInfo_DspMemDump(FILE *fp, Uint32 arg)
 {
 	char cmdbuf[] = "dspmemdump";
 	char addrbuf[6], spacebuf[2] = "X";
@@ -423,7 +469,7 @@ static Uint32 DebugInfo_DspMemArgs(int argc, char *argv[])
 #endif  /* ENABLE_DSP_EMU */
 
 
-static void DebugInfo_RegAddr(Uint32 arg)
+static void DebugInfo_RegAddr(FILE *fp, Uint32 arg)
 {
 	bool forDsp;
 	char regname[3];
@@ -530,7 +576,7 @@ static char *parse_filename;
 /**
  * Parse and exec commands in the previously given debugger input file
  */
-static void DebugInfo_FileParse(Uint32 dummy)
+static void DebugInfo_FileParse(FILE *fp, Uint32 dummy)
 {
 	if (parse_filename) {
 		DebugUI_ParseFile(parse_filename, true);
@@ -567,27 +613,27 @@ static Uint32 DebugInfo_FileArgs(int argc, char *argv[])
 /**
  * Default information on entering the debugger
  */
-static void DebugInfo_Default(Uint32 dummy)
+static void DebugInfo_Default(FILE *fp, Uint32 dummy)
 {
 	int hbl, fcycles, lcycles;
         uaecptr nextpc, pc = M68000_GetPC();
 	Video_GetPosition(&fcycles, &hbl, &lcycles);
 
-	fprintf(stderr, "\nCPU=$%x, VBL=%d, FrameCycles=%d, HBL=%d, LineCycles=%d, DSP=",
+	fprintf(fp, "\nCPU=$%x, VBL=%d, FrameCycles=%d, HBL=%d, LineCycles=%d, DSP=",
 		pc, nVBLs, fcycles, hbl, lcycles);
 	if (bDspEnabled)
-		fprintf(stderr, "$%x\n", DSP_GetPC());
+		fprintf(fp, "$%x\n", DSP_GetPC());
 	else
-		fprintf(stderr, "N/A\n");
+		fprintf(fp, "N/A\n");
 
-	Disasm(stderr, pc, &nextpc, 1);
+	Disasm(fp, pc, &nextpc, 1);
 }
 
 static const struct {
 	/* if overlaps with other functionality, list only for lock command */
 	bool lock;
 	const char *name;
-	void (*func)(Uint32 arg);
+	void (*func)(FILE *fp, Uint32 arg);
 	/* convert args in argv into single Uint32 for func */
 	Uint32 (*args)(int argc, char *argv[]);
 	const char *info;
@@ -629,7 +675,7 @@ static Uint32 LockedArgument;
  */
 void DebugInfo_ShowSessionInfo(void)
 {
-	infotable[LockedFunction].func(LockedArgument);
+	infotable[LockedFunction].func(stderr, LockedArgument);
 }
 
 
@@ -649,7 +695,7 @@ static char *DebugInfo_Match(const char *text, int state, bool lock)
 		i = 0;
 	}
 	/* next match */
-	while (i++ < ARRAYSIZE(infotable)) {
+	while (i++ < ARRAY_SIZE(infotable)) {
 		if (!lock && infotable[i-1].lock) {
 			continue;
 		}
@@ -683,7 +729,7 @@ int DebugInfo_Command(int nArgc, char *psArgs[])
 	if (nArgc > 1) {
 		cmd = psArgs[1];		
 		/* which subcommand? */
-		for (i = 0; i < ARRAYSIZE(infotable); i++) {
+		for (i = 0; i < ARRAY_SIZE(infotable); i++) {
 			if (strcmp(cmd, infotable[i].name) == 0) {
 				sub = i;
 				break;
@@ -710,7 +756,7 @@ int DebugInfo_Command(int nArgc, char *psArgs[])
 	if (sub < 0 || !ok) {
 		/* no subcommand or something wrong with value, show info */
 		fprintf(stderr, "%s subcommands are:\n", psArgs[0]);
-		for (i = 0; i < ARRAYSIZE(infotable); i++) {
+		for (i = 0; i < ARRAY_SIZE(infotable); i++) {
 			if (!lock && infotable[i].lock) {
 				continue;
 			}
@@ -727,7 +773,7 @@ int DebugInfo_Command(int nArgc, char *psArgs[])
 		fprintf(stderr, "Locked %s output.\n", psArgs[1]);
 	} else {
 		/* do actual work */
-		infotable[sub].func(value);
+		infotable[sub].func(stderr, value);
 	}
 	return DEBUGGER_CMDDONE;
 }

@@ -3,8 +3,8 @@
 
   Copyright (C) 2012 by Nicolas Pomarède
 
-  This file is distributed under the GNU Public License, version 2 or at
-  your option any later version. Read the file gpl.txt for details.
+  This file is distributed under the GNU General Public License, version 2
+  or at your option any later version. Read the file gpl.txt for details.
 
   MC6850 ACIA emulation.
 */
@@ -165,8 +165,7 @@ const char ACIA_fileid[] = "Hatari acia.c : " __DATE__ " " __TIME__;
 #define	ACIA_CR_RECEIVE_INTERRUPT_ENABLE( CR )	( ( CR >> 7 ) & 0x01 )	/* CR7 : Receive interrupt enable */
 
 
-
-int	ACIA_Counter_Divide[ 3 ] = { 1 , 16 , 64 };		/* Used to divide txclock/rxclock to get the correct baud rate */
+static const int ACIA_Counter_Divide[3] = { 1 , 16 , 64 };	/* Used to divide txclock/rxclock to get the correct baud rate */
 
 
 /* Data size, parity and stop bits used for the transfer depending on CR_WORD_SELECT */
@@ -351,8 +350,8 @@ void	ACIA_MemorySnapShot_Capture ( bool bSave )
 /**
  * Set or reset the ACIA's IRQ signal.
  * IRQ signal is inverted (0/low sets irq, 1/high resets irq)
- * In the ST, the 2 ACIA's IRQ pins are connected to the same MFP pin,
- * so they share the same IRQ bit in the MFP.
+ * In the ST, the 2 ACIA's IRQ pins are connected to the same MFP input,
+ * so they share the same IRQ bit in GPIP4.
  */
 static void	ACIA_Set_Line_IRQ_MFP ( int bit )
 {
@@ -364,14 +363,11 @@ static void	ACIA_Set_Line_IRQ_MFP ( int bit )
 		* the irq bit is set and the MFP interrupt is triggered - for example
 		* the "V8 music system" demo depends on this behaviour.
 		* This 4 cycle delay is handled in mfp.c */
-
-		MFP_GPIP &= ~0x10;				/* set IRQ signal for GPIP P4 */
-		MFP_InputOnChannel ( MFP_INT_ACIA , 0 );
+		MFP_GPIP_Set_Line_Input ( MFP_GPIP_LINE_ACIA , MFP_GPIP_STATE_LOW );
 	}
 	else
 	{
-		/* GPIP I4 - General Purpose Pin Keyboard/MIDI interrupt */
-		MFP_GPIP |= 0x10;				/* IRQ bit was reset */
+		MFP_GPIP_Set_Line_Input ( MFP_GPIP_LINE_ACIA , MFP_GPIP_STATE_HIGH );
 	}
 }
 
@@ -443,9 +439,8 @@ static void	ACIA_Set_Timers_IKBD ( void *pACIA )
  * (with cpu running at 8 MHz)
  * InternalCycleOffset allows to compensate for a != 0 value in PendingInterruptCount
  * to keep a constant baud rate.
- * TODO : we use a fixed 8 MHz clock and nCpuFreqShift to convert cycles for our
- * internal timers in cycInt.c. This should be replaced some days by using
- * MachineClocks.CPU_Freq and not using nCpuFreqShift anymore.
+ * TODO : we use a fixed 8 MHz clock to convert cycles for our internal timers
+ * in cycInt.c. This should be replaced some days by using MachineClocks.CPU_Freq.
  */
 static void	ACIA_Start_InterruptHandler_IKBD ( ACIA_STRUCT *pACIA , int InternalCycleOffset )
 {
@@ -455,12 +450,18 @@ static void	ACIA_Start_InterruptHandler_IKBD ( ACIA_STRUCT *pACIA , int Internal
 //	Cycles = MachineClocks.CPU_Freq / pACIA->TX_Clock;		/* Convert ACIA cycles in CPU cycles */
 	Cycles = 8021247 / pACIA->TX_Clock;				/* Convert ACIA cycles in CPU cycles, for a 8 MHz STF reference */
 	Cycles *= pACIA->Clock_Divider;
+#ifdef OLD_CPU_SHIFT
 	Cycles <<= nCpuFreqShift;					/* Compensate for x2 or x4 cpu speed */
+#endif
 
 	LOG_TRACE ( TRACE_ACIA, "acia %s start timer divider=%d cpu_cycles=%d VBL=%d HBL=%d\n" , pACIA->ACIA_Name ,
 		pACIA->Clock_Divider , Cycles , nVBLs , nHBL );
 
+#ifdef OLD_CPU_SHIFT
 	CycInt_AddRelativeInterruptWithOffset ( Cycles, INT_CPU_CYCLE, INTERRUPT_ACIA_IKBD , InternalCycleOffset );
+#else
+	CycInt_AddRelativeInterruptWithOffset ( Cycles, INT_CPU8_CYCLE, INTERRUPT_ACIA_IKBD , InternalCycleOffset );
+#endif
 }
 
 
@@ -532,8 +533,8 @@ void	ACIA_AddWaitCycles ( void )
 	/* Wait for E clock only if this is the first ACIA access for this instruction */
 	/* (NOTE : in UAE, movep behaves like several bytes access with different IoAccessBaseAddress, */
 	/* so only the first movep's access should wait for E Clock) */
-	if ( ( ( MovepByteNbr == 0 ) && ( IoAccessBaseAddress == IoAccessCurrentAddress ) )
-	  || ( MovepByteNbr == 1 ) )					/* First access of a movep */
+	if ( ( ( IoAccessInstrCount == 0 ) && ( IoAccessBaseAddress == IoAccessCurrentAddress ) )
+	  || ( IoAccessInstrCount == 1 ) )				/* First access of a movep */
 		cycles += M68000_WaitEClock ();
 	
 	M68000_WaitState ( cycles );

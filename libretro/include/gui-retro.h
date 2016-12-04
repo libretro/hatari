@@ -22,3 +22,5 @@ extern void gui_poll_events();
 extern int  GuiGetMouseState( int * x,int * y);
 extern int pauseg;
 
+#define SDLGui_DoDialog(a,b) SDLGui_DoDialog((a),(b), false)
+#define  Main_WarpMouse(a,b)  Main_WarpMouse((a),(b), false)

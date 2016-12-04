@@ -45,9 +45,9 @@ const char Change_fileid[] = "Hatari change.c : " __DATE__ " " __TIME__;
 
 #define DEBUG 0
 #if DEBUG
-#define Dprintf(a...) printf(a)
+#define Dprintf(...) printf(__VA_ARGS__)
 #else
-#define Dprintf(a...)
+#define Dprintf(...)
 #endif
 
 /*-----------------------------------------------------------------------*/
@@ -101,7 +101,7 @@ bool Change_DoNeedReset(CNF_PARAMS *current, CNF_PARAMS *changed)
 		return true;
 
 	/* Did change GEMDOS drive Atari/host location or enabling? */
-	if (changed->HardDisk.nHardDiskDrive != current->HardDisk.nHardDiskDrive
+	if (changed->HardDisk.nGemdosDrive != current->HardDisk.nGemdosDrive
 	    || changed->HardDisk.bUseHardDiskDirectories != current->HardDisk.bUseHardDiskDirectories
 	    || (strcmp(changed->HardDisk.szHardDiskDirectories[0], current->HardDisk.szHardDiskDirectories[0])
 	        && changed->HardDisk.bUseHardDiskDirectories))
@@ -145,6 +145,10 @@ bool Change_DoNeedReset(CNF_PARAMS *current, CNF_PARAMS *changed)
  
 	/* Did change FPU? */
 	if (changed->System.n_FPUType != current->System.n_FPUType)
+		return true;
+
+	/* Did change size of TT-RAM? */
+	if (current->Memory.nTTRamSize != changed->Memory.nTTRamSize)
 		return true;
 #endif
 
@@ -193,7 +197,12 @@ void Change_CopyChangedParamsToConfiguration(CNF_PARAMS *current, CNF_PARAMS *ch
 	     || changed->Screen.nMaxWidth != current->Screen.nMaxWidth
 	     || changed->Screen.nMaxHeight != current->Screen.nMaxHeight
 	     || changed->Screen.bAllowOverscan != current->Screen.bAllowOverscan
-	     || changed->Screen.bShowStatusbar != current->Screen.bShowStatusbar))
+	     || changed->Screen.bShowStatusbar != current->Screen.bShowStatusbar
+#if WITH_SDL2
+	     || changed->Screen.nRenderScaleQuality != current->Screen.nRenderScaleQuality
+	     || changed->Screen.bUseVsync != current->Screen.bUseVsync
+#endif
+	    ))
 	{
 		Dprintf("- screenmode>\n");
 		bScreenModeChange = true;
@@ -254,7 +263,7 @@ void Change_CopyChangedParamsToConfiguration(CNF_PARAMS *current, CNF_PARAMS *ch
 		FDC_Drive_Set_NumberOfHeads ( 1 , changed->DiskImage.DriveB_NumberOfHeads );
 
 	/* Did change GEMDOS drive Atari/host location or enabling? */
-	if (changed->HardDisk.nHardDiskDrive != current->HardDisk.nHardDiskDrive
+	if (changed->HardDisk.nGemdosDrive != current->HardDisk.nGemdosDrive
 	    || changed->HardDisk.bUseHardDiskDirectories != current->HardDisk.bUseHardDiskDirectories
 	    || (strcmp(changed->HardDisk.szHardDiskDirectories[0], current->HardDisk.szHardDiskDirectories[0])
 	        && changed->HardDisk.bUseHardDiskDirectories))
@@ -298,15 +307,14 @@ void Change_CopyChangedParamsToConfiguration(CNF_PARAMS *current, CNF_PARAMS *ch
 		bReInitIDEEmu = true;
 	}
 
-	/* Did change blitter, rtc or system type? */
+	/* Did change blitter, DSP or system type? */
 	if (changed->System.bBlitter != current->System.bBlitter
 #if ENABLE_DSP_EMU
 	    || changed->System.nDSPType != current->System.nDSPType
 #endif
-	    || changed->System.bRealTimeClock != current->System.bRealTimeClock
 	    || changed->System.nMachineType != current->System.nMachineType)
 	{
-		Dprintf("- blitter/rtc/dsp/machine>\n");
+		Dprintf("- blitter/dsp/machine>\n");
 		IoMem_UnInit();
 		bReInitIoMem = true;
 	}
@@ -317,7 +325,7 @@ void Change_CopyChangedParamsToConfiguration(CNF_PARAMS *current, CNF_PARAMS *ch
 	    changed->System.nDSPType != DSP_TYPE_EMU)
 	{
 		Dprintf("- DSP>\n");
-		DSP_UnInit();
+		DSP_Disable();
 	}
 #endif
 
@@ -348,7 +356,7 @@ void Change_CopyChangedParamsToConfiguration(CNF_PARAMS *current, CNF_PARAMS *ch
 	    changed->System.nDSPType == DSP_TYPE_EMU)
 	{
 		Dprintf("- DSP<\n");
-		DSP_Init();
+		DSP_Enable();
 	}
 #endif
 
@@ -429,7 +437,7 @@ void Change_CopyChangedParamsToConfiguration(CNF_PARAMS *current, CNF_PARAMS *ch
 	if (bScreenModeChange)
 	{
 		Dprintf("- screenmode<\n");
-		Screen_ModeChanged();
+		Screen_ModeChanged(true);
 	}
 
 	/* Do we need to perform reset? */

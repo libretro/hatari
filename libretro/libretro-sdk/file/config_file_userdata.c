@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2014 The RetroArch team
+/* Copyright  (C) 2010-2015 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (config_file_userdata.c).
@@ -112,7 +112,7 @@ int config_userdata_get_string(void *userdata, const char *key_str,
    if (got)
    {
       *output = str;
-      return true; 
+      return true;
    }
 
    *output = strdup(default_output);

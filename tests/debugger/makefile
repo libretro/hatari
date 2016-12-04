@@ -9,11 +9,14 @@
 # "make valgrind":
 # - run tests under valgrind
 #
-# "make clean; make MUDFLAP=1 mudflap":
-# - run tests with GCC mudflap checks
+# "make clean; make CC=gcc-<version> MUDFLAP=1 mudflap":
+# - run tests with older GCC version mudflap checks
+#   (MudFlap was removed/replaced in GCC 4.9 with AddressSanitizer)
+#
+# TODO: support AddressSanitizer
 
 # Set the C compiler (e.g. gcc)
-CC = gcc
+CC ?= gcc
 
 # Directory given for 'cmake' i.e. where CMake created the config.h.
 # Could also be simply "../.." or "../../build".
@@ -96,10 +99,10 @@ test: $(TESTS)
 	for test in $^; do ./$$test; echo "Press <Enter>"; read proceed; done
 
 # all the real & dummy deps
-SOURCEDEPS = test-dummies.c ../../src/debug/breakcond.c \
+SOURCEDEPS = ../../src/debug/breakcond.c \
 	../../src/debug/debugcpu.c ../../src/debug/history.c \
 	../../src/debug/evaluate.c ../../src/debug/symbols.c \
-	../../src/str.c
+	 ../../src/debug/vars.c ../../src/str.c test-dummies.c
 
 test-symbols: test-symbols.c $(SOURCEDEPS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)

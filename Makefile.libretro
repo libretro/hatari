@@ -2,6 +2,18 @@ CORE_DIR := .
 LIBRETRO_DIR = $(CORE_DIR)/libretro
 ZLIB_DIR = $(LIBRETRO_DIR)/utils/zlib
 
+
+IPFSUPPORT ?= 0
+IPFDIR ?=
+ 
+ifeq ($(IPFSUPPORT), 1)
+CAPS_DIR = $(IPFDIR)
+CAPS_LIB = -L$(CAPS_DIR) -lcapsimage
+else
+CAPS_DIR =
+CAPS_LIB =
+endif
+
 ifeq ($(platform),)
 platform = unix
 ifeq ($(shell uname -a),)
@@ -17,9 +29,16 @@ endif
 
 EXTERNAL_ZLIB = 0
 
+
+ifeq ($(NEWCPU), 1)
+TARGET_NAME	:= nhatari
+else
 TARGET_NAME	:= hatari
+endif
+
 
 ifeq ($(platform), unix)
+   CC = gcc
 	TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
    SHARED :=  -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
@@ -37,10 +56,7 @@ else ifeq ($(platform), osx)
    fpic := -fPIC
    SHARED := -dynamiclib
    PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD
-
-# iOS
-else ifneq (,$(findstring ios,$(platform)))
-
+else ifeq ($(platform), ios)
 	TARGET := $(TARGET_NAME)_libretro_ios.dylib
 	fpic := -fPIC
 	SHARED := -dynamiclib
@@ -49,15 +65,14 @@ else ifneq (,$(findstring ios,$(platform)))
 		IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
 	endif
 
-	CC = cc -arch armv7 -isysroot $(IOSSDK)
+	CC = clang -arch armv7 -isysroot $(IOSSDK)
 	CFLAGS += -DIOS -marm -DHAVE_POSIX_MEMALIGN=1 -w
-ifeq ($(platform),ios9)
-	CC += -miphoneos-version-min=8.0
-	CFLAGS += -miphoneos-version-min=8.0
-else
-	CC += -miphoneos-version-min=5.0
-	CFLAGS += -miphoneos-version-min=5.0
-endif
+	OSXVER = `sw_vers -productVersion | cut -d. -f 2`
+	OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
+	ifeq ($(OSX_LT_MAVERICKS),"YES")
+		CC += -miphoneos-version-min=5.0
+		CFLAGS += -miphoneos-version-min=5.0
+	endif
 
 else ifeq ($(platform), wii)
 	TARGET := $(TARGET_NAME)_libretro_wii.a
@@ -102,16 +117,38 @@ CXXFLAGS  += $(CFLAGS)
 CPPFLAGS  += $(CFLAGS)
 
 EMU = $(CORE_DIR)/src
+
+
+ifeq ($(NEWCPU), 1)
+CFLAGS += -DNEW_WCPU=1
+CPU = $(EMU)/cpu
+else
 CPU = $(EMU)/uae-cpu
+endif
+
 FALCON = $(EMU)/falcon
 DBG = $(EMU)/debug
 FLP = $(EMU)
 GUI = $(LIBRETRO_DIR)/gui-retro
+
+ifeq ($(NEWCPU), 1)
+CPU_PREGEN = $(LIBRETRO_DIR)/new-cpu-pregen
+else
 CPU_PREGEN = $(LIBRETRO_DIR)/uae-cpu-pregen
+endif
+
 LIBCOOBJ = $(LIBRETRO_DIR)/utils/libco
 LIBUTILS = $(LIBRETRO_DIR)/utils
 
 include Makefile.common
+
+LINKFLAGS += -lm -lz
+
+ifeq ($(IPFSUPPORT), 1)
+INCFLAGS += -I$(CAPS_DIR)/include
+PLATFLAGS += -DHAVE_CAPSIMAGE=1
+LINKFLAGS += $(CAPS_LIB)
+endif
 
 OBJECTS := $(SOURCES_C:.c=.o)
 
@@ -126,13 +163,13 @@ $(TARGET): $(OBJECTS)
 
 else ifeq ($(platform), win)
 $(TARGET): $(OBJECTS)
-	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz
+	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  $(LINKFLAGS)
 else ifeq ($(platform), android)
 $(TARGET): $(OBJECTS)
-	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz
+	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  $(LINKFLAGS)
 else
 $(TARGET): $(OBJECTS)
-	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz -lpthread
+	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  $(LINKFLAGS) -lpthread
 
 endif
 

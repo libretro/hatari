@@ -19,6 +19,38 @@ ZLIB_SRCS	:= $(ZLIB_DIR)/adler32.c \
 	$(ZLIB_DIR)/zutil.c 
 endif
 
+
+ifeq ($(NEWCPU), 1)
+
+SOURCES_C +=  \
+$(CPU_PREGEN)/cpuemu_0.c \
+$(CPU_PREGEN)/cpuemu_11.c \
+$(CPU_PREGEN)/cpuemu_13.c \
+$(CPU_PREGEN)/cpuemu_20.c \
+$(CPU_PREGEN)/cpuemu_21.c \
+$(CPU_PREGEN)/cpuemu_22.c \
+$(CPU_PREGEN)/cpuemu_23.c \
+$(CPU_PREGEN)/cpuemu_24.c \
+$(CPU_PREGEN)/cpuemu_31.c \
+$(CPU_PREGEN)/cpuemu_32.c \
+$(CPU_PREGEN)/cpuemu_33.c \
+$(CPU_PREGEN)/cpuemu_40.c \
+$(CPU_PREGEN)/cpudefs.c \
+$(CPU_PREGEN)/cpustbl.c \
+$(CPU)/cpummu.c \
+$(CPU)/cpummu030.c \
+$(CPU)/custom.c \
+$(CPU)/debug.c \
+$(CPU)/events.c \
+$(CPU)/hatari-glue.c \
+$(CPU)/memory.c \
+$(CPU)/newcpu_common.c \
+$(CPU)/readcpu.c \
+$(CPU)/fpp.c \
+$(CPU_PREGEN)/newcpu.c
+
+else
+
 SOURCES_C += $(CPU_PREGEN)/cpudefs.c \
 $(CPU_PREGEN)/cpuemu.c \
 $(CPU_PREGEN)/cpustbl.c \
@@ -28,8 +60,11 @@ $(CPU)/newcpu.c \
 $(CPU)/readcpu.c \
 $(CPU)/fpp.c
 
+endif
+
 SOURCES_C += $(GUI)/dlgAbout.c \
 $(GUI)/dlgAlert.c \
+$(GUI)/dlgHalt.c \
 $(GUI)/dlgDevice.c \
 $(GUI)/dlgFileSelect.c \
 $(GUI)/dlgFloppy.c \
@@ -50,7 +85,6 @@ $(FALCON)/dsp.c \
 $(FALCON)/dsp_core.c \
 $(FALCON)/dsp_cpu.c \
 $(FALCON)/dsp_disasm.c \
-$(FALCON)/hostscreen.c \
 $(FALCON)/microphone.c \
 $(FALCON)/nvram.c \
 $(FALCON)/videl.c
@@ -115,6 +149,7 @@ $(EMU)/main.c \
 $(EMU)/midi.c \
 $(EMU)/memorySnapShot.c \
 $(EMU)/mfp.c \
+$(EMU)/nf_scsidrv.c\
 $(EMU)/paths.c \
 $(EMU)/psg.c \
 $(EMU)/printer.c \
@@ -125,6 +160,7 @@ $(EMU)/rtc.c \
 $(EMU)/scandir.c \
 $(EMU)/stMemory.c \
 $(EMU)/screen.c \
+$(EMU)/screenConvert.c \
 $(EMU)/screenSnapShot.c \
 $(EMU)/shortcut.c \
 $(EMU)/sound.c \

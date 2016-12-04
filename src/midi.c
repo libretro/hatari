@@ -5,16 +5,20 @@
   or at your option any later version. Read the file gpl.txt for details.
 
   MIDI communication.
-  Note that this code is far from being perfect. However, it is already
-  enough to let some ST programs (e.g. the game Pirates!) use the host's midi
-  system.
 
   TODO:
    - Most bits in the ACIA's status + control registers are currently ignored.
-   - Check when we have to clear the ACIA_SR_INTERRUPT_REQUEST bit in the
-     ACIA status register (it is currently done when reading or writing to
-     the data register, but probably it should rather be done when reading the
-     status register?).
+
+  NOTE [NP] :
+    In all accuracy, we should use a complete emulation of the acia serial line,
+    as for the ikbd. But as the MIDI's baudrate is rather high and could require
+    more resources to emulate at the bit level, we handle transfer 1 byte a time
+    instead of sending each bit one after the other.
+    This way, we only need a timer every 2560 cycles (instead of 256 cycles per bit).
+
+    We handle a special case for the TX_EMPTY bit when reading SR : this bit should be set
+    after TDR was copied into TSR, which is approximatively when the next bit should
+    be transferred (256 cycles) (fix the program 'Notator')
 */
 const char Midi_fileid[] = "Hatari midi.c : " __DATE__ " " __TIME__;
 
@@ -24,22 +28,40 @@ const char Midi_fileid[] = "Hatari midi.c : " __DATE__ " " __TIME__;
 #include "configuration.h"
 #include "ioMem.h"
 #include "m68000.h"
+#include "memorySnapShot.h"
 #include "mfp.h"
 #include "midi.h"
 #include "file.h"
 #include "acia.h"
+#include "screen.h"
+#include "video.h"
 
 
 #define ACIA_SR_INTERRUPT_REQUEST  0x80
 #define ACIA_SR_TX_EMPTY           0x02
 #define ACIA_SR_RX_FULL            0x01
 
+/* Delay to send/receive 1 byte through MIDI (in cpu cycles at x1, x2 or x4 speed)
+ * Serial line is set to 31250 bps, 1 start bit, 8 bits, 1 stop, no parity, which gives 256 cycles
+ * per bit at 8 MHz, and 2560 cycles to transfer 10 bits
+ */
+#ifdef OLD_CPU_SHIFT
+#define	MIDI_TRANSFER_BIT_CYCLE		256
+#define	MIDI_TRANSFER_BYTE_CYCLE	(MIDI_TRANSFER_BIT_CYCLE * 10)
+#else
+#define	MIDI_TRANSFER_BIT_CYCLE		( 256 << nCpuFreqShift )
+#define	MIDI_TRANSFER_BYTE_CYCLE	(MIDI_TRANSFER_BIT_CYCLE * 10)
+#endif
 
 static FILE *pMidiFhIn  = NULL;        /* File handle used for Midi input */
 static FILE *pMidiFhOut = NULL;        /* File handle used for Midi output */
 static Uint8 MidiControlRegister;
 static Uint8 MidiStatusRegister;
 static Uint8 nRxDataByte;
+static Uint64 TDR_Write_Time;		/* Time of the last write in TDR fffc06 */
+static Uint64 TDR_Empty_Time;		/* Time when TDR will be empty after a write to fffc06 (ie when TDR is transferred to TSR) */
+static Uint64 TSR_Complete_Time;	/* Time when TSR will be completely transferred */
+
 
 
 /**
@@ -98,15 +120,74 @@ void Midi_UnInit(void)
  */
 void Midi_Reset(void)
 {
+//fprintf ( stderr , "midi reset\n" );
 	MidiControlRegister = 0;
 	MidiStatusRegister = ACIA_SR_TX_EMPTY;
 	nRxDataByte = 1;
+	TDR_Empty_Time = 0;
+	TSR_Complete_Time = 0;
 
-	if (ConfigureParams.Midi.bEnableMidi)
-		CycInt_AddRelativeInterrupt(2050, INT_CPU_CYCLE, INTERRUPT_MIDI);
-	else
-		CycInt_RemovePendingInterrupt (INTERRUPT_MIDI);
+	/* Set timer */
+#ifdef OLD_CPU_SHIFT
+	CycInt_AddRelativeInterrupt ( MIDI_TRANSFER_BYTE_CYCLE , INT_CPU_CYCLE , INTERRUPT_MIDI );
+#else
+	CycInt_AddRelativeInterrupt ( MIDI_TRANSFER_BYTE_CYCLE , INT_CPU_CYCLE , INTERRUPT_MIDI );
+#endif
 }
+
+
+/**
+ * Save/Restore snapshot of local variables
+ */
+void    MIDI_MemorySnapShot_Capture(bool bSave)
+{
+	MemorySnapShot_Store(&MidiControlRegister, sizeof(MidiControlRegister));
+	MemorySnapShot_Store(&MidiStatusRegister, sizeof(MidiStatusRegister));
+	MemorySnapShot_Store(&nRxDataByte, sizeof(nRxDataByte));
+	MemorySnapShot_Store(&TDR_Empty_Time, sizeof(TDR_Empty_Time));
+	MemorySnapShot_Store(&TSR_Complete_Time, sizeof(TSR_Complete_Time));
+}
+
+
+/*-----------------------------------------------------------------------*/
+/**
+ * Check if the IRQ must be changed in SR.
+ * When there's a change, we must change the IRQ line too.
+ */
+static void	MIDI_UpdateIRQ ( void )
+{
+	Uint8		irq_bit_new;
+
+	irq_bit_new = 0;
+
+	if ( ( ( MidiControlRegister & 0x80 ) == 0x80 ) 		/* Check for RX causes of interrupt */
+	  && ( MidiStatusRegister & ACIA_SR_RX_FULL ) )
+	  irq_bit_new = ACIA_SR_INTERRUPT_REQUEST;
+
+	if ( ( ( MidiControlRegister & 0x60) == 0x20 )			/* Check for TX causes of interrupt */
+	  && ( MidiStatusRegister & ACIA_SR_TX_EMPTY ) )
+	  irq_bit_new = ACIA_SR_INTERRUPT_REQUEST;
+	
+	/* Update SR and IRQ line if a change happened */
+	if ( ( MidiStatusRegister & ACIA_SR_INTERRUPT_REQUEST ) != irq_bit_new )
+	{
+		LOG_TRACE ( TRACE_MIDI, "midi update irq irq_new=%d VBL=%d HBL=%d\n" , irq_bit_new?1:0 , nVBLs , nHBL );
+
+		if ( irq_bit_new )
+		{
+			/* Request interrupt by setting GPIP to low/0 */
+			MFP_GPIP_Set_Line_Input ( MFP_GPIP_LINE_ACIA , MFP_GPIP_STATE_LOW );
+			MidiStatusRegister |= ACIA_SR_INTERRUPT_REQUEST;
+		}
+		else
+		{
+			/* Clear interrupt request by setting GPIP to high/1 */
+			MFP_GPIP_Set_Line_Input ( MFP_GPIP_LINE_ACIA , MFP_GPIP_STATE_HIGH );
+			MidiStatusRegister &= ~ACIA_SR_INTERRUPT_REQUEST;
+		}
+	}
+}
+
 
 
 /**
@@ -114,11 +195,24 @@ void Midi_Reset(void)
  */
 void Midi_Control_ReadByte(void)
 {
-	LOG_TRACE(TRACE_MIDI, "MIDI: ReadControl -> $%x\n", MidiStatusRegister);
-
 	ACIA_AddWaitCycles ();						/* Additional cycles when accessing the ACIA */
 
+	/* Special case : if we wrote a byte into TDR, TX_EMPTY bit should be */
+	/* set approximatively after the first bit was transferred using TSR */
+	if ( ( ( MidiStatusRegister & ACIA_SR_TX_EMPTY ) == 0 )
+	  && ( CyclesGlobalClockCounter > TDR_Empty_Time ) )						// OK avec 11 bits et 1 bit
+	{
+		MidiStatusRegister |= ACIA_SR_TX_EMPTY;
+
+		/* Do we need to generate a transfer interrupt? */
+		MIDI_UpdateIRQ ();
+	}
+
+//fprintf ( stderr , "midi read sr %x %lld %lld\n" , MidiStatusRegister , CyclesGlobalClockCounter , TDR_Write_Time );
+
 	IoMem[0xfffc04] = MidiStatusRegister;
+
+	LOG_TRACE ( TRACE_MIDI, "midi read fffc04 sr=0x%02x VBL=%d HBL=%d\n" , MidiStatusRegister , nVBLs , nHBL );
 }
 
 
@@ -131,18 +225,9 @@ void Midi_Control_WriteByte(void)
 
 	MidiControlRegister = IoMem[0xfffc04];
 
-	LOG_TRACE(TRACE_MIDI, "MIDI: WriteControl($%x)\n", MidiControlRegister);
+	LOG_TRACE ( TRACE_MIDI, "midi write fffc04 cr=0x%02x VBL=%d HBL=%d\n" , MidiControlRegister , nVBLs , nHBL );
 
-	/* Do we need to generate a transfer interrupt? */
-	if ((MidiControlRegister & 0xA0) == 0xA0)
-	{
-		LOG_TRACE(TRACE_MIDI, "MIDI: WriteControl transfer interrupt!\n");
-
-		/* Acknowledge in MFP circuit, pass bit,enable,pending */
-		MFP_InputOnChannel ( MFP_INT_ACIA , 0 );
-
-		MidiStatusRegister |= ACIA_SR_INTERRUPT_REQUEST;
-	}
+	MIDI_UpdateIRQ ();
 }
 
 
@@ -151,22 +236,23 @@ void Midi_Control_WriteByte(void)
  */
 void Midi_Data_ReadByte(void)
 {
-	LOG_TRACE(TRACE_MIDI, "MIDI: ReadData -> $%x\n", nRxDataByte);
+	LOG_TRACE ( TRACE_MIDI, "midi read fffc06 rdr=0x%02x VBL=%d HBL=%d\n" , nRxDataByte , nVBLs , nHBL );
+//fprintf ( stderr , "midi rx %x\n" , nRxDataByte);
 
 	ACIA_AddWaitCycles ();						/* Additional cycles when accessing the ACIA */
 
-	MidiStatusRegister &= ~(ACIA_SR_INTERRUPT_REQUEST|ACIA_SR_RX_FULL);
-
-	/* GPIP I4 - General Purpose Pin Keyboard/MIDI interrupt,
-	 * becomes high(1) again after data has been read. */
-	MFP_GPIP |= 0x10;
-
 	IoMem[0xfffc06] = nRxDataByte;
+
+	MidiStatusRegister &= ~ACIA_SR_RX_FULL;
+
+	MIDI_UpdateIRQ ();
 }
 
 
 /**
  * Write to MIDI data register ($FFFC06).
+ * We should determine precisely when TDR will be empty and when TSR will be transferred.
+ * This is required to accurately emulate the TDRE bit in status register (fix the program 'Notator')
  */
 void Midi_Data_WriteByte(void)
 {
@@ -175,10 +261,28 @@ void Midi_Data_WriteByte(void)
 	ACIA_AddWaitCycles ();						/* Additional cycles when accessing the ACIA */
 
 	nTxDataByte = IoMem[0xfffc06];
+	TDR_Write_Time = CyclesGlobalClockCounter;
 
-	LOG_TRACE(TRACE_MIDI, "MIDI: WriteData($%x)\n", nTxDataByte);
+	/* If TSR is already transferred, then TDR will be empty after 1 bit is transferred */
+	/* If TSR is not completely transferred, then TDR will be empty 1 bit after TSR is transferred */
+	if ( CyclesGlobalClockCounter >= TSR_Complete_Time )
+	{
+		TDR_Empty_Time = CyclesGlobalClockCounter + MIDI_TRANSFER_BIT_CYCLE;
+		TSR_Complete_Time = CyclesGlobalClockCounter + MIDI_TRANSFER_BYTE_CYCLE;
+	}
+	else
+	{
+//fprintf ( stderr , "MIDI OVR %lld\n" , TSR_Complete_Time - CyclesGlobalClockCounter );
+		TDR_Empty_Time = TSR_Complete_Time + MIDI_TRANSFER_BIT_CYCLE;
+		TSR_Complete_Time += MIDI_TRANSFER_BYTE_CYCLE;
+	}
 
-	MidiStatusRegister &= ~ACIA_SR_INTERRUPT_REQUEST;
+	LOG_TRACE ( TRACE_MIDI, "midi write fffc06 tdr=0x%02x VBL=%d HBL=%d\n" , nTxDataByte , nVBLs , nHBL );
+//fprintf ( stderr , "midi tx %x sr=%x\n" , nTxDataByte , MidiStatusRegister );
+
+	MidiStatusRegister &= ~ACIA_SR_TX_EMPTY;
+
+	MIDI_UpdateIRQ ();
 
 	if (!ConfigureParams.Midi.bEnableMidi)
 		return;
@@ -198,8 +302,6 @@ void Midi_Data_WriteByte(void)
 			return;
 		}
 	}
-
-	MidiStatusRegister &= ~ACIA_SR_TX_EMPTY;
 }
 
 
@@ -213,22 +315,19 @@ void Midi_InterruptHandler_Update(void)
 	/* Remove this interrupt from list and re-order */
 	CycInt_AcknowledgeInterrupt();
 
-	/* Flush outgoing data */
-	if (!(MidiStatusRegister & ACIA_SR_TX_EMPTY))
+	/* Special case : if we wrote a byte into TDR, TX_EMPTY bit should be */
+	/* set when reaching TDR_Empty_Time */
+	if ( ( ( MidiStatusRegister & ACIA_SR_TX_EMPTY ) == 0 )
+	  && ( CyclesGlobalClockCounter > TDR_Empty_Time ) )
 	{
-		/* Do we need to generate a transfer interrupt? */
-		if ((MidiControlRegister & 0xA0) == 0xA0)
-		{
-			LOG_TRACE(TRACE_MIDI, "MIDI: WriteData transfer interrupt!\n");
-			/* Acknowledge in MFP circuit, pass bit,enable,pending */
-			MFP_InputOnChannel ( MFP_INT_ACIA , 0 );
-			MidiStatusRegister |= ACIA_SR_INTERRUPT_REQUEST;
-		}
+		MidiStatusRegister |= ACIA_SR_TX_EMPTY;
 
+		/* Do we need to generate a transfer interrupt? */
+		MIDI_UpdateIRQ ();
+
+		/* Flush outgoing data (not necessary ?) */
 		// if (pMidiFhOut)
 		//	fflush(pMidiFhOut);
-
-		MidiStatusRegister |= ACIA_SR_TX_EMPTY;
 	}
 
 	/* Read the bytes in, if we have any */
@@ -240,18 +339,10 @@ void Midi_InterruptHandler_Update(void)
 			LOG_TRACE(TRACE_MIDI, "MIDI: Read character -> $%x\n", nInChar);
 			/* Copy into our internal queue */
 			nRxDataByte = nInChar;
-			/* Do we need to generate a receive interrupt? */
-			if ((MidiControlRegister & 0x80) == 0x80)
-			{
-				LOG_TRACE(TRACE_MIDI, "MIDI: WriteData receive interrupt!\n");
-				/* Acknowledge in MFP circuit */
-				MFP_InputOnChannel ( MFP_INT_ACIA , 0 );
-				MidiStatusRegister |= ACIA_SR_INTERRUPT_REQUEST;
-			}
 			MidiStatusRegister |= ACIA_SR_RX_FULL;
-			/* GPIP I4 - General Purpose Pin Keyboard/MIDI interrupt:
-			 * It will remain low(0) until data is read from $fffc06. */
-			MFP_GPIP &= ~0x10;
+
+			/* Do we need to generate a receive interrupt? */
+			MIDI_UpdateIRQ ();
 		}
 		else
 		{
@@ -260,5 +351,11 @@ void Midi_InterruptHandler_Update(void)
 		}
 	}
 
-	CycInt_AddRelativeInterrupt(2050, INT_CPU_CYCLE, INTERRUPT_MIDI);
+	/* Set timer */
+#ifdef OLD_CPU_SHIFT
+	CycInt_AddRelativeInterrupt ( MIDI_TRANSFER_BYTE_CYCLE , INT_CPU_CYCLE , INTERRUPT_MIDI );
+#else
+	CycInt_AddRelativeInterrupt ( MIDI_TRANSFER_BYTE_CYCLE , INT_CPU_CYCLE , INTERRUPT_MIDI );
+#endif
 }
+

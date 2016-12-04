@@ -48,6 +48,7 @@ const char Statusbar_fileid[] = "Hatari statusbar.c : " __DATE__ " " __TIME__;
 #include "avi_record.h"
 #include "vdi.h"
 #include "fdc.h"
+#include "stMemory.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -99,7 +100,7 @@ static Uint32 RecColorOn, RecColorOff;
 static Uint32 GrayBg, LedColorBg;
 
 /* needs to be enough for all messages, but <= MessageRect width / font width */
-#define MAX_MESSAGE_LEN 52
+#define MAX_MESSAGE_LEN 60
 typedef struct msg_item {
 	struct msg_item *next;
 	char msg[MAX_MESSAGE_LEN+1];
@@ -163,19 +164,21 @@ int Statusbar_SetHeight(int width, int height)
 	int count = backtrace(addr, sizeof(addr)/sizeof(*addr));
 	backtrace_symbols_fd(addr, count, fileno(stderr));
 #endif
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	ScreenHeight = height;
 	StatusbarHeight = Statusbar_GetHeightForSize(width, height);
 	DEBUGPRINT(("Statusbar_SetHeight(%d, %d) -> %d\n", width, height, StatusbarHeight));
+	return StatusbarHeight;
 #else
 //TODO FIX STATUSBAR
-return 0;
-#endif
-	return StatusbarHeight;
+	return 0;
+#endif 	/* RETRO HACK */
 }
-#ifdef __LIBRETRO__
+
+#ifdef __LIBRETRO__ 	/* RETRO HACK */
 int LEDA=0, LEDB=0, LEDC=0;
-#endif
+#endif 	/* RETRO HACK */
+
 /*-----------------------------------------------------------------------*/
 /**
  * Return height of statusbar set with Statusbar_SetHeight()
@@ -192,13 +195,13 @@ int Statusbar_GetHeight(void)
  */
 void Statusbar_EnableHDLed(drive_led_t state)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	/* leds are shown for 1/2 sec after enabling */
 	Led[DRIVE_LED_HD].expire = SDL_GetTicks() + 1000/2;
 	Led[DRIVE_LED_HD].state = state;
 #else
 LEDC= 1;
-#endif
+#endif 	/* RETRO HACK */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -210,14 +213,14 @@ void Statusbar_SetFloppyLed(drive_index_t drive, drive_led_t state)
 {
 	assert(drive == DRIVE_LED_A || drive == DRIVE_LED_B);
 	Led[drive].state = state;
-#ifdef __LIBRETRO__
+#ifdef __LIBRETRO__ 	/* RETRO HACK */
 if(drive == DRIVE_LED_A)
 if(state==true)LEDA=1;
 else LEDA=0;
 else if(drive == DRIVE_LED_B)
 if(state==true)LEDB=1;
 else LEDB=0;
-#endif
+#endif 	/* RETRO HACK */
 }
 
 
@@ -228,7 +231,7 @@ else LEDB=0;
  */
 static void Statusbar_OverlayInit(const SDL_Surface *surf)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	int h;
 	/* led size/pos needs to be re-calculated in case screen changed */
 	h = surf->h / 50;
@@ -245,7 +248,7 @@ static void Statusbar_OverlayInit(const SDL_Surface *surf)
 		OverlayUnderside = NULL;
 	}
 	bOverlayState = OVERLAY_NONE;
-#endif
+#endif	/* RETRO HACK */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -256,7 +259,7 @@ static void Statusbar_OverlayInit(const SDL_Surface *surf)
  */
 void Statusbar_Init(SDL_Surface *surf)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	msg_item_t *item;
 	SDL_Rect ledbox;
 	int i, fontw, fonth, lineh, xoffset, yoffset;
@@ -390,7 +393,7 @@ void Statusbar_Init(SDL_Surface *surf)
 	/* and blit statusbar on screen */
 	SDL_UpdateRects(surf, 1, &FullRect);
 	DEBUGPRINT(("Drawn <- Statusbar_Init()\n"));
-#endif
+#endif  	/* RETRO HACK */
 }
 
 
@@ -451,18 +454,22 @@ void Statusbar_UpdateInfo(void)
 		*end++ = '0' + ConfigureParams.System.nCpuFreq / 10;
 	}
 	*end++ = '0' + ConfigureParams.System.nCpuFreq % 10;
-	end = Statusbar_AddString(end, "MHz/");
+	end = Statusbar_AddString(end, "MHz");
 
 	/* CPU type */
 	if(ConfigureParams.System.nCpuLevel > 0) {
-		*end++ = '0';
-		*end++ = '0' + ConfigureParams.System.nCpuLevel % 10;
-		*end++ = '0';
 		*end++ = '/';
+		*end++ = '0';
+		if ( ConfigureParams.System.nCpuLevel == 5 )	/* Special case : 68060 has nCpuLevel=5 */
+			*end++ = '0' + 6;
+		else
+			*end++ = '0' + ConfigureParams.System.nCpuLevel % 10;
+		*end++ = '0';
 	}
 
 	/* additional WinUAE CPU/FPU info */
 #if ENABLE_WINUAE_CPU
+	*end++ = '/';
 	switch (ConfigureParams.System.n_FPUType) {
 	case FPU_68881:
 		end = Statusbar_AddString(end, "68881");
@@ -476,13 +483,13 @@ void Statusbar_UpdateInfo(void)
 	default:
 		*end++ = '-';
 	}
-	*end++ = '/';
 	if (ConfigureParams.System.bMMU) {
-		end = Statusbar_AddString(end, "MMU/");
+		end = Statusbar_AddString(end, "/MMU");
 	}
 #endif
 
 	/* amount of memory */
+	*end++ = ' ';
 	if (ConfigureParams.Memory.nMemorySize > 9) {
 		*end++ = '1';
 		*end++ = '0' + ConfigureParams.Memory.nMemorySize % 10;
@@ -493,12 +500,20 @@ void Statusbar_UpdateInfo(void)
 			end = Statusbar_AddString(end, "0.5");
 		}
 	}
+	if (TTmemory && ConfigureParams.Memory.nTTRamSize) {
+		end += sprintf(end, "/%i", ConfigureParams.Memory.nTTRamSize);
+	}
 	end = Statusbar_AddString(end, "MB ");
 
 	/* machine type */
 	switch (ConfigureParams.System.nMachineType) {
 	case MACHINE_ST:
-		end = Statusbar_AddString(end, "ST");
+		end = Statusbar_AddString(end, "ST(");
+		end = Statusbar_AddString(end, Video_GetTimings_Name());
+		*end++ = ')';
+		break;
+	case MACHINE_MEGA_ST:
+		end = Statusbar_AddString(end, "MegaST");
 		break;
 	case MACHINE_STE:
 		end = Statusbar_AddString(end, "STE");
@@ -580,7 +595,7 @@ void Statusbar_UpdateInfo(void)
  */
 static SDL_Rect* Statusbar_DrawMessage(SDL_Surface *surf, const char *msg)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	int fontw, fonth, offset;
 	SDL_FillRect(surf, &MessageRect, GrayBg);
 	if (*msg) {
@@ -591,8 +606,12 @@ static SDL_Rect* Statusbar_DrawMessage(SDL_Surface *surf, const char *msg)
 	DEBUGPRINT(("Draw message: '%s'\n", msg));
 	return &MessageRect;
 #else
+
+	int offset = (strlen(msg) * 16) / 2;
+	SDLGui_Text(10 + offset, 470, msg);
+
 	return NULL;
-#endif
+#endif 	/* RETRO HACK */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -618,12 +637,8 @@ static SDL_Rect* Statusbar_ShowMessage(SDL_Surface *surf, Uint32 ticks)
 		assert(MessageList->next); /* last message shouldn't end here */
 		next = MessageList->next;
 		free(MessageList);
+		/* show next */
 		MessageList = next;
-		/* make sure next message gets shown */
-		MessageList->shown = false;
-	}
-	if (MessageList->shown) {
-		return NULL;
 	}
 	/* not shown yet, show */
 	MessageList->shown = true;
@@ -645,7 +660,7 @@ void Statusbar_OverlayBackup(SDL_Surface *surf)
 		/* overlay not used with statusbar */
 		return;
 	}
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	assert(surf);
 	if (!OverlayUnderside) {
 		SDL_Surface *bak;
@@ -659,7 +674,7 @@ void Statusbar_OverlayBackup(SDL_Surface *surf)
 		OverlayUnderside = bak;
 	}
 	SDL_BlitSurface(surf, &OverlayLedRect, OverlayUnderside, NULL);
-#endif
+#endif	/* RETRO HACK */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -671,7 +686,7 @@ void Statusbar_OverlayBackup(SDL_Surface *surf)
  */
 void Statusbar_OverlayRestore(SDL_Surface *surf)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	if ((StatusbarHeight && ConfigureParams.Screen.bShowStatusbar)
 	    || !ConfigureParams.Screen.bShowDriveLed) {
 		/* overlay not used with statusbar */
@@ -683,7 +698,7 @@ void Statusbar_OverlayRestore(SDL_Surface *surf)
 		/* this will make the draw function to update this the screen */
 		bOverlayState = OVERLAY_RESTORED;
 	}
-#endif
+#endif 	/* RETRO HACK */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -692,7 +707,7 @@ void Statusbar_OverlayRestore(SDL_Surface *surf)
  */
 static void Statusbar_OverlayDrawLed(SDL_Surface *surf, Uint32 color)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	SDL_Rect rect;
 	if (bOverlayState == OVERLAY_DRAWN) {
 		/* some led already drawn */
@@ -708,7 +723,7 @@ static void Statusbar_OverlayDrawLed(SDL_Surface *surf, Uint32 color)
 	rect.h -= 2;
 	SDL_FillRect(surf, &OverlayLedRect, LedColorBg);
 	SDL_FillRect(surf, &rect, color);
-#endif
+#endif	/* RETRO HACK */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -719,7 +734,7 @@ static void Statusbar_OverlayDrawLed(SDL_Surface *surf, Uint32 color)
  */
 static SDL_Rect* Statusbar_OverlayDraw(SDL_Surface *surf)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	Uint32 currentticks = SDL_GetTicks();
 	int i;
 
@@ -749,7 +764,7 @@ static SDL_Rect* Statusbar_OverlayDraw(SDL_Surface *surf)
 	case OVERLAY_NONE:
 		break;
 	}
-#endif
+#endif  	/* RETRO HACK */
 	return NULL;
 }
 
@@ -764,7 +779,7 @@ static SDL_Rect* Statusbar_OverlayDraw(SDL_Surface *surf)
  */
 SDL_Rect* Statusbar_Update(SDL_Surface *surf, bool do_update)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__ 	/* RETRO HACK */
 	static char FdcOld[FDC_MSG_MAX_LEN] = "";
 	char FdcNew[FDC_MSG_MAX_LEN];
 	Uint32 color, currentticks;
@@ -876,5 +891,6 @@ SDL_Rect* Statusbar_Update(SDL_Surface *surf, bool do_update)
 	return last_rect;
 #else
 return NULL;
-#endif
+#endif  	/* RETRO HACK */
+
 }
