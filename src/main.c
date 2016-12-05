@@ -837,12 +837,11 @@ static void Main_UnInit(void)
 	Log_UnInit();
 }
 
-
 /*-----------------------------------------------------------------------*/
 /**
  * Load initial configuration file(s)
  */
-static void Main_LoadInitialConfig(const char *argv2)
+static void Main_LoadInitialConfig(void)
 {
 	char *psGlobalConfig;
 
@@ -851,7 +850,10 @@ static void Main_LoadInitialConfig(const char *argv2)
 	{
 
 #ifdef __LIBRETRO__	/* RETRO HACK */
-snprintf(psGlobalConfig, FILENAME_MAX, "%s",argv2);
+//retroup: load default cfg from system dir
+extern const char *retro_system_directory;
+snprintf(psGlobalConfig, FILENAME_MAX, "%s%chatari.cfg",retro_system_directory, PATHSEP);	
+	
 printf("RetroConf:'%s'\n",psGlobalConfig);
 #else
 
@@ -930,7 +932,7 @@ int main(int argc, char *argv[])
 	Configuration_SetDefault();
 
 	/* Now load the values from the configuration file */
-	Main_LoadInitialConfig(argv[2]);
+	Main_LoadInitialConfig();
 
 	/* Check for any passed parameters */
 	if (!Opt_ParseParameters(argc, (const char * const *)argv))
