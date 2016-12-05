@@ -50,7 +50,6 @@ const char Gemdos_fileid[] = "Hatari gemdos.c : " __DATE__ " " __TIME__;
 #include "m68000.h"
 #include "memorySnapShot.h"
 #include "printer.h"
-#include "rs232.h"
 #include "statusbar.h"
 #include "scandir.h"
 #include "stMemory.h"
@@ -132,7 +131,9 @@ typedef struct
 static FILE_HANDLE  FileHandles[MAX_FILE_HANDLES];
 static INTERNAL_DTA InternalDTAs[MAX_DTAS_FILES];
 static int DTAIndex;        /* Circular index into above */
+static Uint32 DTA_Gemdos;   /* DTA address in ST memory space */
 static DTA *pDTA;           /* Our GEMDOS hard drive Disk Transfer Address structure */
+			    /* This a direct pointer to DTA_Gemdos using STMemory_STAddrToPointer() */
 static Uint16 CurrentDrive; /* Current drive (0=A,1=B,2=C etc...) */
 static Uint32 act_pd;       /* Used to get a pointer to the current basepage */
 static Uint16 nAttrSFirst;  /* File attribute for SFirst/Snext */
@@ -299,6 +300,9 @@ static int PopulateDTA(char *path, struct dirent *file)
 
 	GemDOS_DateTime2Tos(filestat.st_mtime, &DateTime, tempstr);
 
+	/* Atari memory modified directly through pDTA members -> flush the data cache */
+	M68000_Flush_Data_Cache(DTA_Gemdos, sizeof(DTA));
+
 	/* convert to atari-style uppercase */
 	Str_Filename2TOSname(file->d_name, pDTA->dta_name);
 #if DEBUG_PATTERN_MATCH
@@ -345,12 +349,11 @@ static bool fsfirst_match(const char *pat, const char *name)
 
 	if (name[0] == '.')
 		return false;           /* skip .* files */
-	if (strcmp(pat,"*.*")==0)
-		return true;            /* match everything */
-	if (strcasecmp(pat,name)==0)
-		return true;            /* exact case insensitive match */
 
-	dot = strrchr(name, '.');	/* '*' matches everything except _last_ '.' */
+	dot = strrchr(name, '.');	/* '*' matches everything except last dot in name */
+	if (dot && p[0] == '*' && p[1] == 0)
+		return false;		/* plain '*' must not match anything with extension */
+
 	while (*n)
 	{
 		if (*p=='*')
@@ -359,23 +362,27 @@ static bool fsfirst_match(const char *pat, const char *name)
 				n++;
 			p++;
 		}
-		else
+		else if (*p=='?' && *n)
 		{
-			if (*p=='?' && *n)
-			{
-				n++;
-				p++;
-			}
-			else
-			{
-				if (toupper((unsigned char)*p++) != toupper((unsigned char)*n++))
-					return false;
-			}
+			n++;
+			p++;
 		}
+		else if (toupper((unsigned char)*p++) != toupper((unsigned char)*n++))
+			return false;
 	}
 
-	/* The name matches the pattern if it ends here, too */
-	return (*p == 0 || (*p == '*' && *(p+1) == 0));
+	/* printf("'%s': '%s' -> '%s' : '%s' -> %d\n", name, pat, n, p); */
+
+	/* The traversed name matches the pattern, if pattern also
+	 * ends here, or with '*'. '*' for extension matches also
+	 * filenames without extension, so pattern ending with
+	 * '.*' will also be a match.
+	 */
+	return (
+		(p[0] == 0) ||
+		(p[0] == '*' && p[1] == 0) ||
+		(p[0] == '.' && p[1] == '*' && p[2] == 0)
+	       );
 }
 
 
@@ -456,8 +463,7 @@ static void GemDOS_UpdateCurrentProgram(int Handle)
 	PexecCalled = false;
 
 	/* store program path */
-	Symbols_ChangeCurrentProgram(FileHandles[Handle].FileHandle,
-				     FileHandles[Handle].szActualName);
+	Symbols_ChangeCurrentProgram(FileHandles[Handle].szActualName);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -471,12 +477,12 @@ void GemDOS_Init(void)
 
 	/* Clear handles structure */
 	memset(FileHandles, 0, sizeof(FileHandles));
-	for(i = 0; i < ARRAYSIZE(ForcedHandles); i++)
+	for(i = 0; i < ARRAY_SIZE(ForcedHandles); i++)
 	{
 		GemDOS_UnforceFileHandle(i);
 	}
 	/* Clear DTAs */
-	for(i = 0; i < ARRAYSIZE(InternalDTAs); i++)
+	for(i = 0; i < ARRAY_SIZE(InternalDTAs); i++)
 	{
 		InternalDTAs[i].bUsed = false;
 		InternalDTAs[i].nentries = 0;
@@ -495,11 +501,11 @@ void GemDOS_Reset(void)
 	int i;
 
 	/* Init file handles table */
-	for (i = 0; i < ARRAYSIZE(FileHandles); i++)
+	for (i = 0; i < ARRAY_SIZE(FileHandles); i++)
 	{
 		GemDOS_CloseFileHandle(i);
 	}
-	for(i = 0; i < ARRAYSIZE(ForcedHandles); i++)
+	for(i = 0; i < ARRAY_SIZE(ForcedHandles); i++)
 	{
 		GemDOS_UnforceFileHandle(i);
 	}
@@ -509,10 +515,24 @@ void GemDOS_Reset(void)
 	}
 	DTAIndex = 0;
 
+	if (emudrives)
+	{
+		for (i = 0; i < MAX_HARDDRIVES; i++)
+		{
+			if (emudrives[i])
+			{
+				/* Initialize current directory to the root of the drive */
+				strcpy(emudrives[i]->fs_currpath, emudrives[i]->hd_emulation_dir);
+				File_AddSlashToEndFileName(emudrives[i]->fs_currpath);
+			}
+		}
+	}
+
 	/* Reset */
 	bInitGemDOS = false;
 	CurrentDrive = nBootDrive;
 	Symbols_RemoveCurrentProgram();
+	DTA_Gemdos = 0x0;
 	pDTA = NULL;
 }
 
@@ -524,6 +544,8 @@ static bool GEMDOS_DoesHostDriveFolderExist(char* lpstrPath, int iDrive)
 {
 	bool bExist = false;
 
+	Log_Printf(LOG_DEBUG, "Checking GEMDOS %c: HDD: %s\n", 'A'+iDrive, lpstrPath);
+
 	if (access(lpstrPath, F_OK) != 0 )
 	{
 		/* Try lower case drive letter instead */
@@ -531,16 +553,18 @@ static bool GEMDOS_DoesHostDriveFolderExist(char* lpstrPath, int iDrive)
 		lpstrPath[iIndex] = tolower((unsigned char)lpstrPath[iIndex]);
 	}
 
-	/* Check the file/folder is accessible (security basis) */
-	if (access(lpstrPath, F_OK) == 0 )
+	/* Check if it's a HDD identifier (or other emulated device)
+	 * and if the file/folder is accessible (security basis) */
+	if (iDrive > 1 && access(lpstrPath, F_OK) == 0 )
 	{
-		 /* If its a HDD identifier (or other emulated device) */
-		if (iDrive > 1)
+		struct stat status;
+		if (stat(lpstrPath, &status) == 0 && (status.st_mode & S_IFDIR) != 0)
 		{
-			struct stat status;
-			stat( lpstrPath, &status );
-			if ( status.st_mode & S_IFDIR )
-				bExist = true;
+			bExist = true;
+		}
+		else
+		{
+			Log_Printf(LOG_WARN, "Not suitable as GEMDOS HDD dir: %s\n", lpstrPath);
 		}
 	}
 
@@ -564,7 +588,8 @@ static bool GemDOS_DetermineMaxPartitions(int *pnMaxDrives)
 
 	/* Scan through the main directory to see whether there are just single
 	 * letter sub-folders there (then use multi-partition mode) or if
-	 * arbitrary sub-folders are there (then use single-partition mode */
+	 * arbitrary sub-folders are there (then use single-partition mode)
+	 */
 	count = scandir(ConfigureParams.HardDisk.szHardDiskDirectories[0], &files, 0, alphasort);
 	if (count < 0)
 	{
@@ -641,20 +666,19 @@ void GemDOS_InitDrives(void)
 	/* intialize data for harddrive emulation: */
 	if (nMaxDrives > 0 && !emudrives)
 	{
-		emudrives = malloc(MAX_HARDDRIVES * sizeof(EMULATEDDRIVE *));
+		emudrives = calloc(MAX_HARDDRIVES, sizeof(EMULATEDDRIVE *));
 		if (!emudrives)
 		{
 			perror("GemDOS_InitDrives");
 			return;
 		}
-		memset(emudrives, 0, MAX_HARDDRIVES * sizeof(EMULATEDDRIVE *));
 	}
 
 	ImagePartitions = nAcsiPartitions + nIDEPartitions;
-	if (ConfigureParams.HardDisk.nHardDiskDrive == DRIVE_SKIP)
+	if (ConfigureParams.HardDisk.nGemdosDrive == DRIVE_SKIP)
 		SkipPartitions = ImagePartitions;
 	else
-		SkipPartitions = ConfigureParams.HardDisk.nHardDiskDrive;
+		SkipPartitions = ConfigureParams.HardDisk.nGemdosDrive;
 
 	/* Now initialize all available drives */
 	for(i = 0; i < nMaxDrives; i++)
@@ -692,10 +716,6 @@ void GemDOS_InitDrives(void)
 		// drive letter/number exists...
 		if (GEMDOS_DoesHostDriveFolderExist(emudrives[i]->hd_emulation_dir, DriveNumber))
 		{
-			/* initialize current directory string, too (initially the same as hd_emulation_dir) */
-			strcpy(emudrives[i]->fs_currpath, emudrives[i]->hd_emulation_dir);
-			File_AddSlashToEndFileName(emudrives[i]->fs_currpath);    /* Needs trailing slash! */
-
 			/* map drive */
 			Log_Printf(LOG_INFO, "GEMDOS HDD emulation, %c: <-> %s.\n",
 				   'A'+DriveNumber, emudrives[i]->hd_emulation_dir);
@@ -752,7 +772,6 @@ void GemDOS_UnInitDrives(void)
  */
 void GemDOS_MemorySnapShot_Capture(bool bSave)
 {
-	unsigned int Addr;
 	int i;
 	bool bEmudrivesAvailable;
 
@@ -805,13 +824,17 @@ void GemDOS_MemorySnapShot_Capture(bool bSave)
 	MemorySnapShot_Store(&act_pd, sizeof(act_pd));
 	if (bSave)
 	{
-		Addr = ((Uint8 *)pDTA - STRam);
-		MemorySnapShot_Store(&Addr,sizeof(Addr));
+		/* Store the value in ST memory space */
+		MemorySnapShot_Store ( &DTA_Gemdos , sizeof(DTA_Gemdos) );
 	}
 	else
 	{
-		MemorySnapShot_Store(&Addr,sizeof(Addr));
-		pDTA = (DTA *)(STRam + Addr);
+		/* Restore the value in ST memory space and update pDTA */
+		MemorySnapShot_Store ( &DTA_Gemdos , sizeof(DTA_Gemdos) );
+		if ( DTA_Gemdos == 0x0 )
+			pDTA = NULL;
+		else
+			pDTA = (DTA *)STMemory_STAddrToPointer( DTA_Gemdos );
 	}
 	MemorySnapShot_Store(&CurrentDrive,sizeof(CurrentDrive));
 	/* Don't save file handles as files may have changed which makes
@@ -820,11 +843,11 @@ void GemDOS_MemorySnapShot_Capture(bool bSave)
 	if (!bSave)
 	{
 		/* Clear file handles  */
-		for(i = 0; i < ARRAYSIZE(FileHandles); i++)
+		for(i = 0; i < ARRAY_SIZE(FileHandles); i++)
 		{
 			GemDOS_CloseFileHandle(i);
 		}
-		for(i = 0; i < ARRAYSIZE(ForcedHandles); i++)
+		for(i = 0; i < ARRAY_SIZE(ForcedHandles); i++)
 		{
 			GemDOS_UnforceFileHandle(i);
 		}
@@ -841,7 +864,7 @@ static int GemDOS_FindFreeFileHandle(void)
 	int i;
 
 	/* Scan our file list for free slot */
-	for(i = 0; i < ARRAYSIZE(FileHandles); i++)
+	for(i = 0; i < ARRAY_SIZE(FileHandles); i++)
 	{
 		if (!FileHandles[i].bUsed)
 			return i;
@@ -860,7 +883,7 @@ static bool GemDOS_BasepageMatches(Uint32 checkbase)
 {
 	int maxparents = 12; /* prevent basepage parent loops */
 	Uint32 basepage = STMemory_ReadLong(act_pd);
-	while (maxparents-- > 0 && STMemory_ValidArea(basepage, 0x100))
+	while (maxparents-- > 0 && STMemory_CheckAreaType ( basepage, 0x100, ABFLAG_RAM ) )
 	{
 		if (basepage == checkbase)
 			return true;
@@ -878,7 +901,7 @@ static int GemDOS_GetValidFileHandle(int Handle)
 	int Forced = -1;
 
 	/* Has handle been aliased with Fforce()? */
-	if (Handle >= 0 && Handle < ARRAYSIZE(ForcedHandles)
+	if (Handle >= 0 && Handle < ARRAY_SIZE(ForcedHandles)
 	    && ForcedHandles[Handle].Handle != UNFORCED_HANDLE)
 	{
 		if (GemDOS_BasepageMatches(ForcedHandles[Handle].Basepage))
@@ -899,7 +922,7 @@ static int GemDOS_GetValidFileHandle(int Handle)
 		Handle -= BASE_FILEHANDLE;
 	}
 	/* handle is valid for current program and in our handle table? */
-	if (Handle >= 0 && Handle < ARRAYSIZE(FileHandles)
+	if (Handle >= 0 && Handle < ARRAY_SIZE(FileHandles)
 	    && FileHandles[Handle].bUsed)
 	{
 		Uint32 current = STMemory_ReadLong(act_pd);
@@ -1081,10 +1104,11 @@ static int clip_to_83(char *name)
  */
 static bool add_path_component(char *path, int maxlen, const char *origname, bool is_dir)
 {
-	char *tmp, *match, name[strlen(origname) + 3];
+	char *tmp, *match;
 	int dot, namelen, pathlen;
 	int (*chr_conv)(int);
 	bool modified;
+	char *name = alloca(strlen(origname) + 3);
 
 	/* append separator */
 	pathlen = strlen(path);
@@ -1336,7 +1360,7 @@ void GemDOS_CreateHardDriveFileName(int Drive, const char *pszFileName,
 		if ((s = strchr(filename, '\\')))
 		{
 			int dirlen = s - filename;
-			char dirname[dirlen+1];
+			char *dirname = alloca(dirlen + 1);
 			/* copy dirname */
 			strncpy(dirname, filename, dirlen);
 			dirname[dirlen] = '\0';
@@ -1414,20 +1438,21 @@ static bool GemDOS_SetDrv(Uint32 Params)
 static bool GemDOS_SetDTA(Uint32 Params)
 {
 	/*  Look up on stack to find where DTA is */
-	Uint32 nDTA = STMemory_ReadLong(Params);
+	DTA_Gemdos = STMemory_ReadLong(Params);
 
-	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x1A Fsetdta(0x%x) at PC 0x%X\n", nDTA,
+	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x1A Fsetdta(0x%x) at PC 0x%X\n", DTA_Gemdos,
 		  M68000_GetPC());
 
-	if (STMemory_ValidArea(nDTA, sizeof(DTA)))
+	if ( STMemory_CheckAreaType ( DTA_Gemdos, sizeof(DTA), ABFLAG_RAM ) )
 	{
 		/* Store as PC pointer */
-		pDTA = (DTA *)STRAM_ADDR(nDTA);
+		pDTA = (DTA *)STMemory_STAddrToPointer(DTA_Gemdos);
 	}
 	else
 	{
+		Log_Printf(LOG_WARN, "GEMDOS Fsetdta() failed due to invalid DTA address 0x%x\n", DTA_Gemdos);
+		DTA_Gemdos = 0x0;
 		pDTA = NULL;
-		Log_Printf(LOG_WARN, "GEMDOS Fsetdta() failed due to invalid DTA address 0x%x\n", nDTA);
 	}
 	/* redirect to TOS */
 	return false;
@@ -1464,7 +1489,7 @@ static bool GemDOS_DFree(Uint32 Params)
 		return false;
 	}
 	/* Check that write is requested to valid memory area */
-	if (!STMemory_ValidArea(Address, 16))
+	if ( !STMemory_CheckAreaType ( Address, 16, ABFLAG_RAM ) )
 	{
 		Log_Printf(LOG_WARN, "GEMDOS Dfree() failed due to invalid RAM range 0x%x+%i\n", Address, 16);
 		Regs[REG_D0] = GEMDOS_ERANGE;
@@ -1547,7 +1572,7 @@ static Uint32 errno2gemdos(const int error, const etype_t etype)
 	case EPERM:
 	case EACCES:
 	case EROFS:
-		return GEMDOS_EACCDN;        /* Acess denied */
+		return GEMDOS_EACCDN;        /* Access denied */
 	default:
 		return GEMDOS_ERROR;         /* Misc error */
 	}
@@ -1564,7 +1589,7 @@ static bool GemDOS_MkDir(Uint32 Params)
 	int Drive;
 
 	/* Find directory to make */
-	pDirName = (char *)STRAM_ADDR(STMemory_ReadLong(Params));
+	pDirName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params));
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x39 Dcreate(\"%s\") at PC 0x%X\n", pDirName,
 		  M68000_GetPC());
@@ -1616,7 +1641,7 @@ static bool GemDOS_RmDir(Uint32 Params)
 	int Drive;
 
 	/* Find directory to make */
-	pDirName = (char *)STRAM_ADDR(STMemory_ReadLong(Params));
+	pDirName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params));
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x3A Ddelete(\"%s\") at PC 0x%X\n", pDirName,
 		  M68000_GetPC());
@@ -1670,7 +1695,7 @@ static bool GemDOS_ChDir(Uint32 Params)
 	int Drive;
 
 	/* Find new directory */
-	pDirName = (char *)STRAM_ADDR(STMemory_ReadLong(Params));
+	pDirName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params));
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x3B Dsetpath(\"%s\") at PC 0x%X\n", pDirName,
 		  M68000_GetPC());
@@ -1759,7 +1784,7 @@ static bool GemDOS_Create(Uint32 Params)
 	int Drive,Index, Mode;
 
 	/* Find filename */
-	pszFileName = (char *)STRAM_ADDR(STMemory_ReadLong(Params));
+	pszFileName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params));
 	Mode = STMemory_ReadWord(Params+SIZE_LONG);
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x3C Fcreate(\"%s\", 0x%x) at PC 0x%X\n", pszFileName, Mode,
@@ -1876,11 +1901,12 @@ static bool GemDOS_Open(Uint32 Params)
 	FILE *AutostartHandle;
 
 	/* Find filename */
-	pszFileName = (char *)STRAM_ADDR(STMemory_ReadLong(Params));
+	pszFileName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params));
 	Mode = STMemory_ReadWord(Params+SIZE_LONG);
 	Mode &= 3;
 
-	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x3D Fopen(\"%s\", %s) at PC=0x%X\n",
+	LOG_TRACE(TRACE_OS_GEMDOS|TRACE_OS_BASE,
+		  "GEMDOS 0x3D Fopen(\"%s\", %s) at PC=0x%X\n",
 		  pszFileName, Modes[Mode], M68000_GetPC());
 
 	Drive = GemDOS_FileName2HardDriveID(pszFileName);
@@ -1888,7 +1914,7 @@ static bool GemDOS_Open(Uint32 Params)
 	if (!ISHARDDRIVE(Drive))
 	{
 		/* redirect to TOS */
-		LOG_TRACE(TRACE_OS_GEMDOS, "-> to TOS\n");
+		LOG_TRACE(TRACE_OS_GEMDOS|TRACE_OS_BASE, "-> to TOS\n");
 		return false;
 	}
 
@@ -1963,7 +1989,7 @@ static bool GemDOS_Open(Uint32 Params)
 
 		/* Return valid ST file handle from our range (BASE_FILEHANDLE upwards) */
 		Regs[REG_D0] = Index+BASE_FILEHANDLE;
-		LOG_TRACE(TRACE_OS_GEMDOS, "-> FD %d (%s -> %s)\n",
+		LOG_TRACE(TRACE_OS_GEMDOS|TRACE_OS_BASE, "-> FD %d (%s -> %s)\n",
 			  Regs[REG_D0], Modes[Mode], RealMode);
 		return true;
 	}
@@ -1985,7 +2011,7 @@ static bool GemDOS_Open(Uint32 Params)
 		/* File not found / error opening */
 		Regs[REG_D0] = GEMDOS_EFILNF;
 	}
-	LOG_TRACE(TRACE_OS_GEMDOS, "-> ERROR %d (errno = %d)\n", Regs[REG_D0], errno);
+	LOG_TRACE(TRACE_OS_GEMDOS|TRACE_OS_BASE, "-> ERROR %d (errno = %d)\n", Regs[REG_D0], errno);
 	return true;
 }
 
@@ -2001,8 +2027,9 @@ static bool GemDOS_Close(Uint32 Params)
 	/* Find our handle - may belong to TOS */
 	Handle = STMemory_ReadWord(Params);
 
-	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x3E Fclose(%i) at PC 0x%X\n", Handle,
-		  M68000_GetPC());
+	LOG_TRACE(TRACE_OS_GEMDOS|TRACE_OS_BASE,
+		  "GEMDOS 0x3E Fclose(%i) at PC 0x%X\n",
+		  Handle, M68000_GetPC());
 
 	/* Get internal handle */
 	if ((Handle = GemDOS_GetValidFileHandle(Handle)) < 0)
@@ -2019,7 +2046,7 @@ static bool GemDOS_Close(Uint32 Params)
 	GemDOS_CloseFileHandle(Handle);
 
 	/* unalias handle */
-	for (i = 0; i < ARRAYSIZE(ForcedHandles); i++)
+	for (i = 0; i < ARRAY_SIZE(ForcedHandles); i++)
 	{
 		if (ForcedHandles[i].Handle == Handle)
 			GemDOS_UnforceFileHandle(i);
@@ -2037,7 +2064,8 @@ static bool GemDOS_Close(Uint32 Params)
 static bool GemDOS_Read(Uint32 Params)
 {
 	char *pBuffer;
-	long CurrentPos, FileSize, nBytesRead, nBytesLeft;
+	off_t CurrentPos, FileSize;
+	long nBytesRead, nBytesLeft;
 	Uint32 Addr;
 	Uint32 Size;
 	int Handle;
@@ -2046,7 +2074,6 @@ static bool GemDOS_Read(Uint32 Params)
 	Handle = STMemory_ReadWord(Params);
 	Size = STMemory_ReadLong(Params+SIZE_WORD);
 	Addr = STMemory_ReadLong(Params+SIZE_WORD+SIZE_LONG);
-	pBuffer = (char *)STRAM_ADDR(Addr);
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x3F Fread(%i, %i, 0x%x) at PC 0x%X\n",
 	          Handle, Size, Addr,
@@ -2068,13 +2095,23 @@ static bool GemDOS_Read(Uint32 Params)
 	}
 	
 	/* To quick check to see where our file pointer is and how large the file is */
-	CurrentPos = ftell(FileHandles[Handle].FileHandle);
-	fseek(FileHandles[Handle].FileHandle, 0, SEEK_END);
-	FileSize = ftell(FileHandles[Handle].FileHandle);
-	fseek(FileHandles[Handle].FileHandle, CurrentPos, SEEK_SET);
+	CurrentPos = ftello(FileHandles[Handle].FileHandle);
+	if (CurrentPos == -1L
+	    || fseeko(FileHandles[Handle].FileHandle, 0, SEEK_END) != 0)
+	{
+		Regs[REG_D0] = GEMDOS_E_SEEK;
+		return true;
+	}
+	FileSize = ftello(FileHandles[Handle].FileHandle);
+	if (FileSize == -1L
+	    || fseeko(FileHandles[Handle].FileHandle, CurrentPos, SEEK_SET) != 0)
+	{
+		Regs[REG_D0] = GEMDOS_E_SEEK;
+		return true;
+	}
 
 	nBytesLeft = FileSize-CurrentPos;
-	
+
 	/* Check for bad size and End Of File */
 	if (Size <= 0 || nBytesLeft <= 0)
 	{
@@ -2088,13 +2125,18 @@ static bool GemDOS_Read(Uint32 Params)
 		Size = nBytesLeft;
 
 	/* Check that read is to valid memory area */
-	if (!STMemory_ValidArea(Addr, Size))
+	if ( !STMemory_CheckAreaType ( Addr, Size, ABFLAG_RAM ) )
 	{
 		Log_Printf(LOG_WARN, "GEMDOS Fread() failed due to invalid RAM range 0x%x+%i\n", Addr, Size);
 		Regs[REG_D0] = GEMDOS_ERANGE;
 		return true;
 	}
+
+	/* Atari memory modified directly with fread() -> flush the instr/data caches */
+	M68000_Flush_All_Caches(Addr, Size);
+
 	/* And read data in */
+	pBuffer = (char *)STMemory_STAddrToPointer(Addr);
 	nBytesRead = fread(pBuffer, 1, Size, FileHandles[Handle].FileHandle);
 	
 	if (ferror(FileHandles[Handle].FileHandle))
@@ -2127,7 +2169,6 @@ static bool GemDOS_Write(Uint32 Params)
 	Handle = STMemory_ReadWord(Params);
 	Size = STMemory_ReadLong(Params+SIZE_WORD);
 	Addr = STMemory_ReadLong(Params+SIZE_WORD+SIZE_LONG);
-	pBuffer = (char *)STRAM_ADDR(Addr);
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x40 Fwrite(%i, %i, 0x%x) at PC 0x%X\n",
 	          Handle, Size, Addr,
@@ -2149,13 +2190,14 @@ static bool GemDOS_Write(Uint32 Params)
 	}
 
 	/* Check that write is from valid memory area */
-	if (!STMemory_ValidArea(Addr, Size))
+	if ( !STMemory_CheckAreaType ( Addr, Size, ABFLAG_RAM ) )
 	{
 		Log_Printf(LOG_WARN, "GEMDOS Fwrite() failed due to invalid RAM range 0x%x+%i\n", Addr, Size);
 		Regs[REG_D0] = GEMDOS_ERANGE;
 		return true;
 	}
 
+	pBuffer = (char *)STMemory_STAddrToPointer(Addr);
 	fp = FileHandles[Handle].FileHandle;
 	nBytesWritten = fwrite(pBuffer, 1, Size, fp);
 	if (ferror(fp))
@@ -2184,7 +2226,7 @@ static bool GemDOS_FDelete(Uint32 Params)
 	int Drive;
 
 	/* Find filename */
-	pszFileName = (char *)STRAM_ADDR(STMemory_ReadLong(Params));
+	pszFileName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params));
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x41 Fdelete(\"%s\") at PC 0x%X\n", pszFileName,
 		  M68000_GetPC());
@@ -2261,7 +2303,11 @@ static bool GemDOS_LSeek(Uint32 Params)
 	nOldPos = ftell(fhndl);
 
 	/* Determine the size of the file */
-	fseek(fhndl, 0L, SEEK_END);
+	if (fseek(fhndl, 0L, SEEK_END) != 0)
+	{
+		Regs[REG_D0] = GEMDOS_E_SEEK;
+		return true;
+	}
 	nFileSize = ftell(fhndl);
 
 	switch (Mode)
@@ -2269,23 +2315,21 @@ static bool GemDOS_LSeek(Uint32 Params)
 	 case 0: nDestPos = Offset; break; /* positive offset */
 	 case 1: nDestPos = nOldPos + Offset; break;
 	 case 2: nDestPos = nFileSize + Offset; break; /* negative offset */
-	 default:
-		/* Restore old position and return error */
-		fseek(fhndl, nOldPos, SEEK_SET);
-		Regs[REG_D0] = GEMDOS_EINVFN;
-		return true;
+	 default: nDestPos = -1;
 	}
 
 	if (nDestPos < 0 || nDestPos > nFileSize)
 	{
 		/* Restore old position and return error */
-		fseek(fhndl, nOldPos, SEEK_SET);
+		if (fseek(fhndl, nOldPos, SEEK_SET) != 0)
+			perror("GemDOS_LSeek");
 		Regs[REG_D0] = GEMDOS_ERANGE;
 		return true;
 	}
 
 	/* Seek to new position and return offset from start of file */
-	fseek(fhndl, nDestPos, SEEK_SET);
+	if (fseek(fhndl, nDestPos, SEEK_SET) != 0)
+		perror("GemDOS_LSeek");
 	Regs[REG_D0] = ftell(fhndl);
 
 	return true;
@@ -2307,7 +2351,7 @@ static bool GemDOS_Fattrib(Uint32 Params)
 	struct stat FileStat;
 
 	/* Find filename */
-	psFileName = (char *)STRAM_ADDR(STMemory_ReadLong(Params));
+	psFileName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params));
 	nDrive = GemDOS_FileName2HardDriveID(psFileName);
 
 	nRwFlag = STMemory_ReadWord(Params+SIZE_LONG);
@@ -2430,9 +2474,9 @@ static bool GemDOS_Force(Uint32 Params)
 		/* assume it was TOS one -> let TOS handle it */
 		return false;
 	}
-	if (std < 0 || std >= ARRAYSIZE(ForcedHandles))
+	if (std < 0 || std >= ARRAY_SIZE(ForcedHandles))
 	{
-		Log_Printf(LOG_WARN, "Warning: forcing of non-standard %d (> %d) handle ignored.\n", std, ARRAYSIZE(ForcedHandles));
+		Log_Printf(LOG_WARN, "Warning: forcing of non-standard %d (> %d) handle ignored.\n", std, ARRAY_SIZE(ForcedHandles));
 		return false;
 	}
 	/* mark given standard handle redirected by this process */
@@ -2478,7 +2522,7 @@ static bool GemDOS_GetDir(Uint32 Params)
 		File_CleanFileName(path);
 		len = strlen(path);
 		/* Check that write is requested to valid memory area */
-		if (!STMemory_ValidArea(Address, len))
+		if ( !STMemory_CheckAreaType ( Address, len, ABFLAG_RAM ) )
 		{
 			Log_Printf(LOG_WARN, "GEMDOS Dgetpath() failed due to invalid RAM range 0x%x+%i\n", Address, len);
 			Regs[REG_D0] = GEMDOS_ERANGE;
@@ -2489,7 +2533,7 @@ static bool GemDOS_GetDir(Uint32 Params)
 			c = path[i];
 			STMemory_WriteByte(Address+i, (c==PATHSEP ? '\\' : c) );
 		}
-		LOG_TRACE(TRACE_OS_GEMDOS, "-> '%s'\n", (char *)STRAM_ADDR(Address));
+		LOG_TRACE(TRACE_OS_GEMDOS, "-> '%s'\n", (char *)STMemory_STAddrToPointer(Address));
 
 		Regs[REG_D0] = GEMDOS_EOK;          /* OK */
 
@@ -2514,7 +2558,7 @@ static int GemDOS_Pexec(Uint32 Params)
 	/* Find PExec mode */
 	Mode = STMemory_ReadWord(Params);
 
-	if (LOG_TRACE_LEVEL(TRACE_OS_GEMDOS))
+	if (LOG_TRACE_LEVEL(TRACE_OS_GEMDOS|TRACE_OS_BASE))
 	{
 		Uint32 fname, cmdline, env_string;
 		fname = STMemory_ReadLong(Params+SIZE_WORD);
@@ -2523,12 +2567,17 @@ static int GemDOS_Pexec(Uint32 Params)
 		if (Mode == 0 || Mode == 3)
 		{
 			int cmdlen;
+			char *str;
 			const char *name, *cmd;
-			name = (const char *)STRAM_ADDR(fname);
-			cmd = (const char *)STRAM_ADDR(cmdline);
+			name = (const char *)STMemory_STAddrToPointer(fname);
+			cmd = (const char *)STMemory_STAddrToPointer(cmdline);
 			cmdlen = *cmd++;
-			LOG_TRACE_PRINT ( "GEMDOS 0x4B Pexec(%i, \"%s\", [%d]\"%s\", 0x%x) at PC 0x%X\n", Mode, name, cmdlen, cmdlen?cmd:"", env_string,
+			str = malloc(cmdlen+1);
+			memcpy(str, cmd, cmdlen);
+			str[cmdlen] = '\0';
+			LOG_TRACE_PRINT ( "GEMDOS 0x4B Pexec(%i, \"%s\", [%d]\"%s\", 0x%x) at PC 0x%X\n", Mode, name, cmdlen, str, env_string,
 				M68000_GetPC());
+			free(str);
 		}
 		else
 		{
@@ -2542,7 +2591,7 @@ static int GemDOS_Pexec(Uint32 Params)
 	{
 	 case 0:      /* Load and go */
 	 case 3:      /* Load, don't go */
-		pszFileName = (char *)STRAM_ADDR(STMemory_ReadLong(Params+SIZE_WORD));
+		pszFileName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params+SIZE_WORD));
 		Drive = GemDOS_FileName2HardDriveID(pszFileName);
 		
 		/* If not using A: or B:, use my own routines to load */
@@ -2574,23 +2623,23 @@ static int GemDOS_Pexec(Uint32 Params)
 static bool GemDOS_SNext(void)
 {
 	struct dirent **temp;
-	Uint32 nDTA;
 	int Index;
 	int ret;
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x4F Fsnext() at PC 0x%X\n" , M68000_GetPC());
 
 	/* Refresh pDTA pointer (from the current basepage) */
-	nDTA = STMemory_ReadLong(STMemory_ReadLong(act_pd)+32);
+	DTA_Gemdos = STMemory_ReadLong(STMemory_ReadLong(act_pd)+32);
 
-	if (!STMemory_ValidArea(nDTA, sizeof(DTA)))
+	if ( !STMemory_CheckAreaType ( DTA_Gemdos, sizeof(DTA), ABFLAG_RAM ) )
 	{
+		Log_Printf(LOG_WARN, "GEMDOS Fsnext() failed due to invalid DTA address 0x%x\n", DTA_Gemdos);
+		DTA_Gemdos = 0x0;
 		pDTA = NULL;
-		Log_Printf(LOG_WARN, "GEMDOS Fsnext() failed due to invalid DTA address 0x%x\n", nDTA);
 		Regs[REG_D0] = GEMDOS_EINTRN;    /* "internal error */
 		return true;
 	}
-	pDTA = (DTA *)STRAM_ADDR(nDTA);
+	pDTA = (DTA *)STMemory_STAddrToPointer(DTA_Gemdos);
 
 	/* Was DTA ours or TOS? */
 	if (do_get_mem_long(pDTA->magic) != DTA_MAGIC_NUMBER)
@@ -2646,13 +2695,12 @@ static bool GemDOS_SFirst(Uint32 Params)
 	char *pszFileName;
 	const char *dirmask;
 	struct dirent **files;
-	Uint32 nDTA;
 	int Drive;
 	DIR *fsdir;
 	int i,j,count;
 
 	/* Find filename to search for */
-	pszFileName = (char *)STRAM_ADDR(STMemory_ReadLong(Params));
+	pszFileName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params));
 	nAttrSFirst = STMemory_ReadWord(Params+SIZE_LONG);
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x4E Fsfirst(\"%s\", 0x%x) at PC 0x%X\n", pszFileName, nAttrSFirst,
@@ -2670,16 +2718,21 @@ static bool GemDOS_SFirst(Uint32 Params)
 		                    szActualFileName, sizeof(szActualFileName));
 
 	/* Refresh pDTA pointer (from the current basepage) */
-	nDTA = STMemory_ReadLong(STMemory_ReadLong(act_pd)+32);
+	DTA_Gemdos = STMemory_ReadLong(STMemory_ReadLong(act_pd)+32);
 
-	if (!STMemory_ValidArea(nDTA, sizeof(DTA)))
+	if ( !STMemory_CheckAreaType ( DTA_Gemdos, sizeof(DTA), ABFLAG_RAM ) )
 	{
+		Log_Printf(LOG_WARN, "GEMDOS Fsfirst() failed due to invalid DTA address 0x%x\n", DTA_Gemdos);
+		DTA_Gemdos = 0x0;
 		pDTA = NULL;
-		Log_Printf(LOG_WARN, "GEMDOS Fsfirst() failed due to invalid DTA address 0x%x\n", nDTA);
 		Regs[REG_D0] = GEMDOS_EINTRN;    /* "internal error */
 		return true;
 	}
-	pDTA = (DTA *)STRAM_ADDR(nDTA);
+
+	/* Atari memory modified directly with do_mem_* + strcpy() -> flush the data cache */
+	M68000_Flush_Data_Cache(DTA_Gemdos, sizeof(DTA));
+
+	pDTA = (DTA *)STMemory_STAddrToPointer(DTA_Gemdos);
 
 	/* Populate DTA, set index for our use */
 	do_put_mem_word(pDTA->index, DTAIndex);
@@ -2777,8 +2830,8 @@ static bool GemDOS_Rename(Uint32 Params)
 	int NewDrive, OldDrive;
 
 	/* Read details from stack, skip first (dummy) arg */
-	pszOldFileName = (char *)STRAM_ADDR(STMemory_ReadLong(Params+SIZE_WORD));
-	pszNewFileName = (char *)STRAM_ADDR(STMemory_ReadLong(Params+SIZE_WORD+SIZE_LONG));
+	pszOldFileName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params+SIZE_WORD));
+	pszNewFileName = (char *)STMemory_STAddrToPointer(STMemory_ReadLong(Params+SIZE_WORD+SIZE_LONG));
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x56 Frename(\"%s\", \"%s\") at PC 0x%X\n", pszOldFileName, pszNewFileName,
 		  M68000_GetPC());
@@ -2862,7 +2915,7 @@ static bool GemDOS_GSDToF(Uint32 Params)
 	if (GemDOS_GetFileInformation(Handle, &DateTime) == true)
 	{
 		/* Check that write is requested to valid memory area */
-		if (STMemory_ValidArea(pBuffer, 4))
+		if ( STMemory_CheckAreaType ( pBuffer, 4, ABFLAG_RAM ) )
 		{
 			STMemory_WriteWord(pBuffer, DateTime.timeword);
 			STMemory_WriteWord(pBuffer+SIZE_WORD, DateTime.dateword);
@@ -2892,7 +2945,7 @@ static void GemDOS_TerminateClose(void)
 	Uint32 current = STMemory_ReadLong(act_pd);
 
 	closed = 0;
-	for (i = 0; i < ARRAYSIZE(FileHandles); i++)
+	for (i = 0; i < ARRAY_SIZE(FileHandles); i++)
 	{
 		if (FileHandles[i].Basepage == current)
 		{
@@ -2901,7 +2954,7 @@ static void GemDOS_TerminateClose(void)
 		}
 	}
 	unforced = 0;
-	for (i = 0; i < ARRAYSIZE(ForcedHandles); i++)
+	for (i = 0; i < ARRAY_SIZE(ForcedHandles); i++)
 	{
 		if (ForcedHandles[i].Basepage == current)
 		{
@@ -2921,7 +2974,7 @@ static void GemDOS_TerminateClose(void)
  */
 static bool GemDOS_Pterm0(Uint32 Params)
 {
-	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x00 Pterm0() at PC 0x%X\n",
+	LOG_TRACE(TRACE_OS_GEMDOS|TRACE_OS_BASE, "GEMDOS 0x00 Pterm0() at PC 0x%X\n",
 		  M68000_GetPC());
 	GemDOS_TerminateClose();
 	Symbols_RemoveCurrentProgram();
@@ -2934,7 +2987,7 @@ static bool GemDOS_Pterm0(Uint32 Params)
  */
 static bool GemDOS_Ptermres(Uint32 Params)
 {
-	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x31 Ptermres(0x%X, %hd) at PC 0x%X\n",
+	LOG_TRACE(TRACE_OS_GEMDOS|TRACE_OS_BASE, "GEMDOS 0x31 Ptermres(0x%X, %hd) at PC 0x%X\n",
 		  STMemory_ReadLong(Params), (Sint16)STMemory_ReadWord(Params+SIZE_WORD),
 		  M68000_GetPC());
 	GemDOS_TerminateClose();
@@ -2947,7 +3000,7 @@ static bool GemDOS_Ptermres(Uint32 Params)
  */
 static bool GemDOS_Pterm(Uint32 Params)
 {
-	LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x4C Pterm(%hd) at PC 0x%X\n",
+	LOG_TRACE(TRACE_OS_GEMDOS|TRACE_OS_BASE, "GEMDOS 0x4C Pterm(%hd) at PC 0x%X\n",
 		  (Sint16)STMemory_ReadWord(Params),
 		  M68000_GetPC());
 	GemDOS_TerminateClose();
@@ -3056,7 +3109,7 @@ static const char* GemDOS_Opcode2Name(Uint16 opcode)
 		"Frename",
 		"Fdatime"
 	};
-	if (opcode < ARRAYSIZE(names))
+	if (opcode < ARRAY_SIZE(names))
 		return names[opcode];
 	return "MiNT?";
 }
@@ -3065,7 +3118,7 @@ static const char* GemDOS_Opcode2Name(Uint16 opcode)
  * If bShowOpcodes is true, show GEMDOS call opcode/function name table,
  * otherwise GEMDOS HDD emulation information.
  */
-void GemDOS_Info(Uint32 bShowOpcodes)
+void GemDOS_Info(FILE *fp, Uint32 bShowOpcodes)
 {
 	int i, used;
 
@@ -3074,88 +3127,88 @@ void GemDOS_Info(Uint32 bShowOpcodes)
 		Uint16 opcode;
 		for (opcode = 0; opcode < 0x5A; )
 		{
-			fprintf(stderr, "%02x %-9s",
+			fprintf(fp, "%02x %-9s",
 				opcode, GemDOS_Opcode2Name(opcode));
 			if (++opcode % 6 == 0)
-				fputs("\n", stderr);
+				fputs("\n", fp);
 		}
 		return;
 	}
 
 	if (!GEMDOS_EMU_ON)
 	{
-		fputs("GEMDOS HDD emulation isn't enabled!\n", stderr);
+		fputs("GEMDOS HDD emulation isn't enabled!\n", fp);
 		return;
 	}
 
 	/* GEMDOS vector set by Hatari can be overwritten e.g. MiNT */
-	fprintf(stderr, "Current GEMDOS handler: (0x84) = 0x%x, emu one = 0x%x\n", STMemory_ReadLong(0x0084), CART_GEMDOS);
-	fprintf(stderr, "Stored GEMDOS handler: (0x%x) = 0x%x\n\n", CART_OLDGEMDOS, STMemory_ReadLong(CART_OLDGEMDOS));
+	fprintf(fp, "Current GEMDOS handler: (0x84) = 0x%x, emu one = 0x%x\n", STMemory_ReadLong(0x0084), CART_GEMDOS);
+	fprintf(fp, "Stored GEMDOS handler: (0x%x) = 0x%x\n\n", CART_OLDGEMDOS, STMemory_ReadLong(CART_OLDGEMDOS));
 
-	fprintf(stderr, "Connected drives mask: 0x%x\n\n", ConnectedDriveMask);
-	fputs("GEMDOS HDD emulation drives:\n", stderr);
+	fprintf(fp, "Connected drives mask: 0x%x\n\n", ConnectedDriveMask);
+	fputs("GEMDOS HDD emulation drives:\n", fp);
 	for(i = 0; i < MAX_HARDDRIVES; i++)
 	{
 		if (!emudrives[i])
 			continue;
-		fprintf(stderr, "- %c: %s\n",
+		fprintf(fp, "- %c: %s\n",
 			'A' + emudrives[i]->drive_number,
 			emudrives[i]->hd_emulation_dir);
 	}
 
-	fputs("\nInternal Fsfirst() DTAs:\n", stderr);
-	for(used = i = 0; i < ARRAYSIZE(InternalDTAs); i++)
+	fputs("\nInternal Fsfirst() DTAs:\n", fp);
+	for(used = i = 0; i < ARRAY_SIZE(InternalDTAs); i++)
 	{
 		int j, centry, entries;
 
 		if (!InternalDTAs[i].bUsed)
 			continue;
 
-		fprintf(stderr, "+ %d: %s\n", i, InternalDTAs[i].path);
+		fprintf(fp, "+ %d: %s\n", i, InternalDTAs[i].path);
 		
 		centry = InternalDTAs[i].centry;
 		entries = InternalDTAs[i].nentries;
 		for (j = 0; j < entries; j++)
 		{
-			fprintf(stderr, "  - %d: %s%s\n",
+			fprintf(fp, "  - %d: %s%s\n",
 				j, InternalDTAs[i].found[j]->d_name,
 				j == centry ? " *" : "");
 		}
-		fprintf(stderr, "  Fsnext entry = %d.\n", centry);
+		fprintf(fp, "  Fsnext entry = %d.\n", centry);
 		used++;
 	}
 	if (!used)
-		fputs("- None in use.\n", stderr);
+		fputs("- None in use.\n", fp);
 
-	fputs("\nOpen GEMDOS HDD file handles:\n", stderr);
-	for (used = i = 0; i < ARRAYSIZE(FileHandles); i++)
+	fputs("\nOpen GEMDOS HDD file handles:\n", fp);
+	for (used = i = 0; i < ARRAY_SIZE(FileHandles); i++)
 	{
 		if (!FileHandles[i].bUsed)
 			continue;
-		fprintf(stderr, "- %d (0x%x): %s\n", i + BASE_FILEHANDLE,
+		fprintf(fp, "- %d (0x%x): %s\n", i + BASE_FILEHANDLE,
 			FileHandles[i].Basepage, FileHandles[i].szActualName);
 		used++;
 	}
 	if (!used)
-		fputs("- None.\n", stderr);
-	fputs("\nForced GEMDOS HDD file handles:\n", stderr);
-	for (used = i = 0; i < ARRAYSIZE(ForcedHandles); i++)
+		fputs("- None.\n", fp);
+	fputs("\nForced GEMDOS HDD file handles:\n", fp);
+	for (used = i = 0; i < ARRAY_SIZE(ForcedHandles); i++)
 	{
 		if (ForcedHandles[i].Handle == UNFORCED_HANDLE)
 			continue;
-		fprintf(stderr, "- %d -> %d (0x%x)\n", i,
+		fprintf(fp, "- %d -> %d (0x%x)\n", i,
 			ForcedHandles[i].Handle + BASE_FILEHANDLE,
 			ForcedHandles[i].Basepage);
 		used++;
 	}
 	if (!used)
-		fputs("- None.\n", stderr);
+		fputs("- None.\n", fp);
 }
 
 #else /* !ENABLE_TRACING */
-void GemDOS_Info(Uint32 bShowOpcodes)
+void GemDOS_Info(FILE *fp, Uint32 bShowOpcodes)
 {
-	fputs("Hatari isn't configured with ENABLE_TRACING\n", stderr);
+	fputs("Hatari isn't configured with ENABLE_TRACING\n", fp);
 }
 #endif /* !ENABLE_TRACING */
 
@@ -3292,7 +3345,7 @@ void GemDOS_OpCode(void)
 	case 0x2A:	/* Tgetdate */
 	case 0x2C:	/* Tgettime */
 		/* commands with no args */
-		LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x%2hX %s() at PC 0x%X\n",
+		LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x%02hX %s() at PC 0x%X\n",
 			  GemDOSCall, GemDOS_Opcode2Name(GemDOSCall),
 			  M68000_GetPC());
 		break;
@@ -3305,7 +3358,7 @@ void GemDOS_OpCode(void)
 	case 0x2d:	/* Tsettime */
 	case 0x45:	/* Fdup */
 		/* commands taking single word */
-		LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x%2hX %s(0x%hX) at PC 0x%X\n",
+		LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x%02hX %s(0x%hX) at PC 0x%X\n",
 			  GemDOSCall, GemDOS_Opcode2Name(GemDOSCall),
 			  STMemory_ReadWord(Params),
 			  M68000_GetPC());
@@ -3317,7 +3370,7 @@ void GemDOS_OpCode(void)
 	case 0x48:	/* Malloc */
 	case 0x49:	/* Mfree */
 		/* commands taking long/pointer */
-		LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x%2hX %s(0x%X) at PC 0x%X\n",
+		LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x%02hX %s(0x%X) at PC 0x%X\n",
 			  GemDOSCall, GemDOS_Opcode2Name(GemDOSCall),
 			  STMemory_ReadLong(Params),
 			  M68000_GetPC());
@@ -3348,7 +3401,7 @@ void GemDOS_OpCode(void)
 
 	default:
 		/* rest of commands */
-		LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x%2hX (%s) at PC 0x%X\n",
+		LOG_TRACE(TRACE_OS_GEMDOS, "GEMDOS 0x%02hX (%s) at PC 0x%X\n",
 			  GemDOSCall, GemDOS_Opcode2Name(GemDOSCall),
 			  M68000_GetPC());
 	}
@@ -3398,6 +3451,9 @@ void GemDOS_OpCode(void)
  */
 void GemDOS_Boot(void)
 {
+	if (bInitGemDOS)
+		GemDOS_Reset();
+
 	bInitGemDOS = true;
 
 	LOG_TRACE(TRACE_OS_GEMDOS, "Gemdos_Boot() at PC 0x%X\n", M68000_GetPC() );
@@ -3405,7 +3461,7 @@ void GemDOS_Boot(void)
 	/* install our gemdos handler, if -e or --harddrive option used,
 	 * or user wants to do GEMDOS tracing
 	 */
-	if (!GEMDOS_EMU_ON && !(LogTraceFlags & TRACE_OS_GEMDOS))
+	if (!GEMDOS_EMU_ON && !(LogTraceFlags & (TRACE_OS_GEMDOS|TRACE_OS_BASE)))
 		return;
 
 	/* Get the address of the p_run variable that points to the actual basepage */
@@ -3419,7 +3475,8 @@ void GemDOS_Boot(void)
 	}
 	else
 	{
-		act_pd = STMemory_ReadLong(TosAddress + 0x28);
+		Uint32 osAddress = STMemory_ReadLong(0x4f2);
+		act_pd = STMemory_ReadLong(osAddress + 0x28);
 	}
 
 	/* Save old GEMDOS handler address */

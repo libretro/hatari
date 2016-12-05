@@ -5,16 +5,19 @@
  *	or at your option any later version. Read the file gpl.txt for details.
  ***/
 
-#include <stdio.h>
-#include <ctype.h>
-#include <strings.h>
-#include <stdlib.h>
-
-#include "config.h"
-#include "sysdeps.h"
 #include "main.h"
+#include <ctype.h>
+#if HAVE_STRINGS_H
+# include <strings.h>
+#endif
+
+#include "sysdeps.h"
 #include "configuration.h"
 #include "newcpu.h"
+#include "stMemory.h"
+#ifdef WINUAE_FOR_HATARI
+#include "debug.h"
+#endif
 #include "paths.h"
 #include "profile.h"
 #include "tos.h"
@@ -37,7 +40,7 @@ static const Diss68kOptions optionsMask = doptOpcodesSmall | doptRegisterSmall |
 
 // values <0 will hide the group
 static int			optionPosAddress = 0;	// current address
-static int			optionPosHexdump = 10;	// 16-bit words at this address
+static int			optionPosHexdump = 12;	// 16-bit words at this address
 static int			optionPosLabel = 35;	// label, if defined
 static int			optionPosOpcode = 47;	// opcode
 static int			optionPosOperand = 57;	// operands for the opcode
@@ -127,7 +130,7 @@ static inline unsigned short	Disass68kGetWord(long addr)
 	if ( ! valid_address ( addr , 2 ) )
 		return 0;
 
-	return get_word(addr);
+	return STMemory_ReadWord ( addr );
 }
 
 // Load a text file into memory, count the lines and replace the LF with 0-bytes.
@@ -135,28 +138,31 @@ static int			Disass68kLoadTextFile(const char *filename, char **filebuf)
 {
 	long	index;
 	long	fileLength;
-	int	lineCount;
+	int	lineCount = 0;
 	char	*fbuf;
 	FILE	*f;
 	
 	if(filebuf)
 		*filebuf = NULL;
 	f = fopen(filename, "r");
-	if(!f) return 0;
-	if(fseek(f, 0, SEEK_END))
+	if (!f)
 		return 0;
+	if (fseek(f, 0, SEEK_END))
+		goto out;
 	fileLength = ftell(f);
-	if(fileLength <= 0) return 0;
-	if(fseek(f, 0, SEEK_SET))
-		return 0;
+	if (fileLength <= 0)
+		goto out;
+	if (fseek(f, 0, SEEK_SET))
+		goto out;
 	fbuf = malloc(fileLength);
-	if(!fbuf) return 0;
+	if(!fbuf)
+		goto out;
 	if((size_t)fileLength != fread(fbuf, sizeof(char), fileLength, f))
 	{
 		free(fbuf);
-		return 0;
+		goto out;
 	}
-	lineCount = 0;
+
 	for(index=0; index<fileLength; ++index)
 	{
 		if(fbuf[index] == '\r')	// convert potential CR into a space (which we ignore at the end of the line anyway)
@@ -169,6 +175,8 @@ static int			Disass68kLoadTextFile(const char *filename, char **filebuf)
 	}
 	if(filebuf)
 		*filebuf = fbuf;
+out:
+	fclose(f);
 	return lineCount;
 }
 
@@ -1302,7 +1310,7 @@ typedef const struct {
 	int				disassFlag;
 } OpcodeTableStruct;
 
-static const OpcodeTableStruct	OpcodeTable[] = {
+static OpcodeTableStruct	OpcodeTable[] = {
 	{ MC_ALL, {0xff00, 0x0000}, {-1,6,2,0}, {ofI,ofEa}, "ORI.?",{0,EA_Immed|EA_PCRel|EA_An}},
 	{ MC_ALL, {0xf1c0, 0x0100}, {4}, {ofDestDn,ofEa}, "BTST",{0,EA_An|EA_Immed} },
 	{ MC_ALL, {0xf1c0, 0x0140}, {4}, {ofDestDn,ofEa}, "BCHG",{0,EA_Immed|EA_PCRel|EA_An}},
@@ -1721,7 +1729,6 @@ static const OpcodeTableStruct	OpcodeTable[] = {
 static int	Disass68k(long addr, char *labelBuffer, char *opcodeBuffer, char *operandBuffer, char *commentBuffer)
 {
 	long	baseAddr = addr;
-	int		val;
 	int		i;
 	int		count = 0;
 	char	addressLabel[256];
@@ -1822,10 +1829,10 @@ static int	Disass68k(long addr, char *labelBuffer, char *opcodeBuffer, char *ope
 
 	case dtASCString:
 	{
-		int	count = 1;
-		unsigned short	val = Disass68kGetWord(addr+0);
+		unsigned short	opcval = Disass68kGetWord(addr+0);
+		count = 1;
 		strcpy(opcodeBuffer,"DC.B");
-		if((val >> 8) == 0)
+		if ((opcval >> 8) == 0)
 		{
 			strcat(operandBuffer, "0");
 		} else {
@@ -1862,13 +1869,14 @@ static int	Disass68k(long addr, char *labelBuffer, char *opcodeBuffer, char *ope
 	case dtFunctionPointer:
 	{
 		const char	*sp;
+		int		val;
 		val = (Disass68kGetWord(addr) << 16) | Disass68kGetWord(addr+2);
 		sp = Disass68kSymbolName(val, 2);
 		strcpy(opcodeBuffer,"DC.L");
 		if(sp)
 			sprintf(operandBuffer,"%s", sp);
 		else
-			sprintf(operandBuffer,"$%6.6x", val);
+			sprintf(operandBuffer,"$%8.8x", val);
 		return 4;
 	}
 
@@ -1890,13 +1898,12 @@ more:
 	while(1)
 	{
 		unsigned short	opcode[5];
-		unsigned int	i;
 		OpcodeTableStruct	*ots = &OpcodeTable[index++];
 		int	size;
 		char	sizeChar = 0;
 		char	*dbuf;
 		int	ea;
-		unsigned int	maxop;
+		int	maxop;
 
 		if(ots->opcodeName == NULL)
 			break;
@@ -2018,10 +2025,10 @@ more:
 		ea = opcode[0] & 0x3F;
 		dbuf = operandBuffer;
 
-		maxop=(sizeof(ots->op)/sizeof(ots->op[0]));
+		maxop = (int)(sizeof(ots->op)/sizeof(ots->op[0]));
 		for(i=0; i<maxop; ++i)
 		{
-			int reg;
+			int reg, val;
 
 			switch(ots->op[i])
 			{
@@ -2446,7 +2453,7 @@ static void Disass68k_loop (FILE *f, uaecptr addr, uaecptr *nextpc, int cnt)
 	}
 
 	while (cnt-- > 0) {
-		const int	addrWidth = 6;		// 6 on an ST, 8 on a TT
+		const int	addrWidth = 8;		// 6 on an ST (24 bit addressing), 8 on a TT (32 bit addressing)
 		char	lineBuffer[1024];
 
 		char	addressBuffer[32];
@@ -2501,10 +2508,10 @@ static void Disass68k_loop (FILE *f, uaecptr addr, uaecptr *nextpc, int cnt)
 		if (optionPosComment >= 0)
 		{
 			float percentage;
-			Uint32 count, cycles, misses;
-			if (Profile_CpuAddressData(addr, &percentage, &count, &cycles, &misses))
+			Uint32 count, cycles, i_misses, d_hits;
+			if (Profile_CpuAddressData(addr, &percentage, &count, &cycles, &i_misses, &d_hits))
 			{
-				sprintf(commentBuffer, "%5.2f%% (%u, %u, %u)", percentage, count, cycles, misses);
+				sprintf(commentBuffer, "%5.2f%% (%u, %u, %u, %u)", percentage, count, cycles, i_misses, d_hits);
 				Disass68kComposeStr(lineBuffer, commentBuffer, optionPosComment+1, 0);
 			}
 			/* show comments only if profile data is missing */
@@ -2545,7 +2552,11 @@ Uint32 Disasm_GetNextPC(Uint32 pc)
 void Disasm (FILE *f, uaecptr addr, uaecptr *nextpc, int cnt)
 {
 	if (ConfigureParams.Debugger.bDisasmUAE)
+#ifdef WINUAE_FOR_HATARI
+		m68k_disasm_file (f, addr, nextpc, cnt);
+#else
 		m68k_disasm (f, addr, nextpc, cnt);
+#endif
 	else
 		Disass68k_loop (f, addr, nextpc, cnt);
 }

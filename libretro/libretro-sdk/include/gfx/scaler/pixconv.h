@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2014 The RetroArch team
+/* Copyright  (C) 2010-2015 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (pixconv.h).
@@ -42,6 +42,10 @@ void conv_rgb565_argb8888(void *output, const void *input,
       int out_stride, int in_stride);
 
 void conv_rgba4444_argb8888(void *output, const void *input,
+      int width, int height,
+      int out_stride, int in_stride);
+
+void conv_rgba4444_rgb565(void *output, const void *input,
       int width, int height,
       int out_stride, int in_stride);
 

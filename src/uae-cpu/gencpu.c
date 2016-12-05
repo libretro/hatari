@@ -75,6 +75,12 @@
 /* 2014/04/11	[NP]	Add refill_prefetch for i_Move Dn,(An) (International 3D Tennis)		*/
 /* 2014/08/15	[NP]	Cancel change from 2008/04/26, sz_byte for Areg is not valid for MOVE,		*/
 /*			'move.b a1,(a0)' should give an illegal exception				*/
+/* 2012/05/05	[NP]	In i_JMP, in case of address error with jmp xxx.w, last_addr_for_exception_3	*/
+/*			should be pc+2 (The Teller, 'jmp $201.w')					*/
+/* 2015/07/29	[NP]	In the case of an address error, correctly set last_writeaccess_for_exception_3	*/
+/*			to 0 (read) or 1 (write) (War Heli)						*/
+/* 2015/07/29	[NP]	Add refill_prefetch for i_Bcc (War Heli, 'bra.s -2' ($60fe))			*/
+/* 2015/11/09	[NP]	Add refill_prefetch for i_ADD #xx,d16(An) (Cubase, 'addi.w #5,2(a0)')		*/
 
 
 const char GenCpu_fileid[] = "Hatari gencpu.c : " __DATE__ " " __TIME__;
@@ -438,6 +444,10 @@ static void genamode (amodes mode, const char *reg, wordsizes size,
 	printf ("\t\tlast_fault_for_exception_3 = %sa;\n", name);
 	printf ("\t\tlast_op_for_exception_3 = opcode;\n");
 	printf ("\t\tlast_instructionaccess_for_exception_3 = 0;\n");
+	if ( getv == 2 )
+		printf ("\t\tlast_writeaccess_for_exception_3 = 1;\n");		/* write */
+	else
+		printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");		/* read */
 	printf ("\t\tlast_addr_for_exception_3 = m68k_getpc() + %d;\n", m68k_pc_offset);
 	printf ("\t\tException(3, 0, M68000_EXC_SRC_CPU);\n");
 	printf ("\t\tgoto %s;\n", endlabelstr);
@@ -1086,7 +1096,10 @@ static void gen_opcode (unsigned long int opcode)
 	genamode (curi->smode, "srcreg", curi->size, "src", 1, 0);
 	genamode (curi->dmode, "dstreg", curi->size, "dst", 1, 0);
 	start_brace ();
-	printf("\trefill_prefetch (m68k_getpc(), 2);\n");	// FIXME [NP] For Transbeauce 2 demo, need better prefetch emulation
+	if ( ( curi->smode == imm ) && ( curi->dmode == Ad16 ) )				// FIXME [NP] add.w #xx,xx(an) (Cubase : addi.w #5,2(a0))
+	  printf("\trefill_prefetch (m68k_getpc(), 6);\n");					// FIXME [NP] need better prefetch emulation
+	else
+	  printf("\trefill_prefetch (m68k_getpc(), 2);\n");	// FIXME [NP] For Transbeauce 2 demo, need better prefetch emulation
 	genflags (flag_add, curi->size, "newv", "src", "dst");
 	genastore ("newv", curi->dmode, "dstreg", curi->size, "dst");
         if(curi->size==sz_long && curi->dmode==Dreg)
@@ -1294,35 +1307,23 @@ static void gen_opcode (unsigned long int opcode)
 	genamode (curi->smode, "srcreg", curi->size, "src", 1, 0);
 
 	printf ("\tuaecptr memp = m68k_areg(regs, dstreg) + (uae_s32)(uae_s16)%s;\n", gen_nextiword ());
-	/* [NP] Use MovepByteNbr to keep track of each access inside a movep */
 	if (curi->size == sz_word) {
-	    printf ("\tMovepByteNbr=1; put_byte(memp, src >> 8); MovepByteNbr=2; put_byte(memp + 2, src);\n");
+	    printf ("\tput_byte(memp, src >> 8); put_byte(memp + 2, src);\n");
 	} else {
-	    printf ("\tMovepByteNbr=1; put_byte(memp, src >> 24); MovepByteNbr=2; put_byte(memp + 2, src >> 16);\n");
-	    printf ("\tMovepByteNbr=3; put_byte(memp + 4, src >> 8); MovepByteNbr=4; put_byte(memp + 6, src);\n");
+	    printf ("\tput_byte(memp, src >> 24); put_byte(memp + 2, src >> 16);\n");
+	    printf ("\tput_byte(memp + 4, src >> 8); put_byte(memp + 6, src);\n");
 	}
-	printf ("\tMovepByteNbr=0;\n");
         if(curi->size==sz_long)  insn_n_cycles=24;  else  insn_n_cycles=16;
 	break;
     case i_MVPMR:
 	printf ("\tuaecptr memp = m68k_areg(regs, srcreg) + (uae_s32)(uae_s16)%s;\n", gen_nextiword ());
 	genamode (curi->dmode, "dstreg", curi->size, "dst", 2, 0);
-	/* [NP] Use MovepByteNbr to keep track of each access inside a movep */
 	if (curi->size == sz_word) {
-	    //printf ("\tuae_u16 val = (get_byte(memp) << 8) + get_byte(memp + 2);\n");
-	    printf ("\tuae_u16 val;\n");
-	    printf ("\tMovepByteNbr=1; val = (get_byte(memp) << 8);\n");
-	    printf ("\tMovepByteNbr=2; val += get_byte(memp + 2);\n");
+	    printf ("\tuae_u16 val = (get_byte(memp) << 8) + get_byte(memp + 2);\n");
 	} else {
-	    //printf ("\tuae_u32 val = (get_byte(memp) << 24) + (get_byte(memp + 2) << 16)\n");
-	    //printf ("              + (get_byte(memp + 4) << 8) + get_byte(memp + 6);\n");
-	    printf ("\tuae_u32 val;\n");
-	    printf ("\tMovepByteNbr=1; val = (get_byte(memp) << 24);\n");
-	    printf ("\tMovepByteNbr=2; val += (get_byte(memp + 2) << 16);\n");
-	    printf ("\tMovepByteNbr=3; val += (get_byte(memp + 4) << 8);\n");
-	    printf ("\tMovepByteNbr=4; val += get_byte(memp + 6);\n");
+	    printf ("\tuae_u32 val = (get_byte(memp) << 24) + (get_byte(memp + 2) << 16)\n");
+	    printf ("              + (get_byte(memp + 4) << 8) + get_byte(memp + 6);\n");
 	}
-	printf ("\tMovepByteNbr=0;\n");
 	genastore ("val", curi->dmode, "dstreg", curi->size, "dst");
         if(curi->size==sz_long)  insn_n_cycles=24;  else  insn_n_cycles=16;
 	break;
@@ -1450,6 +1451,7 @@ static void gen_opcode (unsigned long int opcode)
 		printf ("\t\tlast_addr_for_exception_3 = m68k_getpc ();\n");
 		printf ("\t\tlast_fault_for_exception_3 = pc;\n");
 		printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+		printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 		printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 		printf ("\t}\n");
 		need_endlabel = 1;
@@ -1481,6 +1483,7 @@ static void gen_opcode (unsigned long int opcode)
 		printf ("\t\tlast_addr_for_exception_3 = m68k_getpc ();\n");
 		printf ("\t\tlast_fault_for_exception_3 = newpc;\n");
 		printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+		printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 		printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 		printf ("\t}\n");
 		need_endlabel = 1;
@@ -1502,6 +1505,7 @@ static void gen_opcode (unsigned long int opcode)
 	    printf ("\t\tlast_addr_for_exception_3 = m68k_getpc ();\n");
 	    printf ("\t\tlast_fault_for_exception_3 = pc;\n");
 	    printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+	    printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 	    printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 	    printf ("\t}\n");
 	    need_endlabel = 1;
@@ -1533,6 +1537,7 @@ static void gen_opcode (unsigned long int opcode)
 	    printf ("\t\tlast_addr_for_exception_3 = oldpc;\n");
 	    printf ("\t\tlast_fault_for_exception_3 = m68k_getpc ();\n");
 	    printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+	    printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 	    printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 	    printf ("\t}\n");
 	    need_endlabel = 1;
@@ -1558,6 +1563,7 @@ static void gen_opcode (unsigned long int opcode)
 	    printf ("\t\tlast_addr_for_exception_3 = m68k_getpc ();\n");
 	    printf ("\t\tlast_fault_for_exception_3 = pc;\n");
 	    printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+	    printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 	    printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 	    printf ("\t}\n");
 	    need_endlabel = 1;
@@ -1575,6 +1581,7 @@ static void gen_opcode (unsigned long int opcode)
 	    printf ("\t\tlast_addr_for_exception_3 = oldpc;\n");
 	    printf ("\t\tlast_fault_for_exception_3 = srca;\n");
 	    printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+	    printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 	    printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 	    printf ("\t}\n");
 	    need_endlabel = 1;
@@ -1597,9 +1604,13 @@ static void gen_opcode (unsigned long int opcode)
 	genamode (curi->smode, "srcreg", curi->size, "src", 0, 0);
 	if (using_exception_3) {
 	    printf ("\tif (srca & 1) {\n");
-	    printf ("\t\tlast_addr_for_exception_3 = m68k_getpc() + %d;\n" , m68k_pc_offset);	// [NP] last_addr is not pc+6
+	    if ( opcode == 0x4ef8 )									// [NP] jmp xxx.w
+		printf ("\t\tlast_addr_for_exception_3 = m68k_getpc() + 2;\n");				// [NP] last_addr is pc+2
+	    else
+		printf ("\t\tlast_addr_for_exception_3 = m68k_getpc() + %d;\n" , m68k_pc_offset);	// [NP] last_addr is not pc+6
 	    printf ("\t\tlast_fault_for_exception_3 = srca;\n");
 	    printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+	    printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 	    printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 	    printf ("\t}\n");
 	    need_endlabel = 1;
@@ -1626,6 +1637,7 @@ static void gen_opcode (unsigned long int opcode)
 	    printf ("\t\tlast_addr_for_exception_3 = m68k_getpc() + 2;\n");	// [NP] FIXME should be +4, not +2 (same as DBcc) ?
 	    printf ("\t\tlast_fault_for_exception_3 = m68k_getpc() + s;\n");
 	    printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+	    printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 	    printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 	    printf ("\t}\n");
 	    need_endlabel = 1;
@@ -1643,6 +1655,7 @@ static void gen_opcode (unsigned long int opcode)
 		printf ("\t\tlast_addr_for_exception_3 = m68k_getpc() + 2;\n");
 		printf ("\t\tlast_fault_for_exception_3 = m68k_getpc() + 1;\n");
 		printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+		printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 		printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 		need_endlabel = 1;
 	    } else {
@@ -1657,12 +1670,14 @@ static void gen_opcode (unsigned long int opcode)
 	    printf ("\t\tlast_addr_for_exception_3 = m68k_getpc() + 2;\n");	// [NP] FIXME should be +4, not +2 (same as DBcc) ?
 	    printf ("\t\tlast_fault_for_exception_3 = m68k_getpc() + 2 + (uae_s32)src;\n");
 	    printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+	    printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 	    printf ("\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 	    printf ("\t}\n");
 	    need_endlabel = 1;
 	}
 	printf ("\tm68k_incpc ((uae_s32)src + 2);\n");
 	fill_prefetch_0 ();
+	printf("\trefill_prefetch (m68k_getpc(), 0);\n");			// FIXME [NP] need better prefetch emulation (needed in War Heli for 60fe : bra.s -2)
 	printf ("\treturn 10;\n");
 	printf ("didnt_jump:;\n");
 	need_endlabel = 1;
@@ -1710,6 +1725,7 @@ static void gen_opcode (unsigned long int opcode)
 	    printf ("\t\t\tlast_addr_for_exception_3 = m68k_getpc() + 2 + 2;\n");	// [NP] last_addr is pc+4, not pc+2
 	    printf ("\t\t\tlast_fault_for_exception_3 = m68k_getpc() + 2 + (uae_s32)offs + 2;\n");
 	    printf ("\t\tlast_instructionaccess_for_exception_3 = 1;\n");
+	    printf ("\t\tlast_writeaccess_for_exception_3 = 0;\n");
 	    printf ("\t\t\tlast_op_for_exception_3 = opcode; Exception(3,0,M68000_EXC_SRC_CPU); goto %s;\n", endlabelstr);
 	    printf ("\t\t}\n");
 	    need_endlabel = 1;

@@ -15,6 +15,7 @@ const char Paths_fileid[] = "Hatari paths.c : " __DATE__ " " __TIME__;
 #include "main.h"
 #include "file.h"
 #include "paths.h"
+#include "str.h"
 
 #if defined(WIN32) && !defined(mkdir)
 #define mkdir(name,mode) mkdir(name)
@@ -22,8 +23,10 @@ const char Paths_fileid[] = "Hatari paths.c : " __DATE__ " " __TIME__;
 
 #if defined(__MACOSX__)
 	#define HATARI_HOME_DIR "Library/Application Support/Hatari"
+#elif defined(WIN32)
+	#define HATARI_HOME_DIR "AppData\\Local\\Hatari"
 #else
-	#define HATARI_HOME_DIR ".hatari"
+	#define HATARI_HOME_DIR ".config/hatari"
 #endif
 
 static char sWorkingDir[FILENAME_MAX];    /* Working directory */
@@ -45,6 +48,11 @@ const char *Paths_GetWorkingDir(void)
  */
 const char *Paths_GetDataDir(void)
 {
+//retroup: load bios from system dir
+#ifdef __LIBRETRO__	/* RETRO HACK */
+	extern const char *retro_system_directory;
+	return retro_system_directory;
+#endif
 	return sDataDir;
 }
 
@@ -108,11 +116,10 @@ static void Paths_GetExecDirFromPATH(const char *argv0, char *pExecDir, int nMax
 		if (File_Exists(pTmpName))
 		{
 			/* Found the executable - so use the corresponding path: */
-			strncpy(pExecDir, pAct, nMaxLen);
-			pExecDir[nMaxLen-1] = 0;
+			strlcpy(pExecDir, pAct, nMaxLen);
 			break;
 		}
-		pAct = strtok (0, pToken);
+		pAct = strtok (NULL, pToken);
   	}
 
 	free(pPathEnv);
@@ -144,7 +151,7 @@ static char *Paths_InitExecDir(const char *argv0)
 	{
 		int i;
 		/* On Linux, we can analyze the symlink /proc/self/exe */
-		i = readlink("/proc/self/exe", psExecDir, FILENAME_MAX);
+		i = readlink("/proc/self/exe", psExecDir, FILENAME_MAX-1);
 		if (i > 0)
 		{
 			char *p;
@@ -162,7 +169,7 @@ static char *Paths_InitExecDir(const char *argv0)
 	/* If we do not have the execdir yet, analyze argv[0] and the PATH: */
 	if (psExecDir[0] == 0)
 	{
-		if (strchr(argv0, PATHSEP) == 0)
+		if (strchr(argv0, PATHSEP) == NULL)
 		{
 			/* No separator in argv[0], we have to explore PATH... */
 			Paths_GetExecDirFromPATH(argv0, psExecDir, FILENAME_MAX);
@@ -172,8 +179,7 @@ static char *Paths_InitExecDir(const char *argv0)
 			/* There was a path separator in argv[0], so let's assume a
 			 * relative or absolute path to the current directory in argv[0] */
 			char *p;
-			strncpy(psExecDir, argv0, FILENAME_MAX);
-			psExecDir[FILENAME_MAX-1] = 0;
+			strlcpy(psExecDir, argv0, FILENAME_MAX);
 			p = strrchr(psExecDir, PATHSEP);  /* Search last slash */
 			if (p)
 				*p = 0;                       /* Strip file name from path */
@@ -218,24 +224,43 @@ static void Paths_InitHomeDirs(void)
 		/* $HOME not set, so let's use current working dir as home */
 		strcpy(sUserHomeDir, sWorkingDir);
 		strcpy(sHatariHomeDir, sWorkingDir);
+		return;
 	}
-	else
-	{
-		sUserHomeDir[FILENAME_MAX-1] = 0;
 
-		/* Try to use a .hatari directory in the users home directory */
-		snprintf(sHatariHomeDir, FILENAME_MAX, "%s%c%s", sUserHomeDir,
-		         PATHSEP, HATARI_HOME_DIR);
-		if (!File_DirExists(sHatariHomeDir))
-		{
-			/* Hatari home directory does not exists yet...
-			 * ...so let's try to create it: */
-			if (mkdir(sHatariHomeDir, 0755) != 0)
-			{
-				/* Failed to create, so use user's home dir instead */
-				strcpy(sHatariHomeDir, sUserHomeDir);
-			}
-		}
+	sUserHomeDir[FILENAME_MAX-1] = 0;
+
+	/* Try to use a private hatari directory in the users home directory */
+	snprintf(sHatariHomeDir, FILENAME_MAX, "%s%c%s", sUserHomeDir,
+	         PATHSEP, HATARI_HOME_DIR);
+	if (File_DirExists(sHatariHomeDir))
+	{
+		return;
+	}
+	/* Try legacy location ~/.hatari */
+	snprintf(sHatariHomeDir, FILENAME_MAX, "%s%c.hatari", sUserHomeDir,
+	         PATHSEP);
+	if (File_DirExists(sHatariHomeDir))
+	{
+		return;
+	}
+
+	/* Hatari home directory does not exists yet...
+	 * ... so let's try to create it: */
+#if !defined(__MACOSX__) && !defined(WIN32)
+	snprintf(sHatariHomeDir, FILENAME_MAX, "%s%c.config", sUserHomeDir,
+	         PATHSEP);
+	if (!File_DirExists(sHatariHomeDir))
+	{
+		/* ~/.config does not exist yet, create it first */
+		mkdir(sHatariHomeDir, 0700);
+	}
+#endif
+	snprintf(sHatariHomeDir, FILENAME_MAX, "%s%c%s", sUserHomeDir,
+	         PATHSEP, HATARI_HOME_DIR);
+	if (mkdir(sHatariHomeDir, 0750) != 0)
+	{
+		/* Failed to create, so use user's home dir instead */
+		strcpy(sHatariHomeDir, sUserHomeDir);
 	}
 }
 

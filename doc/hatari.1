@@ -90,7 +90,11 @@ Skip <x> frames after each displayed frame to accelerate emulation
 .TP
 .B \-\-slowdown <x>
 Slow down emulation by factor of x (used as multiplier for VBL wait time)
-.TP 
+.TP
+.B \-\-mousewarp <bool>
+To keep host mouse better in sync with Atari mouse pointer, center it
+to Hatari window on cold reset and resolution changes
+.TP
 .B \-\-statusbar <bool>
 Show statusbar (with floppy leds etc etc)
 .TP 
@@ -109,14 +113,22 @@ Force internal bitdepth (x = 8/15/16/32, 0=disable)
 .SH "ST/STE specific display options"
 .TP
 .B \-\-desktop\-st <bool>
-Whether fullscreen mode uses desktop resolution to avoid: messing
-multi-screen setups, several seconds delay needed by LCD monitors
-resolution switching and the resulting sound break. As Hatari ST/E
-display code doesn't support zooming (except low-rez doubling), it
-doesn't get scaled (by Hatari or monitor) when this is enabled.
+NOTE: this has effect only for SDL1 Hatari build.  In SDL2 build,
+\fB--desktop\fP option controls also ST/STe mode.
+
+Whether to use desktop resolution on fullscreen to avoid issues
+related to resolution switching (messing multi-screen setups, several
+seconds delay needed for resolution switching by some LCD monitors and
+the resulting sound break). Otherwise fullscreen will use a resolution
+that is closest to the Hatari window size.
+
+As Hatari ST/STe display code doesn't support zooming (except low-rez
+doubling), it doesn't get scaled (by Hatari or monitor) when this is
+enabled, and you may get large black borders around ST/STe screen.
 Therefore this is mainly useful only if you suffer from the described
 effects, but still want to grab mouse and remove other distractions
-from the screen just by toggling fullscreen mode. (disabled by default)
+from the screen just by toggling fullscreen mode. (disabled by
+default)
 .TP 
 .B \-\-spec512 <x>
 Hatari uses this threshold to decide when to render a screen with
@@ -125,6 +137,14 @@ the slower but more accurate Spectrum512 screen conversion functions
 .TP 
 .B \-z, \-\-zoom <x>
 Zoom (double) low resolution (1=no, 2=yes)
+.TP
+.B \-\-video-timing <x>
+Wakeup State for MMU/GLUE (x=ws1/ws2/ws3/ws4/random, 
+default ws3). When powering on, the STF will randomly choose one of these
+wake up states. The state will then affect the timings where border removals
+and other video tricks should be made, which can give different results on
+screen. For example, WS3 is known to be compatible with many demos, while WS1 can show
+more problems.
 
 .SH "TT/Falcon specific display options"
 Zooming to sizes specified below is internally done using integer scaling
@@ -149,7 +169,9 @@ Whether to do monitor aspect ratio correction (enabled by default)
 .SH "VDI options"
 .TP
 .B \-\-vdi <bool>
-Whether to use VDI screen mode
+Whether to use VDI screen mode.  Doesn't work with TOS v4.
+TOS v3 memory detection isn't compatible with larger VDI modes
+(i.e. you need to skip the detection at boot)
 .TP
 .B \-\-vdi\-planes <x>
 Use extended VDI resolution with bit depth <x> (x = 1, 2 or 4)
@@ -166,16 +188,26 @@ Use extended VDI resolution with height <h> (200 < h <= 960)
 Remove statusbar from the screen captures
 .TP
 .B \-\-avirecord
-Start AVI recording
+Start AVI recording.  Note: recording will automatically
+stop when emulation resolution changes.
 .TP
 .B \-\-avi\-vcodec <x>
-Select avi video codec (x = bmp/png)
+Select AVI video codec (x = bmp/png).  PNG compression can
+be \fImuch\fP slower than using the uncompressed BMP format,
+but uncompressed video content takes huge amount of space.
+.TP
+.B \-\-png\-level <x>
+Select PNG compression level for AVI video (x = 0-9).
+Both compression efficiency and speed depend on the compressed
+screen content. Highest compression level (9) can be \fIreally\fP
+slow with some content. Levels 3-6 should compress nearly as well
+with clearly smaller CPU overhead.
 .TP
 .B \-\-avi\-fps <x>
-Force avi frame rate (x = 50/60/71/...)
+Force AVI frame rate (x = 50/60/71/...)
 .TP
 .B \-\-avi\-file <file>
-Use <file> to record avi
+Use <file> to record AVI
 
 .SH "Devices options"
 .TP 
@@ -200,7 +232,7 @@ Enable serial port support and use <file> as the input device
 .B \-\-rs232\-out <filename>
 Enable serial port support and use <file> as the output device
 
-.SH "Disk options"
+.SH "Floppy drive options"
 .TP
 .B \-\-drive\-a <bool>
 Enable/disable drive A (default is on)
@@ -219,10 +251,24 @@ Set disk image for floppy drive A
 .TP
 .B \-\-disk\-b <file>
 Set disk image for floppy drive B
+.TP 
+.B \-\-fastfdc <bool>
+speed up FDC emulation (can cause incompatibilities)
 .TP
 .B \-\-protect\-floppy <x>
 Write protect floppy image contents (on/off/auto). With "auto" option
 write protection is according to the disk image file attributes
+
+.SH "Hard drive options"
+.TP
+.B \-d, \-\-harddrive <dir>
+Emulate harddrive partition(s) with <dir> contents.  If directory
+contains only single letter (C-Z) subdirectories, each of these
+subdirectories will be treated as a separate partition, otherwise the
+given directory itself will be assigned to drive "C:". In the multiple
+partition case, the letters used as the subdirectory names will
+determine to which drives/partitions they're assigned. If <dir> is
+an empty string, then harddrive's emulation is disabled
 .TP
 .B \-\-protect\-hd <x>
 Write protect harddrive <dir> contents (on/off/auto). With "auto" option
@@ -233,27 +279,24 @@ emulation
 .B \-\-gemdos\-case <x>
 Specify whether new dir/filenames are forced to be in upper or lower case
 with the GEMDOS HD emulation. Off/upper/lower, off by default
-.TP 
-.B \-d, \-\-harddrive <dir>
-Emulate harddrive partition(s) with <dir> contents.  If directory
-contains only single letter (C-Z) subdirectories, each of these
-subdirectories will be treated as a separate partition, otherwise the
-given directory itself will be assigned to drive "C:". In the multiple
-partition case, the letters used as the subdirectory names will
-determine to which drives/partitions they're assigned. If <dir> is
-an empty string, then harddrive's emulation is disabled
 .TP
-.B \-\-acsi <file>
-Emulate an ACSI hard disk with an image <file>
+.B \-\-gemdos\-conv <bool>
+Whether GEMDOS file names with 8-bit (non-ASCII) characters are
+converted between Atari and host character sets. On Linux, host file
+name character set is assumed to be UTF-8. This option is disabled by
+default, in case you've transferred files from Atari machine without
+proper file name conversion (e.g. by zipping them on Atari and
+unzipping on PC).
+.TP
+.B \-\-acsi <id>=<file>
+Emulate an ACSI hard disk with given BUS ID (0-7) using image <file>.
+If just filename is given, it's assigned to BUS ID 0.
 .TP 
 .B \-\-ide\-master <file>
 Emulate an IDE master hard disk with an image <file>
 .TP 
 .B \-\-ide\-slave <file>
 Emulate an IDE slave hard disk with an image <file>
-.TP 
-.B \-\-fastfdc <bool>
-speed up FDC emulation (can cause incompatibilities)
 
 .SH "Memory options"
 .TP 
@@ -261,7 +304,10 @@ speed up FDC emulation (can cause incompatibilities)
 Load memory snap-shot <file>
 .TP 
 .B \-s, \-\-memsize <x>
-Set amount of emulated RAM, x = 1 to 14 MiB, or 0 for 512 KiB
+Set amount of emulated ST RAM, x = 1 to 14 MiB, or 0 for 512 KiB
+.TP
+.B \-s, \-\-ttram <x>
+Set amount of emulated TT RAM, x = 0 to 256 MiB (in 4MB steps)
 
 .SH "ROM options"
 .TP 
@@ -276,7 +322,7 @@ this enabled unless you know what you are doing!
 Use ROM cartridge image <file> (only works if GEMDOS HD emulation and
 extended VDI resolution are disabled)
 
-.SH "CPU options"
+.SH "Common CPU options"
 .TP 
 .B \-\-cpulevel <x>
 Specify CPU (680x0) to use (use x >= 1 with EmuTOS or TOS >= 2.06 only!)
@@ -287,6 +333,21 @@ Set the CPU clock (8, 16 or 32 Mhz)
 .B \-\-compatible <bool>
 Use a more compatible, but slower 68000 CPU mode with
 better prefetch accuracy and cycle counting
+
+.SH "WinUAE CPU core options"
+.TP
+.B \-\-cpu\-exact <bool>
+Use cycle exact CPU emulation (cache emulation)
+.TP
+.B \-\-addr24 <bool>
+Use 24-bit instead of 32-bit addressing mode
+(24-bit is enabled by default)
+.TP
+.B \-\-fpu <x>
+FPU type (x=none/68881/68882/internal)
+.TP
+.B \-\-mmu <bool>
+Use MMU emulation
 
 .SH "Misc system options"
 .TP 
@@ -419,13 +480,27 @@ Show dialog for log messages above given level
 .B \-\-run\-vbls <x>
 Exit after X VBLs
 
-.SH "KEYBOARD HANDLING"
-Hatari provides special keys for different purposes.
+.SH "INPUT HANDLING"
+Hatari provides special input handling for different purposes.
+
+.SH "Emulated Atari ST joystick"
+Joystick can be emulated either with keyboard or any real joystick
+supported by your kernel / SDL library.  First joystick button
+acts as FIRE, second as SPACE key.
+
+.SH "Emulated Atari ST mouse"
+Middle button mouse click is interpreted as double click, this
+is especially useful in Fast Forward mode.
+.PP
+Mouse scrollwheel will act as cursor up and down keys.
 
 .SH "Emulated Atari ST keyboard"
-All other keys on the keyboard act as the normal Atari ST keys so
-pressing SPACE on your PC will result in an emulated press of the
-SPACE key on the ST. The following keys have special meanings:
+Keys on the keyboard act as the normal Atari ST keys so pressing SPACE
+on your PC will result in an emulated press of the SPACE key on the
+ST. How the PC keys are mapped to Atari key codes, can be changed
+with keyboard config file (-k option).
+.PP
+The following keys have special meanings:
 .TP
 .B  Alt
 will act as the ST's ALTERNATE key
@@ -433,10 +508,10 @@ will act as the ST's ALTERNATE key
 .B  left Ctrl
 will act as the ST's CONTROL key
 .TP
-.B  Page Up
+.B  Print
 will emulate the ST's HELP key
 .TP
-.B  Page Down
+.B  Scroll lock
 will emulate the ST's UNDO key
 .PP
 .B AltGr
@@ -501,11 +576,14 @@ toggle joystick emulation via cursor keys
 .TP
 .B AltGr + F1
 switch joystick type on joy port 0
+.TP
 .B AltGr + F2
 switch joystick type on joy port 1
+.TP
 .B AltGr + F3
 switch joystick type for joypad A
-.B AltGr + F3
+.TP
+.B AltGr + F4
 switch joystick type for joypad B
 .TP
 .B F11
@@ -522,7 +600,7 @@ Pauses the emulation
 .B AltGr + Pause
 Invokes the internal Hatari debugger
 
-.SH "Keyboard shortcuts for SDL GUI"
+.SH "Keyboard shortcuts for the SDL GUI"
 There are multiple ways to interact with the SDL GUI.
 .PP
 TAB and cursor keys change focus between UI elements.  Additionally
@@ -559,7 +637,8 @@ Other Hatari programs and utilities:
 .br
 .IR hmsa (1),
 .IR zip2st (1),
-.IR atari-hd-image (1),
+.IR atari\-convert\-dir (1),
+.IR atari\-hd\-image (1),
 .IR hatariui (1),
 .IR hconsole (1),
 .IR gst2ascii (1),

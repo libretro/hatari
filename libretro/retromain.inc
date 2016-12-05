@@ -37,3 +37,4 @@ extern void retro_shutdown_hatari(void);
 //#warning "conf dir for linux"
 #endif
 
+#define  Main_WarpMouse(a,b)  Main_WarpMouse((a),(b), false)

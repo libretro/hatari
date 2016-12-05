@@ -34,8 +34,17 @@
 /* Define to 1 if you have the <SDL_config.h> header file. */
 #cmakedefine HAVE_SDL_CONFIG_H 1
 
+/* Define to 1 if you have the <sys/time.h> header file. */
+#cmakedefine HAVE_SYS_TIME_H 1
+
 /* Define to 1 if you have the <sys/times.h> header file. */
 #cmakedefine HAVE_SYS_TIMES_H 1
+
+/* Define to 1 if you have the <utime.h> header file. */
+#cmakedefine HAVE_UTIME_H 1
+
+/* Define to 1 if you have the <sys/utime.h> header file. */
+#cmakedefine HAVE_SYS_UTIME_H 1
 
 /* Define to 1 if you have the `cfmakeraw' function. */
 #cmakedefine HAVE_CFMAKERAW 1
@@ -79,6 +88,9 @@
 /* Define to 1 if you have the 'flock' function. */
 #cmakedefine HAVE_FLOCK 1
 
+/* Define to 1 if you have the 'strlcpy' function. */
+#cmakedefine HAVE_LIBC_STRLCPY 1
+
 /* Define to 1 if you have the 'd_type' member in the 'dirent' struct */
 #cmakedefine HAVE_DIRENT_D_TYPE 1
 
@@ -96,3 +108,6 @@
 
 /* Define to 1 to enable trace logs - undefine to slightly increase speed */
 #cmakedefine ENABLE_TRACING 1
+
+/* Define to 1 if udev support is available */
+#cmakedefine HAVE_UDEV 1

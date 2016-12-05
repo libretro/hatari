@@ -70,7 +70,7 @@ static SGOBJ sounddlg[] =
 	{ SGBUTTON,   0,0, 12,20, 16,1, NULL }, /* text set later, see below */
 
 	{ SGBUTTON, SG_DEFAULT, 0, 10,23, 20,1, "Back to main menu" },
-	{ -1, 0, 0, 0,0, 0,0, NULL }
+	{ SGSTOP, 0, 0, 0,0, 0,0, NULL }
 };
 
 #define RECORD_START "_Record sound"
@@ -146,7 +146,7 @@ void Dialog_SoundDlg(void)
 	/* The sound dialog main loop */
 	do
 	{
-		but = SDLGui_DoDialog(sounddlg, NULL);
+		but = SDLGui_DoDialog(sounddlg, NULL, false);
 		switch (but)
 		{
 		 case DLGSOUND_RECBROWSE:                    /* Choose a new record file */

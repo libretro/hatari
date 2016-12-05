@@ -61,11 +61,12 @@ only target, and it's easier this way... */
 #define STACK_ALIGN		16
 #define STACK_OFFSET	sizeof(void *)
 
-uae_u8 always_used[]={4,0xff};
 #if defined(__x86_64__)
+uae_u8 always_used[] = { 4, 12, 0xff };
 uae_s8 can_byte[]={0,1,2,3,5,6,7,8,9,10,11,12,13,14,15,-1};
 uae_s8 can_word[]={0,1,2,3,5,6,7,8,9,10,11,12,13,14,15,-1};
 #else
+uae_u8 always_used[] = { 4, 0xff };
 uae_u8 can_byte[]={0,1,2,3,0xff};
 uae_u8 can_word[]={0,1,2,3,5,6,7,0xff};
 #endif
@@ -641,7 +642,7 @@ LENDFUNC(NONE,NONE,2,raw_imul_32_32,(RW4 d, R4 s))
 {
 #ifdef JIT_DEBUG
 	if (d!=MUL_NREG1 || s!=MUL_NREG2) {
-		write_log (L"JIT: Bad register in IMUL: d=%d, s=%d\n",d,s);
+		write_log (_T("JIT: Bad register in IMUL: d=%d, s=%d\n"),d,s);
 		abort();
 	}
 #endif
@@ -654,7 +655,7 @@ LENDFUNC(NONE,NONE,2,raw_imul_64_32,(RW4 d, RW4 s))
 {
 #ifdef JIT_DEBUG
 	if (d!=MUL_NREG1 || s!=MUL_NREG2) {
-		write_log (L"JIT: Bad register in MUL: d=%d, s=%d\n",d,s);
+		write_log (_T("JIT: Bad register in MUL: d=%d, s=%d\n"),d,s);
 		abort();
 	}
 #endif
@@ -1670,564 +1671,15 @@ STATIC_INLINE void raw_inc_sp(int off)
 	raw_add_l_ri(4,off);
 }
 
+
 /*************************************************************************
 * Handling mistaken direct memory access                                *
 *************************************************************************/
 
-
-#ifdef NATMEM_OFFSET
-#ifdef _WIN32 // %%% BRIAN KING WAS HERE %%%
-#include <winbase.h>
-#else
-#include <asm/sigcontext.h>
-#endif
-#include <signal.h>
-
-#define SIG_READ 1
-#define SIG_WRITE 2
-
-static int in_handler=0;
-static uae_u8 *veccode;
-
-#ifdef _WIN32
-
-#if defined(CPU_64_BIT)
-#define ctxPC (pContext->Rip)
-#else
-#define ctxPC (pContext->Eip)
+#ifdef UAE
+#include "exception_handler.cpp"
 #endif
 
-int EvalException (LPEXCEPTION_POINTERS blah, int n_except)
-{
-	PEXCEPTION_RECORD pExceptRecord = NULL;
-	PCONTEXT          pContext = NULL;
-
-	uae_u8* i = NULL;
-	uae_u32 addr = 0;
-	int r=-1;
-	int size=4;
-	int dir=-1;
-	int len=0;
-
-	if (n_except != STATUS_ACCESS_VIOLATION || !canbang || currprefs.cachesize == 0)
-		return EXCEPTION_CONTINUE_SEARCH;
-
-	pExceptRecord = blah->ExceptionRecord;
-	pContext = blah->ContextRecord;
-
-	if (pContext)
-		i = (uae_u8 *)ctxPC;
-	if (pExceptRecord)
-		addr = (uae_u32)(pExceptRecord->ExceptionInformation[1]);
-#ifdef JIT_DEBUG
-	write_log (L"JIT: fault address is 0x%x at 0x%x\n",addr,i);
-#endif
-	if (!canbang || !currprefs.cachesize)
-		return EXCEPTION_CONTINUE_SEARCH;
-
-	if (in_handler)
-		write_log (L"JIT: Argh --- Am already in a handler. Shouldn't happen!\n");
-
-	if (canbang && i>=compiled_code && i<=current_compile_p) {
-		if (*i==0x66) {
-			i++;
-			size=2;
-			len++;
-		}
-
-		switch(i[0]) {
-		case 0x8a:
-			if ((i[1]&0xc0)==0x80) {
-				r=(i[1]>>3)&7;
-				dir=SIG_READ;
-				size=1;
-				len+=6;
-				break;
-			}
-			break;
-		case 0x88:
-			if ((i[1]&0xc0)==0x80) {
-				r=(i[1]>>3)&7;
-				dir=SIG_WRITE;
-				size=1;
-				len+=6;
-				break;
-			}
-			break;
-		case 0x8b:
-			switch(i[1]&0xc0) {
-			case 0x80:
-				r=(i[1]>>3)&7;
-				dir=SIG_READ;
-				len+=6;
-				break;
-			case 0x40:
-				r=(i[1]>>3)&7;
-				dir=SIG_READ;
-				len+=3;
-				break;
-			case 0x00:
-				r=(i[1]>>3)&7;
-				dir=SIG_READ;
-				len+=2;
-				break;
-			default:
-				break;
-			}
-			break;
-		case 0x89:
-			switch(i[1]&0xc0) {
-			case 0x80:
-				r=(i[1]>>3)&7;
-				dir=SIG_WRITE;
-				len+=6;
-				break;
-			case 0x40:
-				r=(i[1]>>3)&7;
-				dir=SIG_WRITE;
-				len+=3;
-				break;
-			case 0x00:
-				r=(i[1]>>3)&7;
-				dir=SIG_WRITE;
-				len+=2;
-				break;
-			}
-			break;
-		}
-	}
-
-	if (r!=-1) {
-		void* pr=NULL;
-#ifdef JIT_DEBUG
-		write_log (L"JIT: register was %d, direction was %d, size was %d\n",r,dir,size);
-#endif
-
-		switch(r) {
-#if defined(CPU_64_BIT)
-		case 0: pr=&(pContext->Rax); break;
-		case 1: pr=&(pContext->Rcx); break;
-		case 2: pr=&(pContext->Rdx); break;
-		case 3: pr=&(pContext->Rbx); break;
-		case 4: pr=(size>1)?NULL:(((uae_u8*)&(pContext->Rax))+1); break;
-		case 5: pr=(size>1)?
-					(void*)(&(pContext->Rbp)):
-			(void*)(((uae_u8*)&(pContext->Rcx))+1); break;
-		case 6: pr=(size>1)?
-					(void*)(&(pContext->Rsi)):
-			(void*)(((uae_u8*)&(pContext->Rdx))+1); break;
-		case 7: pr=(size>1)?
-					(void*)(&(pContext->Rdi)):
-			(void*)(((uae_u8*)&(pContext->Rbx))+1); break;
-#else
-		case 0: pr=&(pContext->Eax); break;
-		case 1: pr=&(pContext->Ecx); break;
-		case 2: pr=&(pContext->Edx); break;
-		case 3: pr=&(pContext->Ebx); break;
-		case 4: pr=(size>1)?NULL:(((uae_u8*)&(pContext->Eax))+1); break;
-		case 5: pr=(size>1)?
-					(void*)(&(pContext->Ebp)):
-			(void*)(((uae_u8*)&(pContext->Ecx))+1); break;
-		case 6: pr=(size>1)?
-					(void*)(&(pContext->Esi)):
-			(void*)(((uae_u8*)&(pContext->Edx))+1); break;
-		case 7: pr=(size>1)?
-					(void*)(&(pContext->Edi)):
-			(void*)(((uae_u8*)&(pContext->Ebx))+1); break;
-#endif
-		default: abort();
-		}
-		if (pr) {
-			blockinfo* bi;
-
-			if (currprefs.comp_oldsegv) {
-				addr-=(uae_u32)NATMEM_OFFSET;
-
-#ifdef JIT_DEBUG
-				if ((addr>=0x10000000 && addr<0x40000000) ||
-					(addr>=0x50000000)) {
-						write_log (L"JIT: Suspicious address 0x%x in SEGV handler.\n",addr);
-				}
-#endif
-				if (dir==SIG_READ) {
-					switch (size) {
-					case 1: *((uae_u8*)pr)=get_byte (addr); break;
-					case 2: *((uae_u16*)pr)=swap16(get_word (addr)); break;
-					case 4: *((uae_u32*)pr)=swap32(get_long (addr)); break;
-					default: abort();
-					}
-				}
-				else { /* write */
-					switch (size) {
-					case 1: put_byte (addr,*((uae_u8*)pr)); break;
-					case 2: put_word (addr,swap16(*((uae_u16*)pr))); break;
-					case 4: put_long (addr,swap32(*((uae_u32*)pr))); break;
-					default: abort();
-					}
-				}
-#ifdef JIT_DEBUG
-				write_log (L"JIT: Handled one access!\n");
-#endif
-				fflush(stdout);
-				segvcount++;
-				ctxPC+=len;
-			}
-			else {
-				void* tmp=target;
-				int i;
-				uae_u8 vecbuf[5];
-
-				addr-=(uae_u32)NATMEM_OFFSET;
-
-#ifdef JIT_DEBUG
-				if ((addr>=0x10000000 && addr<0x40000000) ||
-					(addr>=0x50000000)) {
-						write_log (L"JIT: Suspicious address 0x%x in SEGV handler.\n",addr);
-				}
-#endif
-
-				target=(uae_u8*)ctxPC;
-				for (i=0;i<5;i++)
-					vecbuf[i]=target[i];
-				emit_byte(0xe9);
-				emit_long((uae_u32)veccode-(uae_u32)target-4);
-#ifdef JIT_DEBUG
-
-				write_log (L"JIT: Create jump to %p\n",veccode);
-				write_log (L"JIT: Handled one access!\n");
-#endif
-				segvcount++;
-
-				target=veccode;
-
-				if (dir==SIG_READ) {
-					switch(size) {
-					case 1: raw_mov_b_ri(r,get_byte (addr)); break;
-					case 2: raw_mov_w_ri(r,swap16(get_word (addr))); break;
-					case 4: raw_mov_l_ri(r,swap32(get_long (addr))); break;
-					default: abort();
-					}
-				}
-				else { /* write */
-					switch(size) {
-					case 1: put_byte (addr,*((uae_u8*)pr)); break;
-					case 2: put_word (addr,swap16(*((uae_u16*)pr))); break;
-					case 4: put_long (addr,swap32(*((uae_u32*)pr))); break;
-					default: abort();
-					}
-				}
-				for (i=0;i<5;i++)
-					raw_mov_b_mi(ctxPC+i,vecbuf[i]);
-				raw_mov_l_mi((uae_u32)&in_handler,0);
-				emit_byte(0xe9);
-				emit_long(ctxPC+len-(uae_u32)target-4);
-				in_handler=1;
-				target=(uae_u8*)tmp;
-			}
-			bi=active;
-			while (bi) {
-				if (bi->handler &&
-					(uae_u8*)bi->direct_handler<=i &&
-					(uae_u8*)bi->nexthandler>i) {
-#ifdef JIT_DEBUG
-						write_log (L"JIT: deleted trigger (%p<%p<%p) %p\n",
-							bi->handler,
-							i,
-							bi->nexthandler,
-							bi->pc_p);
-#endif
-						invalidate_block(bi);
-						raise_in_cl_list(bi);
-						set_special(0);
-						return EXCEPTION_CONTINUE_EXECUTION;
-				}
-				bi=bi->next;
-			}
-			/* Not found in the active list. Might be a rom routine that
-			is in the dormant list */
-			bi=dormant;
-			while (bi) {
-				if (bi->handler &&
-					(uae_u8*)bi->direct_handler<=i &&
-					(uae_u8*)bi->nexthandler>i) {
-#ifdef JIT_DEBUG
-						write_log (L"JIT: deleted trigger (%p<%p<%p) %p\n",
-							bi->handler,
-							i,
-							bi->nexthandler,
-							bi->pc_p);
-#endif
-						invalidate_block(bi);
-						raise_in_cl_list(bi);
-						set_special(0);
-						return EXCEPTION_CONTINUE_EXECUTION;
-				}
-				bi=bi->next;
-			}
-#ifdef JIT_DEBUG
-			write_log (L"JIT: Huh? Could not find trigger!\n");
-#endif
-			return EXCEPTION_CONTINUE_EXECUTION;
-		}
-	}
-	write_log (L"JIT: Can't handle access %08X!\n", i);
-#if 0
-	if (i)
-	{
-		int j;
-
-		for (j=0;j<10;j++) {
-			write_log (L"JIT: instruction byte %2d is 0x%02x\n",j,i[j]);
-		}
-	}
-	write_log (L"Please send the above info (starting at \"fault address\") to\n"
-		L"bmeyer@csse.monash.edu.au\n"
-		L"This shouldn't happen ;-)\n");
-#endif
-	return EXCEPTION_CONTINUE_SEARCH;
-}
-#else
-static void vec(int x, struct sigcontext sc)
-{
-	uae_u8* i=(uae_u8*)sc.eip;
-	uae_u32 addr=sc.cr2;
-	int r=-1;
-	int size=4;
-	int dir=-1;
-	int len=0;
-	int j;
-
-	write_log (L"JIT: fault address is %08x at %08x\n",sc.cr2,sc.eip);
-	if (!canbang)
-		write_log (L"JIT: Not happy! Canbang is 0 in SIGSEGV handler!\n");
-	if (in_handler)
-		write_log (L"JIT: Argh --- Am already in a handler. Shouldn't happen!\n");
-
-	if (canbang && i>=compiled_code && i<=current_compile_p) {
-		if (*i==0x66) {
-			i++;
-			size=2;
-			len++;
-		}
-
-		switch(i[0]) {
-		case 0x8a:
-			if ((i[1]&0xc0)==0x80) {
-				r=(i[1]>>3)&7;
-				dir=SIG_READ;
-				size=1;
-				len+=6;
-				break;
-			}
-			break;
-		case 0x88:
-			if ((i[1]&0xc0)==0x80) {
-				r=(i[1]>>3)&7;
-				dir=SIG_WRITE;
-				size=1;
-				len+=6;
-				break;
-			}
-			break;
-
-		case 0x8b:
-			switch(i[1]&0xc0) {
-			case 0x80:
-				r=(i[1]>>3)&7;
-				dir=SIG_READ;
-				len+=6;
-				break;
-			case 0x40:
-				r=(i[1]>>3)&7;
-				dir=SIG_READ;
-				len+=3;
-				break;
-			case 0x00:
-				r=(i[1]>>3)&7;
-				dir=SIG_READ;
-				len+=2;
-				break;
-			default:
-				break;
-			}
-			break;
-
-		case 0x89:
-			switch(i[1]&0xc0) {
-			case 0x80:
-				r=(i[1]>>3)&7;
-				dir=SIG_WRITE;
-				len+=6;
-				break;
-			case 0x40:
-				r=(i[1]>>3)&7;
-				dir=SIG_WRITE;
-				len+=3;
-				break;
-			case 0x00:
-				r=(i[1]>>3)&7;
-				dir=SIG_WRITE;
-				len+=2;
-				break;
-			}
-			break;
-		}
-	}
-
-	if (r!=-1) {
-		void* pr=NULL;
-		write_log (L"JIT: register was %d, direction was %d, size was %d\n",r,dir,size);
-
-		switch(r) {
-		case 0: pr=&(sc.eax); break;
-		case 1: pr=&(sc.ecx); break;
-		case 2: pr=&(sc.edx); break;
-		case 3: pr=&(sc.ebx); break;
-		case 4: pr=(size>1)?NULL:(((uae_u8*)&(sc.eax))+1); break;
-		case 5: pr=(size>1)?
-					(void*)(&(sc.ebp)):
-			(void*)(((uae_u8*)&(sc.ecx))+1); break;
-		case 6: pr=(size>1)?
-					(void*)(&(sc.esi)):
-			(void*)(((uae_u8*)&(sc.edx))+1); break;
-		case 7: pr=(size>1)?
-					(void*)(&(sc.edi)):
-			(void*)(((uae_u8*)&(sc.ebx))+1); break;
-		default: abort();
-		}
-		if (pr) {
-			blockinfo* bi;
-
-			if (currprefs.comp_oldsegv) {
-				addr-=NATMEM_OFFSET;
-
-				if ((addr>=0x10000000 && addr<0x40000000) ||
-					(addr>=0x50000000)) {
-						write_log (L"JIT: Suspicious address in %x SEGV handler.\n",addr);
-				}
-				if (dir==SIG_READ) {
-					switch(size) {
-					case 1: *((uae_u8*)pr)=get_byte (addr); break;
-					case 2: *((uae_u16*)pr)=get_word (addr); break;
-					case 4: *((uae_u32*)pr)=get_long (addr); break;
-					default: abort();
-					}
-				}
-				else { /* write */
-					switch(size) {
-					case 1: put_byte (addr,*((uae_u8*)pr)); break;
-					case 2: put_word (addr,*((uae_u16*)pr)); break;
-					case 4: put_long (addr,*((uae_u32*)pr)); break;
-					default: abort();
-					}
-				}
-				write_log (L"JIT: Handled one access!\n");
-				fflush(stdout);
-				segvcount++;
-				sc.eip+=len;
-			}
-			else {
-				void* tmp=target;
-				int i;
-				uae_u8 vecbuf[5];
-
-				addr-=NATMEM_OFFSET;
-
-				if ((addr>=0x10000000 && addr<0x40000000) ||
-					(addr>=0x50000000)) {
-						write_log (L"JIT: Suspicious address 0x%x in SEGV handler.\n",addr);
-				}
-
-				target=(uae_u8*)sc.eip;
-				for (i=0;i<5;i++)
-					vecbuf[i]=target[i];
-				emit_byte(0xe9);
-				emit_long((uae_u32)veccode-(uae_u32)target-4);
-				write_log (L"JIT: Create jump to %p\n",veccode);
-
-				write_log (L"JIT: Handled one access!\n");
-				segvcount++;
-
-				target=veccode;
-
-				if (dir==SIG_READ) {
-					switch(size) {
-					case 1: raw_mov_b_ri(r,get_byte (addr)); break;
-					case 2: raw_mov_w_ri(r,get_word (addr)); break;
-					case 4: raw_mov_l_ri(r,get_long (addr)); break;
-					default: abort();
-					}
-				}
-				else { /* write */
-					switch(size) {
-					case 1: put_byte (addr,*((uae_u8*)pr)); break;
-					case 2: put_word (addr,*((uae_u16*)pr)); break;
-					case 4: put_long (addr,*((uae_u32*)pr)); break;
-					default: abort();
-					}
-				}
-				for (i=0;i<5;i++)
-					raw_mov_b_mi(sc.eip+i,vecbuf[i]);
-				raw_mov_l_mi((uae_u32)&in_handler,0);
-				emit_byte(0xe9);
-				emit_long(sc.eip+len-(uae_u32)target-4);
-				in_handler=1;
-				target=tmp;
-			}
-			bi=active;
-			while (bi) {
-				if (bi->handler &&
-					(uae_u8*)bi->direct_handler<=i &&
-					(uae_u8*)bi->nexthandler>i) {
-						write_log (L"JIT: deleted trigger (%p<%p<%p) %p\n",
-							bi->handler,
-							i,
-							bi->nexthandler,
-							bi->pc_p);
-						invalidate_block(bi);
-						raise_in_cl_list(bi);
-						set_special(0);
-						return;
-				}
-				bi=bi->next;
-			}
-			/* Not found in the active list. Might be a rom routine that
-			is in the dormant list */
-			bi=dormant;
-			while (bi) {
-				if (bi->handler &&
-					(uae_u8*)bi->direct_handler<=i &&
-					(uae_u8*)bi->nexthandler>i) {
-						write_log (L"JIT: deleted trigger (%p<%p<%p) %p\n",
-							bi->handler,
-							i,
-							bi->nexthandler,
-							bi->pc_p);
-						invalidate_block(bi);
-						raise_in_cl_list(bi);
-						set_special(0);
-						return;
-				}
-				bi=bi->next;
-			}
-			write_log (L"JIT: Huh? Could not find trigger!\n");
-			return;
-		}
-	}
-	write_log (L"JIT: Can't handle access!\n");
-	for (j=0;j<10;j++) {
-		write_log (L"JIT: instruction byte %2d is %02x\n",j,i[j]);
-	}
-#if 0
-	write_log (L"Please send the above info (starting at \"fault address\") to\n"
-		"bmeyer@csse.monash.edu.au\n"
-		"This shouldn't happen ;-)\n");
-	fflush(stdout);
-#endif
-	signal(SIGSEGV,SIG_DFL);  /* returning here will cause a "real" SEGV */
-}
-#endif
-#endif
 
 /*************************************************************************
 * Checking for CPU features                                             *
@@ -2322,6 +1774,8 @@ static void cpuid(uae_u32 op, uae_u32 *eax, uae_u32 *ebx, uae_u32 *ecx, uae_u32 
 {
 	const int CPUID_SPACE = 4096;
 	uae_u8* cpuid_space = (uae_u8*)cache_alloc(CPUID_SPACE);
+	if (cpuid_space == 0)
+		abort ();
 	static uae_u32 s_op, s_eax, s_ebx, s_ecx, s_edx;
 	uae_u8* tmp=get_target();
 
@@ -2464,7 +1918,7 @@ static void raw_init_cpu(void)
 	}
 	{ 
 		TCHAR *s = au (c->x86_vendor_id);
-		write_log (L"CPUID level=%d, Family=%d, Model=%d, Mask=%d, Vendor=%s [%d]\n",
+		write_log (_T("CPUID level=%d, Family=%d, Model=%d, Mask=%d, Vendor=%s [%d]\n"),
 			c->cpuid_level, c->x86, c->x86_model, c->x86_mask, s, c->x86_vendor);
 		xfree (s);
 	}
@@ -2493,7 +1947,7 @@ static int target_check_bsf(void)
 					}
 				}}}}
 	if (mismatch)
-		write_log (L"Target CPU defines all flags on BSF instruction\n");
+		write_log (_T("Target CPU defines all flags on BSF instruction\n"));
 	return !mismatch;
 }
 #endif
@@ -2561,7 +2015,7 @@ static void raw_init_cpu(void)
 
 	x=cpuid(0);
 	maxlev=x.eax;
-	write_log (L"Max CPUID level=%d Processor is %c%c%c%c%c%c%c%c%c%c%c%c\n",
+	write_log (_T("Max CPUID level=%d Processor is %c%c%c%c%c%c%c%c%c%c%c%c\n"),
 		maxlev,
 		x.ebx,
 		x.ebx>>8,
@@ -2589,16 +2043,16 @@ static void raw_init_cpu(void)
 		have_rat_stall=0;
 #endif
 #if 0
-	write_log (L"have_cmov=%d, avoid_cmov=%d, have_rat_stall=%d\n",
+	write_log (_T("have_cmov=%d, avoid_cmov=%d, have_rat_stall=%d\n"),
 		have_cmov,currprefs.avoid_cmov,have_rat_stall);
 	if (currprefs.avoid_cmov) {
-		write_log (L"Disabling cmov use despite processor claiming to support it!\n");
+		write_log (_T("Disabling cmov use despite processor claiming to support it!\n"));
 		have_cmov=0;
 	}
 #else
 	/* Dear Bernie, I don't want to keep around options which are useless, and not
 	represented in the GUI anymore... Is this okay? */
-	write_log (L"have_cmov=%d, have_rat_stall=%d\n", have_cmov, have_rat_stall);
+	write_log (_T("have_cmov=%d, have_rat_stall=%d\n"), have_cmov, have_rat_stall);
 #endif
 #if 0   /* For testing of non-cmov code! */
 	have_cmov=0;
@@ -2683,7 +2137,7 @@ STATIC_INLINE int stackpos(int r)
 	if (live.spos[r]<0)
 		abort();
 	if (live.tos<live.spos[r]) {
-		write_log (L"JIT: Looking for spos for fnreg %d\n",r);
+		write_log (_T("JIT: Looking for spos for fnreg %d\n"),r);
 		abort();
 	}
 	return live.tos-live.spos[r];
@@ -2697,7 +2151,7 @@ STATIC_INLINE void usereg(int r)
 {
 
 	if (live.spos[r]<0) {
-		// write_log (L"usereg wants to push reg %d onto the x87 stack calling make_tos\n", r);
+		// write_log (_T("usereg wants to push reg %d onto the x87 stack calling make_tos\n"), r);
 		make_tos(r);
 	}
 }
@@ -2831,6 +2285,7 @@ LENDFUNC(NONE,WRITE,2,raw_fmovs_mr,(MEMW m, FR r))
 	emit_byte(0xd9);
 	emit_byte(0x04);
 	emit_byte(0x24); /* fld load r as SINGLE from [esp] */
+	emit_byte(0x9b); /* let the CPU wait on FPU exceptions */
 	emit_byte(0x83);
 	emit_byte(0xc4);
 	emit_byte(0x04); /* add +4 to esp */
@@ -2849,73 +2304,12 @@ LENDFUNC(NONE,NONE,1,raw_fcuts_r,(FRW r))
 	emit_byte(0xdd);
 	emit_byte(0x04);
 	emit_byte(0x24); /* fld load r as DOUBLE from [esp] */
+	emit_byte(0x9b); /* let the CPU wait on FPU exceptions */
 	emit_byte(0x83);
 	emit_byte(0xc4);
 	emit_byte(0x08); /* add +8 to esp */
 }
 LENDFUNC(NONE,NONE,1,raw_fcut_r,(FRW r))
-
-	LOWFUNC(NONE,READ,2,raw_fmovl_ri,(FW r, IMMS i))
-{
-	emit_byte(0x68);
-	emit_long(i);    /* push immediate32 onto [esp] */
-	emit_byte(0xdb);
-	emit_byte(0x04);
-	emit_byte(0x24); /* fild load m32int from [esp] */
-	emit_byte(0x83);
-	emit_byte(0xc4);
-	emit_byte(0x04); /* add +4 to esp */
-	tos_make(r);
-}
-LENDFUNC(NONE,READ,2,raw_fmovl_ri,(FW r, IMMS i))
-
-	LOWFUNC(NONE,READ,2,raw_fmovs_ri,(FW r, IMM i))
-{
-	emit_byte(0x68);
-	emit_long(i);    /* push immediate32 onto [esp] */
-	emit_byte(0xd9);
-	emit_byte(0x04);
-	emit_byte(0x24); /* fld load m32real from [esp] */
-	emit_byte(0x83);
-	emit_byte(0xc4);
-	emit_byte(0x04); /* add +4 to esp */
-	tos_make(r);
-}
-LENDFUNC(NONE,READ,2,raw_fmovs_ri,(FW r, IMM i))
-
-	LOWFUNC(NONE,READ,3,raw_fmov_ri,(FW r, IMM i1, IMM i2))
-{
-	emit_byte(0x68);
-	emit_long(i2);   /* push immediate32 onto [esp] */
-	emit_byte(0x68);
-	emit_long(i1);   /* push immediate32 onto [esp] */
-	emit_byte(0xdd);
-	emit_byte(0x04);
-	emit_byte(0x24); /* fld load m64real from [esp] */
-	emit_byte(0x83);
-	emit_byte(0xc4);
-	emit_byte(0x08); /* add +8 to esp */
-	tos_make(r);
-}
-LENDFUNC(NONE,READ,3,raw_fmov_ri,(FW r, IMM i1, IMM i2))
-
-	LOWFUNC(NONE,READ,4,raw_fmov_ext_ri,(FW r, IMM i1, IMM i2, IMM i3))
-{
-	emit_byte(0x68);
-	emit_long(i3);   /* push immediate32 onto [esp] */
-	emit_byte(0x68);
-	emit_long(i2);   /* push immediate32 onto [esp] */
-	emit_byte(0x68);
-	emit_long(i1);   /* push immediate32 onto [esp] */
-	emit_byte(0xdb);
-	emit_byte(0x2c);
-	emit_byte(0x24); /* fld load m80real from [esp] */
-	emit_byte(0x83);
-	emit_byte(0xc4);
-	emit_byte(0x0c); /* add +12 to esp */
-	tos_make(r);
-}
-LENDFUNC(NONE,READ,4,raw_fmov_ext_ri,(FW r, IMM i1, IMM i2, IMMi3))
 
 	LOWFUNC(NONE,WRITE,2,raw_fmov_ext_mr,(MEMW m, FR r))
 {
@@ -3207,7 +2601,7 @@ LENDFUNC(NONE,NONE,2,raw_ftan_rr,(FW d, FR s))
 	int ds;
 
 	if (s==d) {
-		//write_log (L"FSINCOS src = dest\n");
+		//write_log (_T("FSINCOS src = dest\n"));
 		make_tos(s);
 		emit_byte(0xd9);
 		emit_byte(0xfb); /* fsincos sin(x) push cos(x) */
@@ -3254,7 +2648,7 @@ LOWFUNC(NONE,NONE,2,raw_fscale_rr,(FRW d, FR s))
 	int ds;
 
 	if (live.spos[d]==live.tos && live.spos[s]==live.tos-1) {
-		//write_log (L"fscale found x in TOS-1 and y in TOS\n");
+		//write_log (_T("fscale found x in TOS-1 and y in TOS\n"));
 		emit_byte(0xd9);
 		emit_byte(0xfd);    /* fscale y*(2^x) */
 	}
@@ -3671,13 +3065,13 @@ LENDFUNC(NONE,NONE,2,raw_fatanh_rr,(FW d, FR s))
 		emit_byte(0xdb);
 		emit_byte(0x2c);
 		emit_byte(0x24); /* fld load temp-reg from [esp] */
-		emit_byte(0x83);
-		emit_byte(0xc4);
-		emit_byte(0x0c); /* add +12 to esp */
 		emit_byte(0xd9);
 		emit_byte(0xca); /* fxch swap temp-reg with e^-x in tr */
 		emit_byte(0xde);
 		emit_byte(0xe9); /* fsubp (e^x)-(e^-x) */
+		emit_byte(0x83);
+		emit_byte(0xc4);
+		emit_byte(0x0c); /* delayed add +12 to esp */
 	}
 	else {
 		emit_byte(0xde);
@@ -3766,11 +3160,11 @@ LENDFUNC(NONE,NONE,2,raw_fsinh_rr,(FW d, FR s))
 		emit_byte(0xdb);
 		emit_byte(0x2c);
 		emit_byte(0x24); /* fld load temp-reg from [esp] */
-		emit_byte(0x83);
-		emit_byte(0xc4);
-		emit_byte(0x0c); /* add +12 to esp */
 		emit_byte(0xd9);
 		emit_byte(0xca); /* fxch swap temp-reg with e^-x in tr */
+		emit_byte(0x83);
+		emit_byte(0xc4);
+		emit_byte(0x0c); /* delayed add +12 to esp */
 	}
 	emit_byte(0xde);
 	emit_byte(0xc1);     /* faddp (e^x)+(e^-x) */
@@ -3863,13 +3257,13 @@ LENDFUNC(NONE,NONE,2,raw_fcosh_rr,(FW d, FR s))
 		emit_byte(0xdb);
 		emit_byte(0x2c);
 		emit_byte(0x24); /* fld load temp-reg from [esp] */
-		emit_byte(0x83);
-		emit_byte(0xc4);
-		emit_byte(0x0c); /* add +12 to esp */
 		emit_byte(0xd9);
 		emit_byte(0xca); /* fxch swap temp-reg with e^-x in tr */
 		emit_byte(0xde);
 		emit_byte(0xf9); /* fdivp ((e^x)-(e^-x))/((e^x)+(e^-x)) */
+		emit_byte(0x83);
+		emit_byte(0xc4);
+		emit_byte(0x0c); /* delayed add +12 to esp */
 	}
 	else {
 		emit_byte(0xde);
@@ -3997,7 +3391,7 @@ LENDFUNC(NONE,NONE,2,raw_fdiv_rr,(FRW d, FR s))
 	int ds;
 
 	if (live.spos[d]==live.tos && live.spos[s]==live.tos-1) {
-		//write_log (L"frem found x in TOS-1 and y in TOS\n");
+		//write_log (_T("frem found x in TOS-1 and y in TOS\n"));
 		emit_byte(0xd9);
 		emit_byte(0xf8);    /* fprem rem(y/x) */
 	}
@@ -4018,7 +3412,7 @@ LENDFUNC(NONE,NONE,2,raw_frem_rr,(FRW d, FR s))
 	int ds;
 
 	if (live.spos[d]==live.tos && live.spos[s]==live.tos-1) {
-		//write_log (L"frem1 found x in TOS-1 and y in TOS\n");
+		//write_log (_T("frem1 found x in TOS-1 and y in TOS\n"));
 		emit_byte(0xd9);
 		emit_byte(0xf5);    /* fprem1 rem1(y/x) */
 	}

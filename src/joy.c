@@ -28,14 +28,14 @@ const char Joy_fileid[] = "Hatari joy.c : " __DATE__ " " __TIME__;
 #define Dprintf(a)
 #endif
 
-#define JOY_BUTTON1  1
-#define JOY_BUTTON2  2
+#define JOYREADING_BUTTON1  1		/* bit 0 */
+#define JOYREADING_BUTTON2  2		/* bit 1 */
 
 typedef struct
 {
 	int XPos,YPos;                /* the actually read axis values in range of -32768...0...32767 */
 	int XAxisID,YAxisID;          /* the IDs of the physical PC joystick's axis to be used to gain ST joystick axis input */
-	int Buttons;                  /* JOY_BUTTON1 */
+	int Buttons;                  /* JOYREADING_BUTTON1 */
 } JOYREADING;
 
 typedef struct
@@ -75,6 +75,34 @@ const char *Joy_GetName(int id)
 #else
 	return SDL_JoystickName(id);
 #endif
+}
+
+/**
+ * Return maximum available real joystick ID
+ */
+int Joy_GetMaxId(void)
+{
+	int count = SDL_NumJoysticks();
+	if (count > JOYSTICK_COUNT)
+		count = JOYSTICK_COUNT;
+	return count - 1;
+}
+
+/**
+ * Make sure real Joystick ID is valid, and if not, disable it & return false
+ */
+bool Joy_ValidateJoyId(int i)
+{
+	/* Unavailable joystick ID -> disable it if necessary */
+	if (ConfigureParams.Joysticks.Joy[i].nJoystickMode == JOYSTICK_REALSTICK &&
+	    !bJoystickWorking[ConfigureParams.Joysticks.Joy[i].nJoyId])
+	{
+		Log_Printf(LOG_WARN, "Selected real Joystick %d unavailable, disabling ST joystick %d\n", ConfigureParams.Joysticks.Joy[i].nJoyId, i);
+		ConfigureParams.Joysticks.Joy[i].nJoystickMode = JOYSTICK_DISABLED;
+		ConfigureParams.Joysticks.Joy[i].nJoyId = 0;
+		return false;
+	}
+	return true;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -125,7 +153,7 @@ void Joy_Init(void)
 			bJoystickWorking[i] = true;
 			Log_Printf(LOG_DEBUG, "Joystick %i: %s\n", i, Joy_GetName(i));
 			/* determine joystick axis mapping for given SDL joystick name, last is default: */
-			for (j = 0; j < ARRAYSIZE(AxisMappingTable)-1; j++) {
+			for (j = 0; j < ARRAY_SIZE(AxisMappingTable)-1; j++) {
 				/* check if ID string matches the one reported by SDL: */
 				if(strncmp(AxisMappingTable[j].SDLJoystickName, Joy_GetName(i), strlen(AxisMappingTable[j].SDLJoystickName)) == 0)
 					break;
@@ -136,6 +164,9 @@ void Joy_Init(void)
 					sdlJoystickMapping[i]->SDLJoystickName );
 		}
 	}
+
+	for (i = 0; i < JOYSTICK_COUNT ; i++)
+		Joy_ValidateJoyId(i);
 
 	JoystickSpaceBar = false;
 }
@@ -175,7 +206,7 @@ static bool Joy_ReadJoystick(int nSdlJoyID, JOYREADING *pJoyReading)
 	pJoyReading->Buttons = SDL_JoystickGetButton(sdlJoystick[nSdlJoyID], 0);
 	/* Sets bit #1 if button #2 is pressed: */
 	if (SDL_JoystickGetButton(sdlJoystick[nSdlJoyID], 1))
-		pJoyReading->Buttons |= JOY_BUTTON2;
+		pJoyReading->Buttons |= JOYREADING_BUTTON2;
 
 	return true;
 }
@@ -192,11 +223,6 @@ Uint8 Joy_GetStickData(int nStJoyId)
 {
 	Uint8 nData = 0;
 	JOYREADING JoyReading;
-	int nSdlJoyId;
-	int nAxes; /* how many joystick axes are on the current selected SDL joystick? */
-
-	nSdlJoyId = ConfigureParams.Joysticks.Joy[nStJoyId].nJoyId;
-	nAxes = SDL_JoystickNumAxes(sdlJoystick[nSdlJoyId]);
 
 	/* Are we emulating the joystick via the keyboard? */
 	if (ConfigureParams.Joysticks.Joy[nStJoyId].nJoystickMode == JOYSTICK_KEYBOARD)
@@ -207,9 +233,16 @@ Uint8 Joy_GetStickData(int nStJoyId)
 			nData = nJoyKeyEmu[nStJoyId];
 		}
 	}
-	else if (ConfigureParams.Joysticks.Joy[nStJoyId].nJoystickMode == JOYSTICK_REALSTICK
-	         && bJoystickWorking[nSdlJoyId])
+	else if (ConfigureParams.Joysticks.Joy[nStJoyId].nJoystickMode == JOYSTICK_REALSTICK)
 	{
+		int nSdlJoyId;
+		int nAxes;	/* How many axes are there on the corresponding SDL joystick? */
+
+		nSdlJoyId = ConfigureParams.Joysticks.Joy[nStJoyId].nJoyId;
+		if (nSdlJoyId < 0 || !bJoystickWorking[nSdlJoyId])
+			return 0;
+		nAxes = SDL_JoystickNumAxes(sdlJoystick[nSdlJoyId]);
+
 		/* get joystick axis from configuration settings and make them plausible */
 		JoyReading.XAxisID = sdlJoystickMapping[nSdlJoyId]->XAxisID;
 		JoyReading.YAxisID = sdlJoystickMapping[nSdlJoyId]->YAxisID;
@@ -244,11 +277,11 @@ Uint8 Joy_GetStickData(int nStJoyId)
 			nData |= ATARIJOY_BITMASK_RIGHT;
 
 		/* PC Joystick button 1 is set as ST joystick button */
-		if (JoyReading.Buttons & JOY_BUTTON1)
+		if (JoyReading.Buttons & JOYREADING_BUTTON1)
 			nData |= ATARIJOY_BITMASK_FIRE;
 
 		/* Enable PC Joystick button 2 to mimick space bar (For XenonII, Flying Shark etc...) */
-		if (nStJoyId == JOYID_JOYSTICK1 && (JoyReading.Buttons & JOY_BUTTON2))
+		if (nStJoyId == JOYID_JOYSTICK1 && (JoyReading.Buttons & JOYREADING_BUTTON2))
 		{
 			if (ConfigureParams.Joysticks.Joy[nStJoyId].bEnableJumpOnFire2)
 			{
@@ -329,10 +362,10 @@ static int Joy_GetFireButtons(int nStJoyId)
 bool Joy_SetCursorEmulation(int port)
 {
 	if (port < 0 || port >= JOYSTICK_COUNT) {
-		return 0;
+		return false;
 	}
 	ConfigureParams.Joysticks.Joy[port].nJoystickMode = JOYSTICK_KEYBOARD;
-	return 1;
+	return true;
 }
 
 
@@ -378,12 +411,12 @@ bool Joy_SwitchMode(int port)
 {
 	int mode;
 	if (port < 0 || port >= JOYSTICK_COUNT) {
-		return 0;
+		return false;
 	}
 	mode = (ConfigureParams.Joysticks.Joy[port].nJoystickMode + 1) % JOYSTICK_MODES;
 	ConfigureParams.Joysticks.Joy[port].nJoystickMode = mode;
 	Statusbar_UpdateInfo();
-	return 1;
+	return true;
 }
 
 
@@ -485,11 +518,11 @@ bool Joy_KeyUp(int symkey, int modkey)
 
 /*-----------------------------------------------------------------------*/
 /**
- * Read from STE joypad buttons register (0xff9200)
+ * Read from STE joypad buttons register (0xff9201)
  */
-void Joy_StePadButtons_ReadWord(void)
+void Joy_StePadButtons_ReadByte(void)
 {
-	Uint16 nData = 0xffff;
+	Uint8 nData = 0xff;
 
 	if (ConfigureParams.Joysticks.Joy[JOYID_STEPADA].nJoystickMode != JOYSTICK_DISABLED
 	    && (nSteJoySelect & 0x0f) != 0x0f)
@@ -547,8 +580,8 @@ void Joy_StePadButtons_ReadWord(void)
 		}
 	}
 
-	Dprintf(("0xff9200 -> 0x%04x\n", nData));
-	IoMem_WriteWord(0xff9200, nData);
+	Dprintf(("0xff9201 -> 0x%04x\n", nData));
+	IoMem_WriteByte(0xff9201, nData);
 }
 
 

@@ -9,9 +9,13 @@
 #define HATARI_FILE_H
 
 #include "config.h"
+#include <sys/types.h>		/* Needed for off_t */
 
 #ifndef HAVE_FSEEKO
 #define fseeko fseek
+#endif
+#ifndef HAVE_FTELLO
+#define ftello ftell
 #endif
 
 extern void File_CleanFileName(char *pszFileName);
@@ -40,5 +44,8 @@ extern void File_MakeAbsoluteName(char *pszFileName);
 extern void File_MakeValidPathName(char *pPathName);
 extern void File_PathShorten(char *path, int dirs);
 extern void File_HandleDotDirs(char *path);
+#if defined(WIN32)
+extern char* WinTmpFile(void);
+#endif
 
 #endif /* HATARI_FILE_H */

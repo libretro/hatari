@@ -8,12 +8,15 @@
 #ifndef HATARI_STR_H
 #define HATARI_STR_H
 
+#include "config.h"
 #include <string.h>
-#include <config.h>
 #if HAVE_STRINGS_H
 # include <strings.h>
 #endif
 
+#if !HAVE_LIBC_STRLCPY
+#define strlcpy(dst, src, len) SDL_strlcpy(dst, src, len)
+#endif
 
 /* Define this only for an old Linux system which does not store
  * pathnames in UTF-8. If this is defined, pathnames are converted
@@ -45,7 +48,6 @@ extern void Str_Dump_Hex_Ascii ( char *p , int Len , int Width , const char *Suf
 
 /* Interface of character set conversions */
 extern void Str_AtariToHost(const char *source, char *dest, int destLen, char replacementChar);
-extern void Str_HostToAtari(const char *source, char *dest, char replacementChar);
 extern void Str_DecomposedToPrecomposedUtf8(const char *source, char *dest);
 
 

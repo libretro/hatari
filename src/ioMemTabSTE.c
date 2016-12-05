@@ -9,11 +9,13 @@
 const char IoMemTabSTE_fileid[] = "Hatari ioMemTabSTE.c : " __DATE__ " " __TIME__;
 
 #include "main.h"
+#include "configuration.h"
 #include "dmaSnd.h"
 #include "fdc.h"
 #include "acia.h"
 #include "ioMem.h"
 #include "ioMemTables.h"
+#include "m68000.h"
 #include "joy.h"
 #include "mfp.h"
 #include "midi.h"
@@ -23,6 +25,38 @@ const char IoMemTabSTE_fileid[] = "Hatari ioMemTabSTE.c : " __DATE__ " " __TIME_
 #include "screen.h"
 #include "video.h"
 #include "blitter.h"
+#include "statusbar.h"
+
+
+/**
+ * Take into account Mega STe Cache/Processor Control register $ff8e21.b
+	$FFFF8E21 Mega STe Cache/Processor Control
+		BIT 1 : Cache (0 - disabled, 1 - enabled)
+		BIT 0 : CPU Speed (0 - 8mhz, 1 - 16mhz)
+
+   We handle only bit 0, bit 1 is ignored (cache is not emulated)
+*/
+void IoMemTabMegaSTE_CacheCpuCtrl_WriteByte(void)
+{
+	Uint8 busCtrl = IoMem_ReadByte(0xff8e21);
+
+	/* 68000 Frequency changed ? */
+	/* We change freq only in 68000 mode for a normal MegaSTE */
+	if ( ConfigureParams.System.nCpuLevel == 0 )
+	{
+		if ((busCtrl & 0x1) == 1) {
+			/* 16 Mhz bus for 68000 */
+			nCpuFreqShift = 1;
+			ConfigureParams.System.nCpuFreq = 16;
+		}
+		else {
+			/* 8 Mhz bus for 68000 */
+			nCpuFreqShift = 0;
+			ConfigureParams.System.nCpuFreq = 8;
+		}
+	}
+	Statusbar_UpdateInfo();			/* Update clock speed in the status bar */
+}
 
 
 /*-----------------------------------------------------------------------*/
@@ -36,9 +70,9 @@ const INTERCEPT_ACCESS_FUNC IoMemTable_STE[] =
 	{ 0xff8002, 14,        IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus errors here */
 
 	{ 0xff8200, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
-	{ 0xff8201, SIZE_BYTE, IoMem_ReadWithoutInterception, Video_ScreenBaseSTE_WriteByte },  /* Video base high byte */
+	{ 0xff8201, SIZE_BYTE, IoMem_ReadWithoutInterception, Video_ScreenBase_WriteByte },     /* Video base high byte */
 	{ 0xff8202, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
-	{ 0xff8203, SIZE_BYTE, IoMem_ReadWithoutInterception, Video_ScreenBaseSTE_WriteByte },  /* Video base med byte */
+	{ 0xff8203, SIZE_BYTE, IoMem_ReadWithoutInterception, Video_ScreenBase_WriteByte },     /* Video base med byte */
 	{ 0xff8204, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
 	{ 0xff8205, SIZE_BYTE, Video_ScreenCounter_ReadByte, Video_ScreenCounter_WriteByte },
 	{ 0xff8206, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
@@ -48,7 +82,7 @@ const INTERCEPT_ACCESS_FUNC IoMemTable_STE[] =
 	{ 0xff820a, SIZE_BYTE, Video_Sync_ReadByte, Video_Sync_WriteByte },
 	{ 0xff820b, SIZE_BYTE, IoMem_VoidRead_00, IoMem_VoidWrite },                            /* No bus error here : return 0 not ff */
 	{ 0xff820c, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
-	{ 0xff820d, SIZE_BYTE, Video_BaseLow_ReadByte, Video_ScreenBaseSTE_WriteByte },
+	{ 0xff820d, SIZE_BYTE, Video_BaseLow_ReadByte, Video_ScreenBase_WriteByte },
 	{ 0xff820e, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
 	{ 0xff820f, SIZE_BYTE, Video_LineWidth_ReadByte, Video_LineWidth_WriteByte },
 	{ 0xff8240, SIZE_WORD, Video_Color0_ReadWord, Video_Color0_WriteWord },			/* COLOR 0 */
@@ -67,10 +101,10 @@ const INTERCEPT_ACCESS_FUNC IoMemTable_STE[] =
 	{ 0xff825a, SIZE_WORD, Video_Color13_ReadWord, Video_Color13_WriteWord },		/* COLOR 13 */
 	{ 0xff825c, SIZE_WORD, Video_Color14_ReadWord, Video_Color14_WriteWord },		/* COLOR 14 */
 	{ 0xff825e, SIZE_WORD, Video_Color15_ReadWord, Video_Color15_WriteWord },		/* COLOR 15 */
-	{ 0xff8260, SIZE_BYTE, Video_ShifterMode_ReadByte, Video_ShifterMode_WriteByte },
+	{ 0xff8260, SIZE_BYTE, Video_Res_ReadByte, Video_Res_WriteByte },
 	{ 0xff8261, 3,         IoMem_VoidRead_00, IoMem_VoidWrite },                            /* No bus errors here : return 0 not ff */
-	{ 0xff8264, SIZE_BYTE, IoMem_ReadWithoutInterception, Video_HorScroll_Write_8264 },	/* STE horizontal fine scrolling (no prefetch) */
-	{ 0xff8265, SIZE_BYTE, IoMem_ReadWithoutInterception, Video_HorScroll_Write_8265 },	/* STE horizontal fine scrolling */
+	{ 0xff8264, SIZE_BYTE, Video_HorScroll_Read_8264, Video_HorScroll_Write_8264 },		/* STE horizontal fine scrolling (no prefetch) */
+	{ 0xff8265, SIZE_BYTE, Video_HorScroll_Read_8265, Video_HorScroll_Write_8265 },		/* STE horizontal fine scrolling */
 	{ 0xff8266, 26,        IoMem_VoidRead_00, IoMem_VoidWrite },                            /* No bus errors here : return 0 not ff */
 
 	{ 0xff8604, SIZE_WORD, FDC_DiskControllerStatus_ReadWord, FDC_DiskController_WriteWord },
@@ -84,10 +118,10 @@ const INTERCEPT_ACCESS_FUNC IoMemTable_STE[] =
 	{ 0xff860e, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
 	{ 0xff860f, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
 
-        { 0xff8800, SIZE_BYTE, PSG_ff8800_ReadByte, PSG_ff8800_WriteByte },
-        { 0xff8801, SIZE_BYTE, PSG_ff880x_ReadByte, PSG_ff8801_WriteByte },
-        { 0xff8802, SIZE_BYTE, PSG_ff880x_ReadByte, PSG_ff8802_WriteByte },
-        { 0xff8803, SIZE_BYTE, PSG_ff880x_ReadByte, PSG_ff8803_WriteByte },
+	{ 0xff8800, SIZE_BYTE, PSG_ff8800_ReadByte, PSG_ff8800_WriteByte },
+	{ 0xff8801, SIZE_BYTE, PSG_ff880x_ReadByte, PSG_ff8801_WriteByte },
+	{ 0xff8802, SIZE_BYTE, PSG_ff880x_ReadByte, PSG_ff8802_WriteByte },
+	{ 0xff8803, SIZE_BYTE, PSG_ff880x_ReadByte, PSG_ff8803_WriteByte },
 
 	{ 0xff8900, SIZE_WORD, DmaSnd_SoundControl_ReadWord, DmaSnd_SoundControl_WriteWord },   /* DMA sound control */
 	{ 0xff8902, SIZE_BYTE, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
@@ -149,7 +183,7 @@ const INTERCEPT_ACCESS_FUNC IoMemTable_STE[] =
 	{ 0xff8a3e, SIZE_WORD, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
 
 	{ 0xff9000, SIZE_WORD, IoMem_VoidRead, IoMem_VoidWrite },                               /* No bus error here */
-	{ 0xff9200, SIZE_WORD, Joy_StePadButtons_ReadWord, IoMem_WriteWithoutInterception },    /* Joypad fire buttons */
+	{ 0xff9201, SIZE_BYTE, Joy_StePadButtons_ReadByte, IoMem_WriteWithoutInterception },    /* Joypad fire buttons */
 	{ 0xff9202, SIZE_WORD, Joy_StePadMulti_ReadWord, Joy_StePadMulti_WriteWord },           /* Joypad directions/buttons/selection */
 	{ 0xff9211, SIZE_BYTE, IoMem_VoidRead, IoMem_WriteWithoutInterception }, /* Joypad 0 X position (?) */
 	{ 0xff9213, SIZE_BYTE, IoMem_VoidRead, IoMem_WriteWithoutInterception }, /* Joypad 0 Y position (?) */

@@ -31,7 +31,7 @@ static int DesktopWidth, DesktopHeight;
  */
 void Resolution_Init(void)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__	/* RETRO HACK */
 #if WITH_SDL2
 	SDL_DisplayMode dm;
 	if (SDL_GetDesktopDisplayMode(0, &dm) == 0)
@@ -73,7 +73,7 @@ DesktopWidth = retrow;
 DesktopHeight =retroh;
 ConfigureParams.Screen.nMaxWidth = DesktopWidth;
 ConfigureParams.Screen.nMaxHeight = DesktopHeight;
-#endif
+#endif	/* RETRO HACK */
 	DEBUGPRINT(("Desktop resolution: %dx%d\n",DesktopWidth, DesktopHeight));
 	fprintf(stderr, "Configured max Hatari resolution = %dx%d, optimal for ST = %dx%d\n",
 		ConfigureParams.Screen.nMaxWidth, ConfigureParams.Screen.nMaxHeight,
@@ -155,7 +155,7 @@ static inline bool Resolution_Select(SDL_Rect **modes, int *width, int *height)
  */
 bool Resolution_Search(int *width, int *height, int *bpp, bool keep)
 {
-#ifndef __LIBRETRO__
+#ifndef __LIBRETRO__	/* RETRO HACK */
 #if !WITH_SDL2
 	SDL_Rect **modes;
 	SDL_PixelFormat pixelformat;
@@ -172,7 +172,11 @@ bool Resolution_Search(int *width, int *height, int *bpp, bool keep)
 		if (keep)
 		{
 			Resolution_GetDesktopSize(width, height);
+#if WITH_SDL2
+			return false;
+#else
 			return true;
+#endif
 		}
 	}
 	if (ConfigureParams.Screen.bForceMax)
@@ -224,7 +228,7 @@ bool Resolution_Search(int *width, int *height, int *bpp, bool keep)
 *width = retrow;
 *height = retroh;
 *bpp = 2;
-#endif
+#endif 	/* RETRO HACK */
 	DEBUGPRINT(("resolution: video mode selected: %dx%dx%d\n",
 		 *width, *height, *bpp));
 	return false;

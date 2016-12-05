@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2014 The RetroArch team
+/* Copyright  (C) 2010-2015 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (pixconv.c).
@@ -355,6 +355,29 @@ void conv_rgba4444_argb8888(void *output_, const void *input_,
          a = (a << 4) | a;
 
          output[w] = (a << 24) | (r << 16) | (g << 8) | (b << 0);
+      }
+   }
+}
+
+void conv_rgba4444_rgb565(void *output_, const void *input_,
+      int width, int height,
+      int out_stride, int in_stride)
+{
+   int h, w;
+   const uint16_t *input = (const uint16_t*)input_;
+   uint16_t *output      = (uint16_t*)output_;
+
+   for (h = 0; h < height;
+         h++, output += out_stride >> 1, input += in_stride >> 1)
+   {
+      for (w = 0; w < width; w++)
+      {
+         uint32_t col = input[w];
+         uint32_t r = (col >> 12) & 0xf;
+         uint32_t g = (col >>  8) & 0xf;
+         uint32_t b = (col >>  4) & 0xf;
+
+         output[w] = (r << 12) | (g << 7) | (b << 1);
       }
    }
 }
@@ -736,7 +759,7 @@ void conv_argb8888_abgr8888(void *output_, const void *input_,
       for (w = 0; w < width; w++)
       {
          uint32_t col = input[w];
-         output[w] = ((col << 16) & 0xff0000) | 
+         output[w] = ((col << 16) & 0xff0000) |
             ((col >> 16) & 0xff) | (col & 0xff00ff00);
       }
    }
@@ -749,6 +772,7 @@ void conv_argb8888_abgr8888(void *output_, const void *input_,
 #define YUV_MAT_U_B (113)
 #define YUV_MAT_V_R (90)
 #define YUV_MAT_V_G (-46)
+
 #if defined(__SSE2__)
 void conv_yuyv_argb8888(void *output_, const void *input_,
       int width, int height,
@@ -920,11 +944,11 @@ void conv_copy(void *output_, const void *input_,
 {
    int h;
    int copy_len = abs(out_stride);
-   if (abs(in_stride) < copy_len)
-      copy_len = abs(in_stride);
-
    const uint8_t *input = (const uint8_t*)input_;
    uint8_t *output      = (uint8_t*)output_;
+
+   if (abs(in_stride) < copy_len)
+      copy_len = abs(in_stride);
 
    for (h = 0; h < height;
          h++, output += out_stride, input += in_stride)

@@ -10,15 +10,21 @@
 #ifndef _SDLMain_h_
 #define _SDLMain_h_
 #import <Cocoa/Cocoa.h>
+#import "SDL.h"
 
 
-@interface HatariAppDelegate : NSObject  // <NSApplicationDelegate>
+@interface HatariAppDelegate : NSObject // SDLApplication// NSObject  // <NSApplicationDelegate>
 {
     IBOutlet NSMenuItem *beginCaptureAnim;
     IBOutlet NSMenuItem *endCaptureAnim;
     IBOutlet NSMenuItem *beginCaptureSound;
     IBOutlet NSMenuItem *endCaptureSound;
+    IBOutlet NSMenuItem *pauseMenuItem;
+
+    BOOL emulationPaused;
+
 }
+- (IBAction)PauseMenu:(id)sender;
 
 - (IBAction)openConfig:(id)sender;
 - (IBAction)saveConfig:(id)sender;
@@ -43,6 +49,7 @@
 - (IBAction)restoreMemorySnap:(id)sender;
 - (IBAction)doFullScreen:(id)sender;
 - (IBAction)debugUI:(id)sender;
+- (IBAction)quit:(id)sender;
 
 - (BOOL)validateMenuItem:(NSMenuItem*)item;
 - (void)setupWorkingDirectory:(BOOL)shouldChdir ;
@@ -50,6 +57,7 @@
 - (void)insertDisk:(int)disque ;
 - (BOOL)validateMenuItem:(NSMenuItem*)item ;
 - (NSString*)displayFileSelection:(const char*)pathInParams preferredFileName:(NSString*)preferredFileName allowedExtensions:(NSArray*)allowedExtensions ;
+
 
 @end
 

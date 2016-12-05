@@ -188,8 +188,8 @@ struct dsp_interrupt_s {
 struct dsp_core_s {
 
 	/* DSP executing instructions ? */
-	volatile int running;
-	
+	int running;
+
 	/* DSP instruction Cycle counter */
 	Uint16	instr_cycle;
 
@@ -210,14 +210,14 @@ struct dsp_core_s {
 	Uint32	ramint[3][512];
 
 	/* peripheral space, [x|y]:0xffc0-0xffff */
-	volatile Uint32	periph[2][64];
-	volatile Uint32	dsp_host_htx;
-	volatile Uint32	dsp_host_rtx;
+	Uint32	periph[2][64];
+	Uint32	dsp_host_htx;
+	Uint32	dsp_host_rtx;
 	Uint16 dsp_host_isr_HREQ;
 
 
 	/* host port, CPU side */
-	volatile Uint8 hostport[12];
+	Uint8 hostport[12];
 
 	/* SSI */
 	dsp_core_ssi_t ssi;
@@ -238,6 +238,9 @@ struct dsp_core_s {
 	Uint16  interrupt_pipeline_count;	/* used to prefetch correctly the 2 inter instructions */
 	Sint16  interrupt_ipl[12];		/* store the current IPL for each interrupt */
 	Uint16  interrupt_isPending[12];	/* store if interrupt is pending for each interrupt */
+
+	/* AGU pipeline simulation for indirect move ea instructions */
+	Uint16	agu_move_indirect_instr;	/* is the current instruction an indirect move ? (LUA, MOVE, MOVEC, MOVEM, TCC) (0=no ; 1 = yes)*/
 };
 
 
@@ -245,7 +248,7 @@ struct dsp_core_s {
 extern dsp_core_t dsp_core;
 
 /* Emulator call these to init/stop/reset DSP emulation */
-extern void dsp_core_init(void (*host_interrupt)(void));
+extern void dsp_core_init(void (*host_interrupt)(int));
 extern void dsp_core_shutdown(void);
 extern void dsp_core_reset(void);
 

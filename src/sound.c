@@ -78,6 +78,7 @@ const char Sound_fileid[] = "Hatari sound.c : " __DATE__ " " __TIME__;
 #include "main.h"
 #include "audio.h"
 #include "cycles.h"
+#include "m68000.h"
 #include "configuration.h"
 #include "dmaSnd.h"
 #include "crossbar.h"
@@ -668,8 +669,7 @@ static void	Ym2149_BuildVolumeTable(void)
 
 	/* Normalise/center the values (convert from u16 to s16) */
 	/* On STE/TT, we use YM_OUTPUT_LEVEL>>1 to avoid overflow with DMA sound */
-	if ( (ConfigureParams.System.nMachineType == MACHINE_STE) || (ConfigureParams.System.nMachineType == MACHINE_MEGA_STE)
-		|| (ConfigureParams.System.nMachineType == MACHINE_TT) )
+	if (Config_IsMachineSTE() || Config_IsMachineTT())
 		YM2149_Normalise_5bit_Table ( ymout5_u16[0][0] , ymout5 , (YM_OUTPUT_LEVEL>>1) , YM_OUTPUT_CENTERED );
 	else
 		YM2149_Normalise_5bit_Table ( ymout5_u16[0][0] , ymout5 , YM_OUTPUT_LEVEL , YM_OUTPUT_CENTERED );
@@ -761,26 +761,6 @@ static ymu32	YM2149_RndCompute(void)
  * render possible tone's freq of 125 or 62.5 kHz (when per==1 or per==2)
  */
 
-#define NEWSTEP
-#ifndef NEWSTEP
-static ymu32	Ym2149_ToneStepCompute(ymu8 rHigh , ymu8 rLow)
-{
-	int	per;
-	yms64	step;
-
-	per = rHigh&15;
-	per = (per<<8)+rLow;
-
-	if  (per <= (int)(YM_ATARI_CLOCK/(YM_REPLAY_FREQ*7)) )
-		return 0;
-
-	step = YM_ATARI_CLOCK;
-	step <<= (15+16-3);
-	step /= (per * YM_REPLAY_FREQ);
-
-	return step;
-}
-#else
 static ymu32	Ym2149_ToneStepCompute(ymu8 rHigh , ymu8 rLow)
 {
 	int	per;
@@ -804,7 +784,8 @@ static ymu32	Ym2149_ToneStepCompute(ymu8 rHigh , ymu8 rLow)
 
 	return step;
 }
-#endif
+
+
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -819,23 +800,6 @@ static ymu32	Ym2149_ToneStepCompute(ymu8 rHigh , ymu8 rLow)
  * 	per==3   step=0x0f1dfe1   freq=41.7 kHz
  */
 
-#ifndef NEWSTEP
-static ymu32	Ym2149_NoiseStepCompute(ymu8 rNoise)
-{
-	int	per;
-	yms64	step;
-
-	per = (rNoise&0x1f);
-	if (per<3)
-		return 0;
-
-	step = YM_ATARI_CLOCK;
-	step <<= (16-1-3);
-	step /= (per * YM_REPLAY_FREQ);
-
-	return step;
-}
-#else
 static ymu32	Ym2149_NoiseStepCompute(ymu8 rNoise)
 {
 	int	per;
@@ -853,7 +817,8 @@ static ymu32	Ym2149_NoiseStepCompute(ymu8 rNoise)
 
 	return step;
 }
-#endif
+
+
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -908,77 +873,6 @@ static ymu32	Ym2149_EnvStepCompute(ymu8 rHigh , ymu8 rLow)
  * to all 0 bits or all 1 bits using a '-'
  */
 
-#ifndef NEWSTEP
-static ymsample	YM2149_NextSample(void)
-{
-	ymsample	sample;
-	int		bt;
-	ymu32		bn;
-	ymu16		Env3Voices;
-	ymu16		Tone3Voices;
-
-
-	/* Noise value : 0 or 0xffff */
-	if ( noisePos&0xffff0000 )
-	{
-		currentNoise = YM2149_RndCompute();
-		noisePos &= 0xffff;
-	}
-	bn = currentNoise;				/* 0 or 0xffff */
-
-	/* Get the 5 bits volume corresponding to the current envelope's position */
-	Env3Voices = YmEnvWaves[ envShape ][ envPos>>24 ];	/* integer part of envPos is in bits 24-31 */
-	Env3Voices &= EnvMask3Voices;			/* only keep volumes for voices using envelope */
-
-//fprintf ( stderr , "env %x %x %x\n" , Env3Voices , envStep , envPos );
-
-	/* Tone3Voices will contain the output state of each voice : 0 or 0x1f */
-	bt = ((((yms32)posA)>>31) | mixerTA) & (bn | mixerNA);	/* 0 or 0xffff */
-	Tone3Voices = bt & YM_MASK_1VOICE;			/* 0 or 0x1f */
-	bt = ((((yms32)posB)>>31) | mixerTB) & (bn | mixerNB);
-	Tone3Voices |= ( bt & YM_MASK_1VOICE ) << 5;
-	bt = ((((yms32)posC)>>31) | mixerTC) & (bn | mixerNC);
-	Tone3Voices |= ( bt & YM_MASK_1VOICE ) << 10;
-
-	/* Combine fixed volumes and envelope volumes and keep the resulting */
-	/* volumes depending on the output state of each voice (0 or 0x1f) */
-	Tone3Voices &= ( Env3Voices | Vol3Voices );
-
-	/* When a step period is 0, the represented frequency was filtered from the */
-	/* ouput of the YM2149. Thus, use the transient DC component of the sample. */
-	/* Note that the "-1" table offset is a "good fit" for the DC component.    */
-
-	if (stepA == 0  &&  (Tone3Voices & YM_MASK_A) > 1)
-		Tone3Voices -= 1;     /* Voice A AC component removed; Transient DC component remains */
-
-	if (stepB == 0  &&  (Tone3Voices & YM_MASK_B) > 1<<5)
-		Tone3Voices -= 1<<5;  /* Voice B AC component removed; Transient DC component remains */
-
-	if (stepC == 0  &&  (Tone3Voices & YM_MASK_C) > 1<<10)
-		Tone3Voices -= 1<<10; /* Voice C AC component removed; Transient DC component remains */
-
-	/* D/A conversion of the 3 volumes into a sample using a precomputed conversion table */
-
-	sample = ymout5[ Tone3Voices ];			/* 16 bits signed value */
-
-
-	/* Increment positions */
-	posA += stepA;
-	posB += stepB;
-	posC += stepC;
-	noisePos += noiseStep;
-
-	envPos += envStep;
-	if ( envPos >= (3*32) << 24 )			/* blocks 0, 1 and 2 were used (envPos 0 to 95) */
-		envPos -= (2*32) << 24;			/* replay/loop blocks 1 and 2 (envPos 32 to 95) */
-
-	/* Apply low pass filter ? */
-	if ( UseLowPassFilter )
-		return LowPassFilter(sample);
-	else
-		return PWMaliasFilter(sample);
-}
-#else
 static ymsample	YM2149_NextSample(void)
 {
 	ymsample	sample;
@@ -1047,7 +941,7 @@ static ymsample	YM2149_NextSample(void)
 	else
 		return PWMaliasFilter(sample);
 }
-#endif
+
 
 
 /*-----------------------------------------------------------------------*/
@@ -1055,11 +949,7 @@ static ymsample	YM2149_NextSample(void)
  * Update internal variables (steps, volume masks, ...) each
  * time an YM register is changed.
  */
-#ifndef NEWSTEP
-#define BIT_SHIFT 31
-#else
 #define BIT_SHIFT 24
-#endif
 void	Sound_WriteReg( int reg , Uint8 data )
 {
 	switch (reg)
@@ -1313,6 +1203,10 @@ static int Sound_SetSamplesPassed(bool FillFrame)
 
 	nSoundCycles = Cycles_GetCounter(CYCLES_COUNTER_VIDEO);
 
+#ifndef OLD_CPU_SHIFT
+	nSoundCycles >>= nCpuFreqShift;
+#endif
+
 	/* example : 160256 cycles per VBL, 44Khz = 882 samples per VBL at 50 Hz */
 	/* 882/160256 samples per cpu clock cycle */
 
@@ -1351,7 +1245,12 @@ static int Sound_SetSamplesPassed(bool FillFrame)
 	if ( ( SamplesToGenerate > MIXBUFFER_SIZE - nGeneratedSamples ) && ( ConfigureParams.System.bFastForward == false )
 	    && ( ConfigureParams.Sound.bEnableSound == true ) )
 	{
-		Log_Printf ( LOG_WARN , "Your system is too slow, some sound samples were not correctly emulated\n" );
+		static int logcnt = 0;
+		if (logcnt++ < 50)
+		{
+			Log_Printf(LOG_WARN, "Your system is too slow, "
+			           "some sound samples were not correctly emulated\n");
+		}
 		Sound_BufferIndexNeedReset = true;
 	}
 
@@ -1373,7 +1272,7 @@ static void Sound_GenerateSamples(int SamplesToGenerate)
 	if (SamplesToGenerate <= 0)
 		return;
 
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON)
+	if (Config_IsMachineFalcon())
 	{
 		for (i = 0; i < SamplesToGenerate; i++)
 		{
@@ -1383,7 +1282,7 @@ static void Sound_GenerateSamples(int SamplesToGenerate)
  		/* If Falcon emulation, crossbar does the job */
  		Crossbar_GenerateSamples(ActiveSndBufIdx, SamplesToGenerate);
 	}
-	else if (ConfigureParams.System.nMachineType != MACHINE_ST)
+	else if (!Config_IsMachineST())
 	{
 		for (i = 0; i < SamplesToGenerate; i++)
 		{
@@ -1393,7 +1292,7 @@ static void Sound_GenerateSamples(int SamplesToGenerate)
  		/* If Ste or TT emulation, DmaSnd does mixing and filtering */
  		DmaSnd_GenerateSamples(ActiveSndBufIdx, SamplesToGenerate);
 	}
-	else if (ConfigureParams.System.nMachineType == MACHINE_ST)
+	else
 	{
 		for (i = 0; i < SamplesToGenerate; i++)
 		{
@@ -1436,15 +1335,14 @@ void Sound_Update(bool FillFrame)
 	if (bRecordingWav)
 		WAVFormat_Update(MixBuffer, OldSndBufIdx, SamplesToGenerate);
 }
-
-#ifdef __LIBRETRO__
+#ifdef __LIBRETRO__ 	/* RETRO HACK */
 extern short signed int SNDBUF[1024*2];
 static void Retro_Audio_CallBack(int len)
 {
-Sint16 *pBuffer;
-int i, window, nSamplesPerFrame;
-pBuffer = (Sint16 *)&SNDBUF[0];
-len = len / 4; // Use length in samples (16 bit stereo), not in bytes
+	Sint16 *pBuffer;
+	int i, window, nSamplesPerFrame;
+	pBuffer = (Sint16 *)&SNDBUF[0];
+	len = len / 4; // Use length in samples (16 bit stereo), not in bytes
 /* Adjust emulation rate within +/- 0.58% (10 cents) occasionally,
 * to synchronize sound. Note that an octave (frequency doubling)
 * has 12 semitones (12th root of two for a semitone), and that
@@ -1455,57 +1353,57 @@ len = len / 4; // Use length in samples (16 bit stereo), not in bytes
 * (2^(10cents/(12semitones*100cents)) - 1) * 10^6 / nScreenRefreshRate
 * See: main.c - Main_WaitOnVbl()
 */
-pulse_swallowing_count = 0; /* 0 = Unaltered emulation rate */
-if (ConfigureParams.Sound.bEnableSoundSync)
-{
-/* Sound synchronized emulation */
-nSamplesPerFrame = nAudioFrequency/nScreenRefreshRate;
-window = (nSamplesPerFrame > SoundBufferSize) ? nSamplesPerFrame : SoundBufferSize;
-/* Window Comparator for SoundBufferSize */
-if (nGeneratedSamples < window + (window >> 1))
-/* Increase emulation rate to maintain sound synchronization */
-pulse_swallowing_count = -5793 / nScreenRefreshRate;
-else
-if (nGeneratedSamples > (window << 1) + (window >> 2))
-/* Decrease emulation rate to maintain sound synchronization */
-pulse_swallowing_count = 5793 / nScreenRefreshRate;
-/* Otherwise emulation rate is unaltered. */
+	pulse_swallowing_count = 0; /* 0 = Unaltered emulation rate */
+	if (ConfigureParams.Sound.bEnableSoundSync)
+	{
+	/* Sound synchronized emulation */
+		nSamplesPerFrame = nAudioFrequency/nScreenRefreshRate;
+		window = (nSamplesPerFrame > SoundBufferSize) ? nSamplesPerFrame : SoundBufferSize;
+	/* Window Comparator for SoundBufferSize */
+		if (nGeneratedSamples < window + (window >> 1))
+			/* Increase emulation rate to maintain sound synchronization */
+			pulse_swallowing_count = -5793 / nScreenRefreshRate;
+		else
+			if (nGeneratedSamples > (window << 1) + (window >> 2))
+			/* Decrease emulation rate to maintain sound synchronization */
+				pulse_swallowing_count = 5793 / nScreenRefreshRate;
+				/* Otherwise emulation rate is unaltered. */
+		}
+		if (nGeneratedSamples >= len)
+		{
+		/* Enough samples available: Pass completed buffer to audio system
+		/* by write samples into sound buffer and by converting them from
+		/* 'signed' to 'unsigned' */
+			for (i = 0; i < len; i++)
+			{
+				*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][0];
+				*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][1];
+			}
+			CompleteSndBufIdx += len;
+			nGeneratedSamples -= len;
+		}
+		else /* Not enough samples available: */
+		{
+			for (i = 0; i < nGeneratedSamples; i++)
+			{
+				*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][0];
+				*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][1];
+			}
+		/* If the buffer is filled more than 50%, mirror sample buffer to fake the
+		/* missing samples */
+			if (nGeneratedSamples >= len/2)
+			{
+				int remaining = len - nGeneratedSamples;
+				memcpy(pBuffer, SNDBUF+(nGeneratedSamples-remaining)*4, remaining*4);
+			}
+		
+			CompleteSndBufIdx += nGeneratedSamples;
+			nGeneratedSamples = 0;
+		}
+	
+		CompleteSndBufIdx = CompleteSndBufIdx % MIXBUFFER_SIZE;
 }
-if (nGeneratedSamples >= len)
-{
-/* Enough samples available: Pass completed buffer to audio system
-* by write samples into sound buffer and by converting them from
-* 'signed' to 'unsigned' */
-for (i = 0; i < len; i++)
-{
-*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][0];
-*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][1];
-}
-CompleteSndBufIdx += len;
-nGeneratedSamples -= len;
-}
-else /* Not enough samples available: */
-{
-for (i = 0; i < nGeneratedSamples; i++)
-{
-*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][0];
-*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][1];
-}
-/* If the buffer is filled more than 50%, mirror sample buffer to fake the
-* missing samples */
-if (nGeneratedSamples >= len/2)
-{
-int remaining = len - nGeneratedSamples;
-memcpy(pBuffer, SNDBUF+(nGeneratedSamples-remaining)*4, remaining*4);
-}
-CompleteSndBufIdx += nGeneratedSamples;
-nGeneratedSamples = 0;
-}
-CompleteSndBufIdx = CompleteSndBufIdx % MIXBUFFER_SIZE;
-}
-#endif
-
-
+#endif	/* RETRO HACK */
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -1521,10 +1419,10 @@ void Sound_Update_VBL(void)
 	Sound_Update(true);					/* generate as many samples as needed to fill this VBL */
 //fprintf ( stderr , "vbl done %d %d\n" , SamplesPerFrame , CurrentSamplesNb );
 
-#ifdef __LIBRETRO__
-memset(SNDBUF,0,1024*4);
-Retro_Audio_CallBack(CurrentSamplesNb*4);
-#endif
+#ifdef __LIBRETRO__	/* RETRO HACK */
+	memset(SNDBUF,0,1024*4);
+	Retro_Audio_CallBack(CurrentSamplesNb*4);
+#endif	/* RETRO HACK */
 
 	CurrentSamplesNb = 0;					/* VBL is complete, reset counter for next VBL */
 

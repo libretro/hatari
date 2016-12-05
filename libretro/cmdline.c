@@ -41,9 +41,21 @@ int pre_main(const char *argv)
 
    if(Only1Arg)
    {
-      Add_Option("hatari");
-      Add_Option("--disk-a");
-      Add_Option(RPATH/*ARGUV[0]*/);
+	   Add_Option("hatari");
+		//retroup: if game extension is stc load a config file, else load disk-a
+		//changed extension from .cfg to .stc to launch hatari with unique file association 
+		const char * suffix = ".stc";
+		size_t str_len = strlen(RPATH);
+		size_t suffix_len = strlen(suffix);
+		if (!strncmp( RPATH + str_len - suffix_len, suffix, suffix_len ))
+		{
+			Add_Option("-c");
+		}
+		else
+		{
+			Add_Option("--disk-a");
+		}
+		Add_Option(RPATH/*ARGUV[0]*/);
    }
    else
    { // Pass all cmdline args
@@ -119,4 +131,3 @@ void parse_cmdline(const char *argv)
       }	
    }
 }
-

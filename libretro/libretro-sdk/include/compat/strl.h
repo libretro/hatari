@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2014 The RetroArch team
+/* Copyright  (C) 2010-2015 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (strl.h).
@@ -35,13 +35,15 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Avoid possible naming collisions during link since 
+/* Avoid possible naming collisions during link since
  * we prefer to use the actual name. */
 #define strlcpy(dst, src, size) strlcpy_rarch__(dst, src, size)
+
 #define strlcat(dst, src, size) strlcat_rarch__(dst, src, size)
 
 size_t strlcpy(char *dest, const char *source, size_t size);
 size_t strlcat(char *dest, const char *source, size_t size);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2014 The RetroArch team
+/* Copyright  (C) 2010-2015 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (strcasestr.h).
@@ -35,7 +35,7 @@
 extern "C" {
 #endif
 
-/* Avoid possible naming collisions during link 
+/* Avoid possible naming collisions during link
  * since we prefer to use the actual name. */
 #define strcasestr(haystack, needle) strcasestr_rarch__(haystack, needle)
 

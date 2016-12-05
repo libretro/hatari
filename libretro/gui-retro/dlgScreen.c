@@ -22,6 +22,7 @@ const char DlgScreen_fileid[] = "Hatari dlgScreen.c : " __DATE__ " " __TIME__;
 #include "clocks_timings.h"
 
 #include "gui-retro.h"
+#define VDI_Limit(...) 800
 
 #define ITEMS_IN_ARRAY(a) (sizeof(a)/sizeof(a[0]))
 

@@ -1,0 +1,40 @@
+/* French					*/
+
+"Insert newly created disk in"="Inserer la disquette créée dans le lecteur";
+"Ignore"="Ignorer";
+"Reset the emulator"="Reset de l'Emulateur ?";
+"Must be reset"="Hatari doit être réinitialisé pour appliquer vos modifications.\nTout travail non enregistré sera perdu.";
+"Don't reset"="Ne pas réinitialiser";
+"Reset"="Reset";
+"OK"="Ok";
+"Cancel"="Annuler";
+"Warm reset!"="Reset à chaud";
+"Really reset the emulator?"="Tout travail ne sera pas sauvegardé. Cliquez sur Annuler pour continuer sans Reset";
+"Quit" = "Quitter" ;
+"Cold reset!"="Reset à froid";
+
+"Detected double bus error => CPU halted!\nEmulation needs to be reset.\n" = "Double erreur de bus => Arrêt du CPU\n Reset de l'émulation obligatoire." ;
+"The emulated system must be reset to apply these changes. Apply changes now and reset the emulator?" =  "Pour appliquer vos changements,l'émulateur doit être re-démarrer\nAppliquer les changements et re-démarrer?" ;
+"All unsaved data will be lost.\nDo you really want to quit?" = "Les données non sauvées seront perdues\n Quitter quand même ?" ;
+"Insert newly created disk in" = "Insérer le nouveau disque créé" ;
+"Ignore" = "Ignorer" ;
+"Please specify a .%@ file" = "SVP, spécifier un fichier .%@ " ;
+" or a ." = " ou ." ;
+"ERROR: Cannot insert same floppy to multiple drives!" = "ERREUR: Impossible d'insérer une disquette dans plusieurs lecteurs" ;
+"Error in Config structure (Contact author).\n" = "Erreur dans la structure de configuration (contacter les auteurs).\n" ;
+"Error, Config file not saved" = "Erreur, fichier de configuration non sauvé." ;
+
+"Can not load TOS file:" = "Impossible de charger le fichier TOS\nChoisir un fichier TOS" ;
+"Detected a RAM TOS - this will probably not work very well!\n" = "Le TOS RAM détecté ne fonctionnera probablement pas très bien!\n" ;
+"Detected RAM TOS image, skipping TOS patches.\n" = "Une image de TOS RAM détectée -> pas de correction du TOS.\n" ;
+"Only TOS versions >= 1.04 support autostarting!\n" = "seuls les versions de TOS >= 1.04 supportent l'auto-démarrage!\n" ;
+"Autostart file removed.\n" = "Suppression du fichier d'auto-démarrage.\n" ;
+"TOS versions 1.06 and 1.62 are for Atari STE only.\n ==> Switching to STE mode now.\n" = "Les TOS 1.06 et 1.62 sont pour l'Atari STE seulement.\n ==> Mettre le mode STE maintenant.\n" ;
+"TOS versions 3.0x are for Atari TT only.\n ==> Switching to TT mode now.\n" = "Les TOS 3.0x sont pour l'Atari Atari TT seulement.\n ==> Mettre le mode TT maintenant.\n" ;
+"TOS versions 4.x are for Atari Falcon only.\n ==> Switching to Falcon mode now.\n" = "Les TOS 4.x sont pour Atari Falcon seulement.\n ==> Mettre le mode Falcon maintenant.\n" ;
+"TOS versions <= 1.4 work only in\nST mode and with a 68000 CPU.\n ==> Switching to ST mode with 68000 now.\n" = "Les TOS <= 1.4 marchent seulement\nen mode ST avec un CPU 68000.\n ==> Mettre le mode ST et le CPU 68000 maintenant.\n" ;
+"This TOS version does not work in TT/Falcon mode.\n ==> Switching to STE mode now.\n" = "Cette version du TOS ne marche pas en mode TT/Falcon.\n ==> Mettre le mode STE maintenant.\n" ;
+"TOS versions 4.x require a CPU >= 68020.\n ==> Switching to 68020 mode now.\n" = "Les TOS 4.x exigent un CPU >= 68020.\n ==> Mettre un CPU 68020 maintenant.\n" ;
+"TOS versions 3.0x require a CPU >= 68030.\n ==> Switching to 68030 mode now.\n" = "Les TOS 3.0x exigent un CPU >= 68030.\n ==> Mettre un CPU 68030 maintenant.\n" ;
+"Please use at least TOS v1.04 for the HD directory emulation (all required GEMDOS functionality isn't completely emulated for this TOS version)." = "SVP, un TOS >=1.04 est nécessaire pour l'émulation HD (Toutes les fonctionalités GEMDOS ne sont pas émulées avec cette version du TOS version)" ;
+"To use extended VDI resolutions, you must select a TOS >= 1.02." = "Pour utiliser les résolutions VDI étendues, le TOS doit être >= 1.02." ;  

@@ -223,6 +223,36 @@ bool Floppy_IsWriteProtected(int Drive)
 
 /*-----------------------------------------------------------------------*/
 /**
+ * Test disk image for executable boot sector.
+ * The boot sector is executable if the 16 bit sum of its 256 words
+ * gives the value 0x1234.
+ */
+static bool Floppy_IsBootSectorExecutable(int Drive)
+{
+	Uint8 *pDiskBuffer;
+	int	sum , i;
+
+	if (EmulationDrives[Drive].bDiskInserted)
+	{
+		pDiskBuffer = EmulationDrives[Drive].pBuffer;
+
+		sum = 0;
+		for ( i=0 ; i<256 ; i++ )
+		{
+			sum += ( ( *pDiskBuffer << 8 ) + *(pDiskBuffer+1) );
+			pDiskBuffer += 2;
+		}
+
+		if ( ( sum & 0xffff ) == FLOPPY_BOOT_SECTOR_EXE_SUM )		/* 0x1234 */
+			return true;
+	}
+
+	return false;         /* Not executable */
+}
+
+
+/*-----------------------------------------------------------------------*/
+/**
  * Test disk image for valid boot-sector.
  * It has been noticed that some disks, eg blank images made by the MakeDisk
  * utility or PaCifiST emulator fill in the boot-sector with incorrect information.
@@ -241,7 +271,7 @@ static bool Floppy_IsBootSectorOK(int Drive)
 
 		/* Check SPC (byte 13) for !=0 value. If is '0', invalid image and Hatari
 		 * won't be-able to read (nor will a real ST)! */
-		if (pDiskBuffer[13] != 0)
+		if ( (pDiskBuffer[13] != 0) ||  ( Floppy_IsBootSectorExecutable ( Drive ) == true ) )
 		{
 			return true;      /* Disk sector is OK! */
 		}
@@ -272,7 +302,7 @@ static char* Floppy_CreateDiskBFileName(const char *pSrcFileName)
 	if (!szDir)
 	{
 		perror("Floppy_CreateDiskBFileName");
-		return false;
+		return NULL;
 	}
 	szName = szDir + FILENAME_MAX;
 	szExt = szName + FILENAME_MAX;
@@ -370,6 +400,7 @@ const char* Floppy_SetDiskFileName(int Drive, const char *pszFileName, const cha
 		if (strcmp(filename, ConfigureParams.DiskImage.szDiskFileName[i]) == 0)
 		{
 			Log_AlertDlg(LOG_ERROR, "ERROR: Cannot insert same floppy to multiple drives!");
+			free(filename);
 			return NULL;
 		}
 	}
@@ -396,7 +427,7 @@ const char* Floppy_SetDiskFileName(int Drive, const char *pszFileName, const cha
  * In case the user eject/insert several disks before returning to emulation,
  * State1 will contain the first action, and State2 the latest action (intermediate
  * actions are ignored, as they wouldn't be seen while the emulation is paused).
- * Each action will take FLOPPY_DRIVE_TRANSITION_DELAY_VBL * 2 VBLs to execute,
+ * Each action will take FLOPPY_DRIVE_TRANSITION_DELAY_VBL VBLs to execute,
  * see fdc.c for details.
  */
 static void	Floppy_DriveTransitionSetState ( int Drive , int State )
@@ -424,7 +455,7 @@ static void	Floppy_DriveTransitionSetState ( int Drive , int State )
 		{
 			/* Set State2 just after State1 ends */
 			EmulationDrives[Drive].TransitionState2 = State;
-			EmulationDrives[Drive].TransitionState2_VBL = EmulationDrives[Drive].TransitionState1_VBL + FLOPPY_DRIVE_TRANSITION_DELAY_VBL * 2;
+			EmulationDrives[Drive].TransitionState2_VBL = EmulationDrives[Drive].TransitionState1_VBL + FLOPPY_DRIVE_TRANSITION_DELAY_VBL;
 		}
 	}
 //fprintf ( stderr , "drive transition state1 %d %d state2 %d %d\n" ,
@@ -448,42 +479,28 @@ int	Floppy_DriveTransitionUpdateState ( int Drive )
 
 	if ( EmulationDrives[Drive].TransitionState1 != 0 )
 	{
-		if ( nVBLs >= EmulationDrives[Drive].TransitionState1_VBL + FLOPPY_DRIVE_TRANSITION_DELAY_VBL * 2 )
+		if ( nVBLs >= EmulationDrives[Drive].TransitionState1_VBL + FLOPPY_DRIVE_TRANSITION_DELAY_VBL )
 			EmulationDrives[Drive].TransitionState1 = 0;	/* State1's delay elapsed */
-		else if ( nVBLs >= EmulationDrives[Drive].TransitionState1_VBL + FLOPPY_DRIVE_TRANSITION_DELAY_VBL )
-		{
-			if ( EmulationDrives[Drive].TransitionState1 == FLOPPY_DRIVE_TRANSITION_STATE_INSERT )
-				Force = -1;				/* Insert phase 2 : clear WPRT */
-			else
-				Force = 1;				/* Eject phase 2 : set WPRT */
-		}
 		else
 		{
 			if ( EmulationDrives[Drive].TransitionState1 == FLOPPY_DRIVE_TRANSITION_STATE_INSERT )
-				Force = 1;				/* Insert phase 1 : set WPRT */
+				Force = 0;				/* Insert : keep WPRT */
 			else
-				Force = -1;				/* Eject phase 1 : clear WPRT */
+				Force = 1;				/* Eject : set WPRT */
 		}
 	}
 
 	if ( ( EmulationDrives[Drive].TransitionState2 != 0 )
 	  && ( nVBLs >= EmulationDrives[Drive].TransitionState2_VBL ) )
 	{
-		if ( nVBLs >= EmulationDrives[Drive].TransitionState2_VBL + FLOPPY_DRIVE_TRANSITION_DELAY_VBL * 2 )
+		if ( nVBLs >= EmulationDrives[Drive].TransitionState2_VBL + FLOPPY_DRIVE_TRANSITION_DELAY_VBL )
 			EmulationDrives[Drive].TransitionState2 = 0;	/* State2's delay elapsed */
-		else if ( nVBLs >= EmulationDrives[Drive].TransitionState2_VBL + FLOPPY_DRIVE_TRANSITION_DELAY_VBL )
-		{
-			if ( EmulationDrives[Drive].TransitionState2 == FLOPPY_DRIVE_TRANSITION_STATE_INSERT )
-				Force = -1;				/* Insert phase 2 : clear WPRT */
-			else
-				Force = 1;				/* Eject phase 2 : set WPRT */
-		}
 		else
 		{
 			if ( EmulationDrives[Drive].TransitionState2 == FLOPPY_DRIVE_TRANSITION_STATE_INSERT )
-				Force = 1;				/* Insert phase 1 : set WPRT */
+				Force = 0;				/* Insert : keep WPRT */
 			else
-				Force = -1;				/* Eject phase 1 : clear WPRT */
+				Force = 1;				/* Eject : set WPRT */
 		}
 	}
 
@@ -548,6 +565,7 @@ bool Floppy_InsertDiskIntoDrive(int Drive)
 		if ( IPF_Insert ( Drive , EmulationDrives[Drive].pBuffer , nImageBytes ) == false )
 		{
 			free ( EmulationDrives[Drive].pBuffer );
+			EmulationDrives[Drive].pBuffer = NULL;
 			return false;
 		}
 	}
@@ -558,6 +576,7 @@ bool Floppy_InsertDiskIntoDrive(int Drive)
 		if ( STX_Insert ( Drive , filename , EmulationDrives[Drive].pBuffer , nImageBytes ) == false )
 		{
 			free ( EmulationDrives[Drive].pBuffer );
+			EmulationDrives[Drive].pBuffer = NULL;
 			return false;
 		}
 	}

@@ -2,7 +2,7 @@
 #
 # Classes for the Hatari UI dialogs
 #
-# Copyright (C) 2008-2012 by Eero Tamminen
+# Copyright (C) 2008-2015 by Eero Tamminen
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -370,12 +370,23 @@ class HardDiskDialog(HatariUIDialog):
         table_add_widget_row(table, row, label, box, True)
         self.ideslave = fsel
         row += 1
-        
+
+        table_add_widget_row(table, row, " ", gtk.HSeparator(), True)
+        row += 1
+
         label = "GEMDOS drive directory:"
-        path = config.get_gemdos_dir()
+        path = config.get_hd_dir()
         fsel, box = factory.get(label, None, path, gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
         table_add_widget_row(table, row, label, box, True)
-        self.gemdos = fsel
+        self.hddir = fsel
+        row += 1
+
+        hddrive = gtk.combo_box_new_text()
+        for text in config.get_hd_drives():
+            hddrive.append_text(text)
+        hddrive.set_tooltip_text("Whether GEMDOS HD emulation uses fixed drive letter, or first free drive letter after ASCI & IDE drives (detection unreliable)")
+        table_add_widget_row(table, row, "GEMDOS HD drive:", hddrive)
+        self.hddrive = hddrive
         row += 1
 
         protect = gtk.combo_box_new_text()
@@ -396,9 +407,6 @@ class HardDiskDialog(HatariUIDialog):
         table.show_all()
     
     def _get_config(self, config):
-        path = config.get_gemdos_dir()
-        if path:
-            self.gemdos.set_filename(path)
         path = config.get_acsi_image()
         if path:
             self.acsi.set_filename(path)
@@ -408,15 +416,20 @@ class HardDiskDialog(HatariUIDialog):
         path = config.get_ideslave_image()
         if path:
             self.ideslave.set_filename(path)
+        path = config.get_hd_dir()
+        if path:
+            self.hddir.set_filename(path)
+        self.hddrive.set_active(config.get_hd_drive())
         self.protect.set_active(config.get_hd_protection())
         self.lower.set_active(config.get_hd_case())
 
     def _set_config(self, config):
         config.lock_updates()
-        config.set_gemdos_dir(self.gemdos.get_filename())
         config.set_acsi_image(self.acsi.get_filename())
         config.set_idemaster_image(self.idemaster.get_filename())
         config.set_ideslave_image(self.ideslave.get_filename())
+        config.set_hd_dir(self.hddir.get_filename())
+        config.set_hd_drive(self.hddrive.get_active())
         config.set_hd_protection(self.protect.get_active())
         config.set_hd_case(self.lower.get_active())
         config.flush_updates()
@@ -791,6 +804,11 @@ class TraceDialog(HatariUIDialog):
         "nvram",
         "scsi_cmd",
         "natfeats",
+        "keymap",
+        "midi",
+        "ide",
+        "os_base",
+        "scsidrv"
     ]
     def __init__(self, parent):
         self.savedpoints = None
@@ -921,6 +939,13 @@ class MachineDialog(HatariUIDialog):
             combo.append_text(text)
         self.memory = table_add_widget_row(table, row, "Memory:", combo, fullspan)
         row += 1
+
+        self.ttram = gtk.Adjustment(config.get_ttram(), 0, 260, 4, 4, 4)
+        ttram = gtk.HScale(self.ttram)
+        ttram.set_digits(0)
+        ttram.set_tooltip_text("TT-RAM needs Falcon/TT with WinUAE CPU core and implies 32-bit addressing.  0 = disabled, 24-bit addressing.")
+        table_add_widget_row(table, row, "TT-RAM", ttram, fullspan)
+        row += 1
         
         label = "TOS image:"
         fsel = self._fsel(label, gtk.FILE_CHOOSER_ACTION_OPEN)
@@ -957,6 +982,7 @@ class MachineDialog(HatariUIDialog):
         self.dsps[config.get_dsp()].set_active(True)
         self.cpulevel.set_active(config.get_cpulevel())
         self.memory.set_active(config.get_memory())
+        self.ttram.set_value(config.get_ttram())
         tos = config.get_tos()
         if tos:
             self.tos.set_filename(tos)
@@ -979,6 +1005,7 @@ class MachineDialog(HatariUIDialog):
         config.set_dsp(self._get_active_radio(self.dsps))
         config.set_cpulevel(self.cpulevel.get_active())
         config.set_memory(self.memory.get_active())
+        config.set_ttram(self.ttram.get_value())
         config.set_tos(self.tos.get_filename())
         config.set_compatible(self.compatible.get_active())
         config.set_timerd(self.timerd.get_active())

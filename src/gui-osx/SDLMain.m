@@ -65,7 +65,7 @@ char szPath[FILENAME_MAX] ;											// for general use
 - (void) setupWorkingDirectory:(BOOL)shouldChdir
 {
 	if (shouldChdir)
-		chdir([[[[NSBundle mainBundle] bundlePath] stringByDeletingLastPathComponent] cStringUsingEncoding:NSASCIIStringEncoding]) ;
+		chdir([[[NSBundle mainBundle].bundlePath stringByDeletingLastPathComponent] cStringUsingEncoding:NSASCIIStringEncoding]) ;
 }
 
 
@@ -97,7 +97,7 @@ char szPath[FILENAME_MAX] ;											// for general use
 	if (gCalledAppMainline)		// app has started, ignore this document.
 		return FALSE;
 
-	temparg = [filename UTF8String] ;
+	temparg = filename.UTF8String ;
 	arglen = SDL_strlen(temparg) + 1 ;
 	arg = (char *) SDL_malloc(arglen) ;
 	if (arg == NULL)
@@ -117,9 +117,9 @@ char szPath[FILENAME_MAX] ;											// for general use
 	return TRUE;
 }
 
-
+/*----------------------------------------------------------------------*/
 // Called when the internal event loop has just started running
-//
+/*----------------------------------------------------------------------*/
 - (void) applicationDidFinishLaunching: (NSNotification *) note
 {
 	int status;
@@ -130,7 +130,7 @@ char szPath[FILENAME_MAX] ;											// for general use
 	//setenv ("SDL_ENABLEAPPEVENTS", "1", 1) ;
 
 	// Hand off to main application code
-
+	emulationPaused=NO;
 	gCalledAppMainline = TRUE;
 	status = SDL_main (gArgc, gArgv) ;
 
@@ -138,7 +138,9 @@ char szPath[FILENAME_MAX] ;											// for general use
 	exit(status) ;
 }
 
+/*----------------------------------------------------------------------*/
 // Hatari Stuff
+/*----------------------------------------------------------------------*/
 - (IBAction)prefsMenu:(id)sender
 {
 	static int in_propdialog =  0;
@@ -155,53 +157,56 @@ char szPath[FILENAME_MAX] ;											// for general use
 	[[PrefsController prefs] loadPrefs:sender];
 }														// */
 
-
+/*----------------------------------------------------------------------*/
 - (IBAction)debugUI:(id)sender
 {
 	DebugUI(REASON_USER);
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)warmReset:(id)sender
 {
 	if ([NSApp myAlerte:NSInformationalAlertStyle Txt:localize(@"Warm reset!") firstB:localize(@"OK") alternateB:localize(@"Cancel")
-									otherB:nil informativeTxt:localize(@"Really reset the emulator?")] == NSAlertDefaultReturn)
+			otherB:nil informativeTxt:localize(@"Really reset the emulator?")] == NSAlertFirstButtonReturn )
 		Reset_Warm();
 } 
-
+/*----------------------------------------------------------------------*/
 - (IBAction)coldReset:(id)sender
 {
 	if ([NSApp myAlerte:NSInformationalAlertStyle Txt:localize(@"Cold reset") firstB:localize(@"OK") alternateB:localize(@"Cancel")
-									otherB:nil informativeTxt:localize(@"Really reset the emulator?")] == NSAlertDefaultReturn)
+			otherB:nil informativeTxt:localize(@"Really reset the emulator?")] == NSAlertFirstButtonReturn )
 		Reset_Cold();
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)insertDiskA:(id)sender
 {
 	[self insertDisk:0] ;
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)insertDiskB:(id)sender
 {
 	[self insertDisk:1] ;
 }
-
+/*----------------------------------------------------------------------*/
 - (void)insertDisk:(int)disque 
 {
 	NSString	*aDisk ;
 
-	aDisk = [NSApp hopenfile:NO defoDir:nil defoFile:@"" types:[NSArray arrayWithObjects:allF,nil]] ;
-	if ([aDisk length] == 0) return ;                 // user canceled
+	aDisk = [NSApp hopenfile:NO defoDir:nil defoFile:@"" types:@[allF]] ;
+	if (aDisk.length == 0) return ;                 		// user canceled
 
 	[aDisk getCString:szPath maxLength:FILENAME_MAX-1 encoding:NSASCIIStringEncoding] ;
 	Floppy_SetDiskFileName(disque, szPath, NULL) ;
 	Floppy_InsertDiskIntoDrive(disque) ;
 }
+/*----------------------------------------------------------------------*/
+- (IBAction)quit:(id)sender
+{
+	Main_RequestQuit(0) ;
+}
 
-
-/*-----------------------------------------------------------------------*/
-/*
- Controls the enabled state of the menu items
- */
+/*----------------------------------------------------------------------*/
+/*Controls the enabled state of the menu items							*/
+/*----------------------------------------------------------------------*/
 - (BOOL)validateMenuItem:(NSMenuItem*)item
 {
 	if (item == beginCaptureAnim)
@@ -224,6 +229,8 @@ char szPath[FILENAME_MAX] ;											// for general use
 	return YES;
 }
 
+/*----------------------------------------------------------------------*/
+
 - (NSString*)displayFileSelection:(const char*)pathInParams preferredFileName:(NSString*)preferredFileName allowedExtensions:(NSArray*)allowedExtensions
 {
 	// BOOL test ;
@@ -236,10 +243,10 @@ char szPath[FILENAME_MAX] ;											// for general use
 	// Get the path from the user settings
 	preferredPath = [[NSString stringWithCString:pathInParams encoding:NSASCIIStringEncoding] stringByAbbreviatingWithTildeInPath];
 
-	if ((preferredPath != nil) && ([preferredPath length] > 0))					// Determine the directory and filename
+	if ((preferredPath != nil) && (preferredPath.length > 0))					// Determine the directory and filename
 	 {
-		directoryToOpen = [preferredPath stringByDeletingLastPathComponent];	// Existing path: we use it
-		fileToPreselect = [preferredPath lastPathComponent];
+		directoryToOpen = preferredPath.stringByDeletingLastPathComponent ;		// Existing path: we use it
+		fileToPreselect = preferredPath.lastPathComponent;
 	 }
 	else
 	 {
@@ -253,25 +260,25 @@ char szPath[FILENAME_MAX] ;											// for general use
 	extensionText = [NSString stringWithFormat:localize(@"Please specify a .%@ file"), [allowedExtensions componentsJoinedByString:localize(@" or a .")] ];
 
 	selectFile = [NSApp hsavefile:YES defoDir:directoryToOpen defoFile:fileToPreselect types:allowedExtensions titre:extensionText ] ;
-	if ([selectFile length] != 0 )
+	if (selectFile.length != 0 )
 		return selectFile ;
 
 	return nil;
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)captureScreen:(id)sender
 {
-	GuiOsx_Pause();
+	GuiOsx_Pause(false);
 	ScreenSnapShot_SaveScreen();
 	GuiOsx_Resume();
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)captureAnimation:(id)sender
 {
-	GuiOsx_Pause();
+	GuiOsx_Pause(false);
 	if(!Avi_AreWeRecording()) {
 		NSString* path = [self displayFileSelection:ConfigureParams.Video.AviRecordFile preferredFileName:@"hatari.avi"
-									 allowedExtensions:[NSArray arrayWithObject:@"avi"]];
+									 allowedExtensions:@[@"avi"]];
 
 		if(path) {
 			GuiOsx_ExportPathString(path, ConfigureParams.Video.AviRecordFile, sizeof(ConfigureParams.Video.AviRecordFile));
@@ -287,39 +294,39 @@ char szPath[FILENAME_MAX] ;											// for general use
 	}
 	GuiOsx_Resume();
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)endCaptureAnimation:(id)sender
 {
-	GuiOsx_Pause();
+	GuiOsx_Pause(false);
 	Avi_StopRecording();
 	GuiOsx_Resume();
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)captureSound:(id)sender
 {
-	GuiOsx_Pause();
+	GuiOsx_Pause(true);
 	NSString* path = [self displayFileSelection:ConfigureParams.Sound.szYMCaptureFileName preferredFileName:@"hatari.wav"
-								 allowedExtensions:[NSArray arrayWithObjects:@"ym", @"wav", nil]];
+								 allowedExtensions:@[@"ym", @"wav"]];
 	if(path) {
 		GuiOsx_ExportPathString(path, ConfigureParams.Sound.szYMCaptureFileName, sizeof(ConfigureParams.Sound.szYMCaptureFileName));
 		Sound_BeginRecording(ConfigureParams.Sound.szYMCaptureFileName);
 	}
 	GuiOsx_Resume();
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)endCaptureSound:(id)sender
 {
-	GuiOsx_Pause();
+	GuiOsx_Pause(false);
 	Sound_EndRecording();
 	GuiOsx_Resume();
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)saveMemorySnap:(id)sender
 {
-	GuiOsx_Pause();
+	GuiOsx_Pause(true);
 
 	NSString* path = [self displayFileSelection:ConfigureParams.Memory.szMemoryCaptureFileName preferredFileName:@"hatari.sav"
-								 allowedExtensions:[NSArray arrayWithObject:@"sav"]];
+        allowedExtensions:@[@"sav"]];
 	if(path) {
 		GuiOsx_ExportPathString(path, ConfigureParams.Memory.szMemoryCaptureFileName, sizeof(ConfigureParams.Memory.szMemoryCaptureFileName));
 		MemorySnapShot_Capture(ConfigureParams.Memory.szMemoryCaptureFileName, TRUE);
@@ -327,7 +334,7 @@ char szPath[FILENAME_MAX] ;											// for general use
 
 	GuiOsx_Resume();
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)restoreMemorySnap:(id)sender
 {
 	NSString *directoryToOpen;
@@ -335,25 +342,25 @@ char szPath[FILENAME_MAX] ;											// for general use
 	NSString *oldPath ;
 	NSString *newPath ;
 
-	GuiOsx_Pause();
+	GuiOsx_Pause(true);
 
 	// Get the path from the user settings
 	oldPath = [NSString stringWithCString:(ConfigureParams.Memory.szMemoryCaptureFileName) encoding:NSASCIIStringEncoding];
 
-	if ((oldPath != nil) && ([oldPath length] > 0))						// Determine directory and filename
-	 {	directoryToOpen = [oldPath stringByDeletingLastPathComponent];	// existing path: we use it.
-		fileToPreselect = [oldPath lastPathComponent]; }
+	if ((oldPath != nil) && (oldPath.length > 0))						// Determine directory and filename
+	 {	directoryToOpen = oldPath.stringByDeletingLastPathComponent ;	// existing path: we use it.
+		fileToPreselect = oldPath.lastPathComponent ; }
 	else
-	 {	directoryToOpen = [@"~" stringByExpandingTildeInPath];			// Currently no path: we use user's directory
+	 {	directoryToOpen = @"~".stringByExpandingTildeInPath ;			// Currently no path: we use user's directory
 		fileToPreselect = nil; } ;
 
-	newPath = [NSApp hopenfile:NO defoDir:directoryToOpen defoFile:fileToPreselect types:[NSArray arrayWithObject:@"sav"] ] ;
-	if ([newPath length] != 0)											// Perform the memory snapshot load
+	newPath = [NSApp hopenfile:NO defoDir:directoryToOpen defoFile:fileToPreselect types:@[@"sav"] ] ;
+	if (newPath.length != 0)											// Perform the memory snapshot load
 		MemorySnapShot_Restore([newPath cStringUsingEncoding:NSASCIIStringEncoding], TRUE);
 
 	GuiOsx_Resume();
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)doFullScreen:(id)sender
 {
 	// A call to Screen_EnterFullScreen() would be required, but this causes a crash when using
@@ -371,29 +378,40 @@ char szPath[FILENAME_MAX] ;											// for general use
 	SDL_PushEvent((SDL_Event*)&event);	// Send the F11 key release
 }
 
-
+/*----------------------------------------------------------------------*/
 - (IBAction)help:(id)sender
 {
 	NSString *the_help;
 
 	the_help = [[NSBundle mainBundle] pathForResource:@"manual" ofType:@"html" inDirectory:@"HatariHelp"];
 
-	if (![[NSWorkspace sharedWorkspace] openFile:the_help withApplication:@"HelpViewer"])
-		if (![[NSWorkspace sharedWorkspace] openFile:the_help withApplication:@"Help Viewer"])
-			[[NSWorkspace sharedWorkspace] openFile:the_help];
+	[[NSWorkspace sharedWorkspace] openFile:the_help];
 }
-
+/*----------------------------------------------------------------------*/
 - (IBAction)compat:(id)sender
 {
-	NSString *C_aide ;
+	NSString *the_help ;
 
-	C_aide = [[NSBundle mainBundle] pathForResource:@"compatibility" ofType:@"html" inDirectory:@"HatariHelp"] ;
+	the_help = [[NSBundle mainBundle] pathForResource:@"compatibility" ofType:@"html" inDirectory:@"HatariHelp"] ;
 
-	if (![[NSWorkspace sharedWorkspace] openFile:C_aide withApplication:@"HelpViewer"])
-		if (![[NSWorkspace sharedWorkspace] openFile:C_aide withApplication:@"Help Viewer"])
-			[[NSWorkspace sharedWorkspace] openFile:C_aide] ;
+	[[NSWorkspace sharedWorkspace] openFile:the_help];
 }
-
+/*----------------------------------------------------------------------*/
+- (IBAction)PauseMenu:(id)sender {
+	if(!emulationPaused)
+	{
+		GuiOsx_Pause(true);
+		emulationPaused=YES;
+		[pauseMenuItem setState:NSOnState];
+	}
+	else
+	{
+		GuiOsx_Resume();
+		emulationPaused=NO;
+		[pauseMenuItem setState:NSOffState];
+	}
+}
+/*----------------------------------------------------------------------*/
 - (IBAction)openConfig:(id)sender
 {
 	BOOL		applyChanges ;
@@ -407,11 +425,11 @@ char szPath[FILENAME_MAX] ;											// for general use
 	// commit back to the configuration settings if choosing user confirm)
 	CurrentParams = ConfigureParams;
 
-	GuiOsx_Pause();
+	GuiOsx_Pause(true);
 
-	newCfg = [NSApp hopenfile:NO defoDir:nil defoFile:ConfigFile types:[NSArray arrayWithObject:@"cfg"] ] ;
+	newCfg = [NSApp hopenfile:NO defoDir:nil defoFile:ConfigFile types:@[@"cfg"] ] ;
 
-	if ([newCfg length] != 0)
+	if (newCfg.length != 0)
 	{
 		[newCfg getCString:szPath maxLength:FILENAME_MAX-1 encoding:NSASCIIStringEncoding] ;	// get Cstring  szPath
 		Configuration_Load(szPath) ;															// Load the config into ConfigureParams
@@ -420,9 +438,9 @@ char szPath[FILENAME_MAX] ;											// for general use
 		// Refresh all the controls to match ConfigureParams
 		if (Change_DoNeedReset(&CurrentParams, &ConfigureParams))
 		 	applyChanges = [NSApp myAlerte:NSInformationalAlertStyle Txt:localize(@"Reset the emulator") firstB:localize(@"Don't reset")
-								alternateB:localize(@"Reset") otherB:nil informativeTxt:@"" ] == NSAlertAlternateReturn ;
+				alternateB:localize(@"Reset") otherB:nil informativeTxt:@"" ] == NSAlertFirstButtonReturn ;
 		if (applyChanges)
-			Change_CopyChangedParamsToConfiguration(&CurrentParams, &ConfigureParams, true); // Ok with Reset
+			Change_CopyChangedParamsToConfiguration(&CurrentParams, &ConfigureParams, true); 	// Ok with Reset
 		else
 			ConfigureParams = CurrentParams;   //Restore previous Params.
 	} ;
@@ -430,28 +448,28 @@ char szPath[FILENAME_MAX] ;											// for general use
 	GuiOsx_Resume();
 }
 
-
+/*----------------------------------------------------------------------*/
 - (IBAction)saveConfig:(id)sender {
 }
 
 @end
-
+/*----------------------------------------------------------------------*/
 static int IsRootCwd()
 {
 	char buf[MAXPATHLEN];
 	char *cwd = getcwd(buf, sizeof (buf));
 	return (cwd && (strcmp(cwd, "/") == 0));
 }
-
+/*----------------------------------------------------------------------*/
 static int IsTenPointNineOrLater()
 {
-	/* Gestalt() is deprecated in 10.8 ... TODO: replace with better test? */
-	SInt32 major, minor;
-	Gestalt(gestaltSystemVersionMajor, &major);
-	Gestalt(gestaltSystemVersionMinor, &minor);
-	return ( ((major << 16) | minor) >= ((10 << 16) | 9) );
-}
+	// OK for 10.9, but before ??
+	NSOperatingSystemVersion systemVersion = [[NSProcessInfo processInfo] operatingSystemVersion];	
+	int r=(systemVersion.majorVersion==10) && (systemVersion.minorVersion>=9);
 
+	return r;
+}
+/*----------------------------------------------------------------------*/
 static int IsFinderLaunch(const int argc, char **argv)
 {
 	/* -psn_XXX is passed if we are launched from Finder in 10.8 and earlier */
@@ -464,14 +482,15 @@ static int IsFinderLaunch(const int argc, char **argv)
 		command line, and if our current working directory is "/". */
 		return 1;
 	}
-	return 0;  /* not a Finder launch. */
+	return 0;					/* not a Finder launch. */
 }
 
 #ifdef main
 #  undef main
 #endif
-
+/*----------------------------------------------------------------------*/
 // Main entry point to executable - should *not* be SDL_main!
+/*----------------------------------------------------------------------*/
 int main (int argc, char **argv)
 {
 	// Copy the arguments into a global variable

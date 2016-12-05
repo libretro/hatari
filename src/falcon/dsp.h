@@ -27,16 +27,20 @@
 # include "dsp_core.h"
 #endif
 
-#define DSP_FREQ	(CPU_FREQ*4)
+#define DSP_CPU_FREQ_RATIO		2	/* Dsp Freq = 2 * Cpu Freq (32 MHz vs 16 MHz on Falcon) */
 
 extern bool bDspEnabled;
 extern bool bDspHostInterruptPending;
+
+extern Uint64   DSP_CyclesGlobalClockCounter;
 
 /* Dsp commands */
 extern bool DSP_ProcessIRQ(void);
 extern void DSP_Init(void);
 extern void DSP_UnInit(void);
 extern void DSP_Reset(void);
+extern void DSP_Enable(void);
+extern void DSP_Disable(void);
 extern void DSP_Run(int nHostCycles);
 
 /* Save Dsp state to snapshot */
@@ -48,10 +52,10 @@ extern Uint16 DSP_GetPC(void);
 extern Uint16 DSP_GetNextPC(Uint16 pc);
 extern Uint16 DSP_GetInstrCycles(void);
 extern Uint32 DSP_ReadMemory(Uint16 addr, char space, const char **mem_str);
-extern Uint16 DSP_DisasmMemory(Uint16 dsp_memdump_addr, Uint16 dsp_memdump_upper, char space);
+extern Uint16 DSP_DisasmMemory(FILE *fp, Uint16 dsp_memdump_addr, Uint16 dsp_memdump_upper, char space);
 extern Uint16 DSP_DisasmAddress(FILE *out, Uint16 lowerAdr, Uint16 UpperAdr);
-extern void DSP_Info(Uint32 dummy);
-extern void DSP_DisasmRegisters(void);
+extern void DSP_Info(FILE *fp, Uint32 dummy);
+extern void DSP_DisasmRegisters(FILE *fp);
 extern int DSP_GetRegisterAddress(const char *arg, Uint32 **addr, Uint32 *mask);
 extern bool DSP_Disasm_SetRegister(const char *arg, Uint32 value);
 
@@ -71,7 +75,8 @@ extern void DSP_SsiTransmit_SCK(void);
 /* Dsp Host interface commands */
 extern void DSP_HandleReadAccess(void);
 extern void DSP_HandleWriteAccess(void);
-extern Uint16 DSP_Get_HREQ(void);
+extern Uint8 DSP_GetHREQ ( void );
+extern int DSP_ProcessIACK ( void );
 
 
 #endif /* DSP_H */

@@ -63,7 +63,7 @@ typedef struct
   Uint32 HBLPaletteMasks[HBL_PALETTE_MASKS];
   Uint8 *pSTScreen;             /* Copy of screen built up during frame (copy each line on HBL to simulate monitor raster) */
   Uint8 *pSTScreenCopy;         /* Previous frames copy of above  */
-  int OverscanModeCopy;         /* Previous screen overscan mode */
+  int VerticalOverscanCopy;	/* Previous screen overscan mode */
   bool bFullUpdate;             /* Set TRUE to cause full update on next draw */
 } FRAMEBUFFER;
 
@@ -92,13 +92,6 @@ enum
 #define PALETTEMASK_UPDATEFULL  0x80000000
 #define PALETTEMASK_UPDATEMASK  (PALETTEMASK_UPDATEFULL|PALETTEMASK_UPDATEPAL|PALETTEMASK_UPDATERES)
 
-/* Overscan values */
-enum
-{
-  OVERSCANMODE_NONE,     /* 0x00 */
-  OVERSCANMODE_TOP,      /* 0x01 */
-  OVERSCANMODE_BOTTOM    /* 0x02 (Top+Bottom) 0x03 */
-};
 
 extern bool bGrabMouse;
 extern bool bInFullScreen;
@@ -115,13 +108,17 @@ extern Uint32 ST2RGB[4096];
 extern void Screen_Init(void);
 extern void Screen_UnInit(void);
 extern void Screen_Reset(void);
+extern bool Screen_Lock(void);
+extern void Screen_UnLock(void);
 extern void Screen_SetFullUpdate(void);
 extern void Screen_EnterFullScreen(void);
 extern void Screen_ReturnFromFullScreen(void);
-extern void Screen_ModeChanged(void);
+extern void Screen_ModeChanged(bool bForceChange);
 extern bool Screen_Draw(void);
-extern bool Screen_SetSDLVideoSize(int width, int height, int bitdepth);
-
-extern bool bTTSampleHold;      /* TT special video mode */
+extern bool Screen_SetSDLVideoSize(int width, int height, int bitdepth, bool bForceChange);
+extern void Screen_SetGenConvSize(int width, int height, int bpp, bool bForceChange);
+extern void Screen_GenConvUpdate(SDL_Rect *extra, bool forced);
+extern Uint32 Screen_GetGenConvWidth(void);
+extern Uint32 Screen_GetGenConvHeight(void);
 
 #endif  /* ifndef HATARI_SCREEN_H */
