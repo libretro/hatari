@@ -48,6 +48,11 @@ const char *Paths_GetWorkingDir(void)
  */
 const char *Paths_GetDataDir(void)
 {
+//retroup: load bios from system dir
+#ifdef __LIBRETRO__	/* RETRO HACK */
+	extern const char *retro_system_directory;
+	return retro_system_directory;
+#endif
 	return sDataDir;
 }
 
