@@ -99,8 +99,8 @@ else
 endif
 
 CFLAGS += \
-	-std=gnu99 -finline-functions -funroll-loops  -fsigned-char -D__LIBRETRO__ \
-	-Wno-strict-prototypes -ffast-math -fomit-frame-pointer -fno-strength-reduce  -fno-builtin -finline-functions
+	-std=gnu99 -funroll-loops  -fsigned-char -D__LIBRETRO__ \
+	-Wno-strict-prototypes -ffast-math -fomit-frame-pointer -fno-builtin
 
 CXXFLAGS  += $(CFLAGS)
 CPPFLAGS  += $(CFLAGS)
