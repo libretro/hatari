@@ -1,6 +1,8 @@
 CORE_DIR := .
 LIBRETRO_DIR = $(CORE_DIR)/libretro
 ZLIB_DIR = $(LIBRETRO_DIR)/utils/zlib
+STATIC_LINKING=0
+STATIC_LINKING_LINK=0
 
 ifeq ($(platform),)
 platform = unix
@@ -74,6 +76,8 @@ else ifeq ($(platform), wii)
    SHARED :=   -lm -lpthread -lc
    PLATFLAGS :=  -DALIGN_DWORD
    EXTERNAL_ZLIB = 1
+	STATIC_LINKING=1
+	STATIC_LINKING_LINK=1
 else ifeq ($(platform), ps3)
 	TARGET := $(TARGET_NAME)_libretro_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
@@ -84,6 +88,8 @@ else ifeq ($(platform), ps3)
 	-D__CELLOS_LV2 -DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) 
    PLATFLAGS :=  -DALIGN_DWORD 
    EXTERNAL_ZLIB = 1
+	STATIC_LINKING=1
+	STATIC_LINKING_LINK=1
 else
    #CC = i586-mingw32msvc-gcc
    CC = x86_64-w64-mingw32-gcc
@@ -120,24 +126,11 @@ include Makefile.common
 OBJECTS := $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
-
-ifeq ($(platform), wii)
-$(TARGET): $(OBJECTS) 
+ifeq ($(STATIC_LINKING_LINK),1)
 	$(AR) rcs $@ $(OBJECTS) 
-else ifeq ($(platform), ps3)
-$(TARGET): $(OBJECTS) 
-	$(AR) rcs $@ $(OBJECTS) 
-
-else ifeq ($(platform), win)
-$(TARGET): $(OBJECTS)
-	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz
-else ifeq ($(platform), android)
-$(TARGET): $(OBJECTS)
-	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz
 else
 $(TARGET): $(OBJECTS)
-	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz -lpthread
-
+	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz
 endif
 
 %.o: %.c
