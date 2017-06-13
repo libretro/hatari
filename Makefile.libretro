@@ -91,8 +91,6 @@ else ifeq ($(platform), ps3)
 	STATIC_LINKING=1
 	STATIC_LINKING_LINK=1
 else
-   #CC = i586-mingw32msvc-gcc
-   CC = x86_64-w64-mingw32-gcc
    PLATFLAGS :=  -DLSB_FIRST -DALIGN_DWORD -DWIN32PORT -DWIN32
 	TARGET := $(TARGET_NAME)_libretro.dll
    SHARED := -shared -static-libgcc -s -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined 
