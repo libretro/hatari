@@ -130,7 +130,7 @@ ifeq ($(STATIC_LINKING_LINK),1)
 	$(AR) rcs $@ $(OBJECTS) 
 else
 $(TARGET): $(OBJECTS)
-	$(CC) $(fpic) $(SHARED) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz
+	$(CC) $(fpic) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz $(SHARED)
 endif
 
 %.o: %.c
@@ -140,4 +140,3 @@ clean:
 	rm -f $(OBJECTS) $(TARGET) 
 
 .PHONY: clean
-
