@@ -1,8 +1,12 @@
+#ifdef HAVE_LIBCO
 #include <libco.h>
 extern cothread_t mainThread;
 extern cothread_t emuThread;
-extern int pauseg;
+#else
+extern int CPULOOP;
+#endif
 
+extern int pauseg;
 #ifdef __CELLOS_LV2__
 #undef HAVE_GETTIMEOFDAY
 #undef HAVE_NANOSLEEP
@@ -37,3 +41,4 @@ extern void retro_shutdown_hatari(void);
 //#warning "conf dir for linux"
 #endif
 
+#define  Main_WarpMouse(a,b)  Main_WarpMouse((a),(b), false)

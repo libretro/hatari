@@ -197,7 +197,8 @@ void Dialog_SystemDlg(void)
 		systemdlg[DLGSYS_BLITTER].state &= ~SG_SELECTED;
 
 	/* Real time clock CPU */
-	if (ConfigureParams.System.bRealTimeClock)
+//FIXME LIBRETRO CHANGE TO NEWSYSTEM
+	if (0/*ConfigureParams.System.bRealTimeClock*/)
 		systemdlg[DLGSYS_RTC].state |= SG_SELECTED;
 	else
 		systemdlg[DLGSYS_RTC].state &= ~SG_SELECTED;
@@ -301,7 +302,8 @@ while (but != DLGSYS_EXIT && but != SDLGUI_QUIT
 
 	ConfigureParams.System.bCompatibleCpu = (systemdlg[DLGSYS_PREFETCH].state & SG_SELECTED);
 	ConfigureParams.System.bBlitter = (systemdlg[DLGSYS_BLITTER].state & SG_SELECTED);
-	ConfigureParams.System.bRealTimeClock = (systemdlg[DLGSYS_RTC].state & SG_SELECTED);
+//FIXME LIBRETRO CHANGE TO NEWSYSTEM
+//	ConfigureParams.System.bRealTimeClock = (systemdlg[DLGSYS_RTC].state & SG_SELECTED);
 	ConfigureParams.System.bPatchTimerD = (systemdlg[DLGSYS_TIMERD].state & SG_SELECTED);
 	ConfigureParams.System.bFastBoot = (systemdlg[DLGSYS_FASTBOOT].state & SG_SELECTED);
 

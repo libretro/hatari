@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <title>Hatari Atari Software Compatibility List</title>
   <meta name="description"
@@ -51,7 +51,7 @@
 <h1 class="pageheader">Hatari Atari Software Compatibility List</h1>
 
 <p class="pageheader">
-Version 1.8, July 2014
+Version 2.0, November 2016
 </p>
 <p class="pageheader">
 This list has been written by: <strong>Thomas Huth</strong>, <strong>Eero Tamminen</strong>
@@ -74,11 +74,7 @@ Hatari on the WWW:
 <h2>Introduction</h2>
 
 <p>Here are lists of Atari software that have been tested with
-different Hatari versions and configurations.  <em>The lists concentrate
-mainly on software that has (historically had) problems working in
-Hatari or provide good regression test-cases for some specific
-technical emulation issues</em>, but some well known other programs
-are also listed.</p>
+different Hatari versions and configurations.</p>
 
 <p>First is listed software (games, demos and applications) for normal
 STs, after them is listed STE software.  Then there are a few TT-only
@@ -113,33 +109,36 @@ is correct.</li>
 specified too little or too much memory.  For ST, 1MB memory size
 is usually fairly safe.</li>
 
-<li>Some games/demos can refuse to run when HD emulation is ON (as it is
-seen as an external cartridge). In STF/STE mode, it is also better to
-disable the MegaST's real time clock.
+<li>Some games/demos can refuse to run when GEMDOS HD emulation is
+enabled (due to presence of Hatari cartridge image needed for that).
+In STF/STE mode, it's also better to disable the MegaST's real time
+clock.
 </li>
 
-<li>TOS version : ST demos and games may require some specific TOS
-version and not work at all with others. If you notice that this
-information is missing for some listed game or demo, please send mail
-to the hatari-devel mailing list.
+<li>TOS version: ST demos and games may require a specific TOS
+version and fail to work with all other versions. If you notice that
+this information is missing for some listed game or demo, please send
+mail to the hatari-devel mailing list.
 <ul>
-<li>Note that many games and demos don't work with the free EmuTOS TOS.
-For more information, see emutos.txt.</li>
+<li>Note that many games and demos (especially floppy based ones),
+don't work with the free EmuTOS TOS. For more information, see
+<a href="emutos.txt">emutos.txt</a>.</li>
 </ul>
 </li>
 
 </ul>
 
 <p>
-Also note that since Hatari 1.8, support is included for STX, IPF and CTR
-disk images. These formats allow to backup a disk in an unaltered form,
-without requiring to remove the protection with a crack. Some complex
-protections rely on precise CPU/FDC timings and on some specific TOS version.
-<br/>
-For STF/STE protected games, it is recommended to use TOS 1.02 or 1.04 and 1MB RAM,
-as well as turning HD emulation OFF for maximum compatibility
-(but most games will run fine with different settings)
-</p>
+Also note that since Hatari 1.8, support is included also for STX, IPF and CTR
+floppy image formats. They allow storing disk contents in an unaltered form,
+without requiring a crack to remove the copy-protection. Some complex
+protections rely on precise CPU/FDC timings provided with these
+formats, and a specific TOS version.</p>
+<ul>
+<li>For STF protected games, it is recommended to use TOS 1.02 or 1.04 and
+1MB RAM, as well as turning HD emulation OFF for maximum compatibility
+(but most games will run fine with different settings).</li>
+</ul>
 
 <p>
 (<a href="http://www.atari-forum.com/viewtopic.php?f=86&amp;t=14839">More
@@ -149,8 +148,13 @@ information on games compatibility on Atari forum</a>.)
 
 <h2>ST software compatibility list</h2>
 
-<p>This is not a comprehensive list. By default <b>everything that
-works on a real ST should work also in Hatari</b>.</p>
+<p>These aren't comprehensive lists. <em>The lists concentrate
+mainly on software that has (historically had) problems working in
+Hatari or provide good regression test-cases for some specific
+technical emulation issues</em>, but some well known other programs
+are also listed.</p>
+
+<p>By default <b>everything that works on a real ST should work also in Hatari</b>.
 
 <h3>ST games</h3>
 
@@ -180,6 +184,11 @@ works on a real ST should work also in Hatari</b>.</p>
       <td>&nbsp;</td>
     </tr>
     <tr>
+      <td><a href="http://www.atarimania.com/game-atari-st-antago_11073.html">Antago</a></td>
+      <td>1.8</td>
+      <td>Write protection should be OFF</td>
+    </tr>
+    <tr>
       <td><a href="http://www.atarimania.com/game-atari-st-arkanoid_22998.html">Arkanoid</a></td>
       <td>1.8</td>
       <td>Requires TOS 1.02 for mouse input</td>
@@ -201,7 +210,7 @@ works on a real ST should work also in Hatari</b>.</p>
     </tr>
     <tr>
       <td>Blood Money - Superior 65</td>
-      <td>1.8.1</td>
+      <td>1.9</td>
       <td>The file version of this game has some serious bugs and will crash with TOS 1.04 or 1.62, and maybe
 	  in other conditions too. Avoid it, use another version of this game</td>
     </tr>
@@ -483,10 +492,20 @@ works on a real ST should work also in Hatari</b>.</p>
       <td>Mouse moved too slowly before Hatari 1.7</td>
     </tr>
     <tr>
+      <td><a href="http://www.atarimania.com/game-atari-st-teller-_10593.html">The Teller</a></td>
+      <td>1.9</td>
+      <td>Does not work with cartridge / HD emulation</td>
+    </tr>
+    <tr>
       <td>The Ultimate Ride</td>
       <td>&nbsp;</td>
       <td>The game has a bug and will crash if drive B is empty. Either disable drive B or insert
 	  disk 2 in drive B to make it work</td>
+    </tr>
+    <tr>
+      <td><a href="http://www.pouet.net/prod.php?which=32816">Tiles Osmosis</a></td>
+      <td>1.8</td>
+      <td>Requires disk in drive A: to start</td>
     </tr>
     <tr>
       <td><a href="http://www.atarimania.com/game-atari-st-to-be-on-top_10640.html">To Be On Top</a></td>
@@ -625,8 +644,17 @@ for border removal).</p>
 <!-- double disk pouet.net version doesn't work unlike above single disk one
       <a href="http://pouet.net/prod.php?which=1287">Suretrip 49%</a></td>
 -->
-      <td>1.2</td>
-      <td>&nbsp;</td>
+      <td>2.0</td>
+      <td>Requires Hatari &ge; 2.0 to work, else the fullscreen tunnel part
+        will crash after a few seconds (due to complex VBL/HBL exception timing)</td>
+    </tr>
+    <tr>
+      <td>Dead Braincells:
+      <a href="http://www.pouet.net/prod.php?which=29701">Monoscreen</a></td>
+      <td class="minor">1.9</td>
+      <td>(Partial) monochrome overscan isn't supported by Hatari.
+          Demo requires manual monitor timings adjustments to work
+	  (which may be SM124 specific)</td>
     </tr>
     <tr>
       <td>Delta Force:
@@ -675,6 +703,14 @@ for border removal).</p>
       <td>In STF mode, some screens tries to simulate more colors by changing the
           palette on each VBL, which creates an unpleasant flickering effect
           (this is not a bug in Hatari). Use STE mode for better results</td>
+    </tr>
+    <tr>
+      <td>Eagles / EKO / Impact:
+      <a href="http://pouet.net/prod.php?which=20057">Place To Be Again</a></td>
+      <td>devel</td>
+      <td>Although the demo should work in STF mode, the colors will be wrong in the
+          Menu part, unless you use STE mode (this is a bug in the demo which
+          disables timer B when enabling timer A to play samples)</td>
     </tr>
     <tr>
       <td>Equinox:
@@ -825,14 +861,29 @@ for border removal).</p>
       <td>Sector One:
       <a href="http://pouet.net/prod.php?which=14739">Oh no!! More Froggies</a></td>
       <td>1.0</td>
-      <td>Demo doesn't support SID sound with timers during
-          the overscan parts, so it stops music (it's not a bug).</td>
+      <td>Works only with &lt;4MB of RAM.  It doesn't support SID sound with timers
+          during the overscan parts, so it stops music (it's not a bug).</td>
     </tr>
     <tr>
       <td>ST Connexion/Overlanders/Legacy:
       <a href="http://www.pouet.net/prod.php?which=8936">Froggies over the Fence</a>*</td>
       <td>1.1</td>
       <td>Uses its own IKBD 6301 routine</td>
+    </tr>
+    <tr>
+      <td>Sync:
+      <a href="http://pouet.net/prod.php?which=61839">The LoSTE screens</a></td>
+      <td>2.0</td>
+      <td>Uses 2 cycle precision to create 0 byte lines on STF/STE and requires
+          wakeup states emulation for STF</td>
+    </tr>
+    <tr>
+      <td>Sync:
+      <a href="http://pouet.net/prod.php?which=66787">{Closure}</a></td>
+      <td>2.0</td>
+      <td>Very technical demo requiring accurate emulation of many items :
+          2 cycle precision, wakeup states emulation for STF, new overscan line
+          with no stabiliser on the right. A real benchmark for emulators !</td>
     </tr>
     <tr>
       <td>The CareBears:
@@ -882,8 +933,8 @@ for border removal).</p>
     <tr>
       <td>TNT Crew:
       <a href="http://pouet.net/prod.php?which=29414">Death of the left border</a></td>
-      <td class="minor">1.1</td>
-      <td>Planes are shifted</td>
+      <td class="minor">2.0</td>
+      <td>Planes are shifted, but Hatari &ge; 2.0 includes a temporary fix for this</td>
     </tr>
     <tr>
       <td>TOS Crew:
@@ -908,7 +959,7 @@ for border removal).</p>
       <td>Ym Rockerz:
       <a href="http://pouet.net/prod.php?which=9454">Popstars</a></td>
       <td>before 1.0</td>
-      <td>Sound works only with Hatari version 0.80 and later</td>
+      <td>&nbsp;</td>
     </tr>
   </tbody>
 </table>
@@ -1026,11 +1077,16 @@ configuration or data files are not writable.</p>
       <td colspan="3" class="subheader">Sound</td>
     </tr>
     <tr>
-      <td><a href="http://www.pouet.net/prod.php?which=56822">Hextracker</a></td>
+      <td><a href="http://dhs.nu/files.php?t=single&ID=135">Hextracker</a></td>
       <td>1.5</td>
       <td>Uses non-standard mouse event scaling factor.
           Mouse cannot traverse whole Hatari window unless
           mouse grab or fullscreen mode is used</td>
+    </tr>
+    <tr>
+      <td><a href="http://www.atarimania.com/utility-atari-st-m_28275.html">M</a></td>
+      <td>1.9</td>
+      <td>MIDI program, use a weird way to trigger interrupt by changing MFP's AER</td>
     </tr>
     <tr>
       <td><a href="http://www.pouet.net/prod.php?which=18929">MusicMon 2</a></td>
@@ -1043,6 +1099,11 @@ configuration or data files are not writable.</p>
       <td>&nbsp;</td>
     </tr>
     <tr>
+      <td><a href="http://www.atarimania.com/utility-atari-st-notator-sl_27282.html">Notator</a></td>
+      <td>1.9</td>
+      <td>MIDI program, very sensitive to the timings when writing to the MIDI's ACIA</td>
+    </tr>
+    <tr>
       <td><a href="http://www.pouet.net/prod.php?which=50030">Protracker</a></td>
       <td>before 1.0</td>
       <td>&nbsp;</td>
@@ -1051,6 +1112,11 @@ configuration or data files are not writable.</p>
       <td>Quartet</td>
       <td>before 1.0</td>
       <td>&nbsp;</td>
+    </tr>
+    <tr>
+      <td><a href="http://www.atarimania.com/utility-atari-st-realtime_22890.html">Realtime</a></td>
+      <td>1.9</td>
+      <td>MIDI program, use a weird way to trigger interrupt by changing MFP's AER</td>
     </tr>
     <tr>
       <td><a href="http://www.pouet.net/prod.php?which=13336">SidSound Designer</a></td>
@@ -1334,9 +1400,14 @@ are just STE enhanced.  These are marked with '*'.</p>
       <td>needs to be run from disk image</td>
     </tr>
     <tr>
+      <td><a href="https://demozoo.org/productions/165172/">Crash Time Plumber</a></td>
+      <td>1.8</td>
+      <td>&nbsp;</td>
+    </tr>
+    <tr>
       <td><a href="http://www.atarimania.com/game-atari-st-dynabusters_28670.html">Dynabusters+</a></td>
-      <td>1.1</td>
-      <td>Hi-score screen flickers</td>
+      <td class="minor">2.0</td>
+      <td>Hi-score ("Table") screen flickers</td>
     </tr>
     <tr>
       <td>Frantick</td>
@@ -1407,7 +1478,7 @@ are just STE enhanced.  These are marked with '*'.</p>
     <tr>
       <td><a href="http://www.rgcd.co.uk/2011/04/r0x-atari-ste-2009.html">R0X</a></td>
       <td>1.3</td>
-      <td>Some "DMA snd: Illegal buffer size (from 0x0 to 0x0)" messages</td>
+      <td>&nbsp;</td>
     </tr>
     <tr>
       <td>Roger</td>
@@ -1425,7 +1496,7 @@ are just STE enhanced.  These are marked with '*'.</p>
       <td>Uses DMA sound</td>
     </tr>
     <tr>
-      <td>Stardust (tunnel demo)</td>
+      <td>Stardust<br />(tunnel demo)</td>
       <td>before 1.0</td>
       <td>&nbsp;</td>
     </tr>
@@ -1481,12 +1552,14 @@ are just STE enhanced.  These are marked with '*'.</p>
       <td>&nbsp;</td>
     </tr>
     <tr>
-      <td><a href="http://www.umich.edu/~archive/atari/Games/Space/zero_5.zip">Zero-5 (demo)</a></td>
-      <td class="minor">1.4</td>
-      <td>STE DMA sound, Blitter and palette.  STE joypad works, but
-      there are issues in mouse control. With Hatari versions earlier
-      than v1.7 there's flicker and wrong colors on the bottom part
-      of the in-game screen</td>
+      <td><a
+href="http://www.umich.edu/~archive/atari/Games/Space/zero_5.zip">Zero-5</a><br />(ST Review -demo)</td>
+      <td class="minor">2.0</td>
+      <td>STE DMA sound, Blitter and palette.  STE joypad / mouse control.
+      Mouse cursor flickers in menus.  Demo crashes after landing on moon,
+      getting back on space and few quantum bombs have exploded (could be
+      demo issue).  Earlier Hatari versions had issues in mouse control +
+      flicker and wrong colors on the bottom part of the in-game screen</td>
     </tr>
   </tbody>
 </table>
@@ -1520,8 +1593,8 @@ are just STE enhanced.  These are marked with '*'.</p>
     <tr>
       <td>Aggression:
       <a href="http://pouet.net/prod.php?which=29355">RGBeast</a></td>
-      <td class="major">1.3</td>
-      <td>Overscan + blitter. Doesn't look right</td>
+      <td>1.9</td>
+      <td>Overscan + blitter. Requires Hatari &ge; 1.9</td>
     </tr>
     <tr>
       <td>Anatomica:
@@ -1544,13 +1617,18 @@ are just STE enhanced.  These are marked with '*'.</p>
 	but the reason why it happens only under Hatari was not found yet</td>
     </tr>
     <tr>
+      <td>Checkpoint:
+      <a href="http://www.pouet.net/prod.php?which=65101">ATM 10 Years</a></td>
+      <td>1.8</td>
+      <td>Streamed music, voxels</td>
+    </tr>
+    <tr>
       <td>Cream: <a href="http://www.pouet.net/prod.php?which=1030">Madness</a></td>
       <td>1.2</td>
       <td>Music demo with Amiga Paula soundchip emulation + tunes</td>
     </tr>
     <tr>
-      <td>Cybernetics: <a href="http://www.pouet.net/prod.php?which=14457">Relapse</a><br>
-          Cybernetics: <a href="http://www.pouet.net/prod.php?which=14458">New Stream</a>
+      <td>Cybernetics: <a href="http://www.pouet.net/prod.php?which=14458">New Stream</a>
       </td>
       <td>1.8</td>
       <td>WRITER.PRG doesn't work due to FDC "write track" command,
@@ -1558,11 +1636,26 @@ are just STE enhanced.  These are marked with '*'.</p>
       by removing their 8 byte header.
     </tr>
     <tr>
+      <td>Cybernetics: <a href="http://www.pouet.net/prod.php?which=14457">Relapse</a>
+      </td>
+      <td>1.9</td>
+      <td>WRITER.PRG doesn't work due to FDC "write track" command (same as 'New Stream').
+      The Graphix Sound 2 part uses blitter with overscan and requires Hatari &ge; 1.9.
+    </tr>
+    <tr>
       <td>Defence Force:
-      <a href="http://www.pouet.net/prod.php?which=54106">Save The Eearth</a></td>
+      <a href="http://www.pouet.net/prod.php?which=54106">Save The Earth</a></td>
       <td>1.5</td>
       <td>Right border switches, blitter, extended palette, HW
           scrolling/screen splitting, DMA music + microwire/lmc control.</td>
+    </tr>
+    <tr>
+      <td>Defence Force:
+      <a href="http://www.pouet.net/prod.php?which=66703">Time Slices</a></td>
+      <td class="minor">2.0</td>
+      <td>Monochrome. Vertical STNICCC2015 scroll text is missing
+          and some parts of the screen have inverted colors:
+	  https://www.youtube.com/watch?v=RlpP7JVImGA</td>
     </tr>
     <tr>
       <td>DHS:
@@ -1674,8 +1767,15 @@ are just STE enhanced.  These are marked with '*'.</p>
     <tr>
       <td>Light:
       <a href="http://www.pouet.net/prod.php?which=21333">VGA slideshow</a></td>
-      <td class="minor">1.2</td>
-      <td>Some vertical bad pixels stripes and one of the images broken, otherwise fine.</td>
+      <td class="minor">2.0</td>
+      <td>Some vertical bad pixels stripes and one of the images broken, otherwise fine</td>
+    </tr>
+    <tr>
+      <td>Masters of Electric City:
+      <a href="http://www.pouet.net/prod.php?which=64511">Unbeatable</a></td>
+      <td>1.8</td>
+      <td>Monochrome.  Claims to work in ST, but due to bug in demo,
+does only on STE</td>
     </tr>
     <tr>
       <td>MJJ-Prod:
@@ -1713,6 +1813,18 @@ are just STE enhanced.  These are marked with '*'.</p>
       <td>&nbsp;</td>
     </tr>
     <tr>
+      <td>No Extra:
+      <a href="http://www.pouet.net/prod.php?which=64372">0OMPA</a></td>
+      <td>1.8</td>
+      <td>&nbsp;</td>
+    </tr>
+    <tr>
+      <td>No Extra:
+      <a href="http://www.pouet.net/prod.php?which=58071">Infinite Live of the Blitter</a></td>
+      <td>1.8+</td>
+      <td>Demo crashes in Hatari v1.7/v1.8 due to Blitter / MFP timings issue. Needs floppy in drive A</td>
+    </tr>
+    <tr>
       <td>Omega:
       <a href="http://www.pouet.net/prod.php?which=15386">Grotesque</a></td>
       <td>before 1.0</td>
@@ -1731,15 +1843,22 @@ are just STE enhanced.  These are marked with '*'.</p>
       <td>50kHz DMA sound</td>
     </tr>
     <tr>
+      <td>Oxygene:
+      <a href="http://www.pouet.net/prod.php?which=66702">We Were @</a></td>
+      <td>2.0</td>
+      <td>Blitter + overscan. 4MB</td>
+    </tr>
+    <tr>
       <td>Paradox:
       <a href="http://pouet.net/prod.php?which=54205">20 years Atari STE megademo</a></td>
       <td class="minor">1.4</td>
-      <td>Sound is broken in Paradox color zoomer screen</td>
+      <td>Sound is broken in Paradox color zoomer screen. Reset screen has a bug and will
+      issue lots of bus errors if RAM is less than 4 MB.</td>
     </tr>
     <tr>
       <td>Paradox:
       <a href="http://pouet.net/prod.php?which=15053">X-mas 2004 demo</a></td>
-      <td class="minor">1.4</td>
+      <td class="minor">2.0</td>
       <td>The last (4th) screen horizontal scroll texts don't look right
       and are jerky. It also needs frameskip even on 1.4Gz Athlon XP</td>
     </tr>
@@ -1827,10 +1946,9 @@ are just STE enhanced.  These are marked with '*'.</p>
     <tr>
       <td>Ym-Rockerz:
       <a href="http://pouet.net/prod.php?which=15943">Tyme Warp</a></td>
-      <td class="minor">1.8</td>
-      <td>The demo tries to detect/restore $ff8e21 (cpu control on Mega STE) in a way
-	that isn't (properly) supported by current bus error handling. The demo also
-	crashes on a real STF, although pouet.net wrongly lists it as STF compatible</td>
+      <td>2.0</td>
+      <td>The demo crashes on a real STF (write to ff8939), although
+	   pouet.net wrongly lists it as STF compatible</td>
     </tr>
     <tr>
       <td>Zeal:
@@ -1856,12 +1974,12 @@ are just STE enhanced.  These are marked with '*'.</p>
   </thead>
   <tbody>
     <tr>
-      <td><a href="http://www.pouet.net/prod.php?which=56822">Hextracker</a></td>
-      <td class="minor">1.7</td>
+      <td><a href="http://dhs.nu/files.php?t=single&ID=135">Hextracker</a> (0.849b)</td>
+      <td class="minor">2.0</td>
       <td>Uses non-standard mouse event scaling factor.
           Mouse cannot (vertically) traverse whole Hatari window
           unless mouse grab or fullscreen mode is used</td>
-    </tr> 
+    </tr>
     <tr>
       <td><a href="http://www.preromanbritain.com/maxymiser/">MaxYMiser DMA</a></td>
       <td>before 1.0</td>
@@ -1908,10 +2026,17 @@ this section lists only TT-specific games and demos.</p>
   <tbody>
     <tr>
       <td><a href="http://yescrew.atari.org/eng/products.htm#capy">Capy</a></td>
-      <td class="major">1.2</td>
-      <td>TT-medium/VGA (640x480x16) only. Bus error at startup.
-      Some other version of the game works on TT, but freezes if menu is invoked.
-      On Falcon emulation the menu at the beginning freezes</td>
+      <td>2.0</td>
+      <td>VGA/TT-medium only. Some version(s) bus error due to DSP register
+          check (although they should support TT with chip music)</td>
+    </tr>
+    <tr>
+      <td><a href="http://atari-forum.com/viewtopic.php?f=26&amp;t=13658&amp;start=50">OpenTTD</a></td>
+      <td>1.9</td>
+      <td>"hatari-prg-args --machine tt --tos tos306uk.img  -s 4 --ttram 256 --
+./openttd-m68020.gtp -m null -s null -b 8bpp-optimized", then select
+"original" as "Land generator" at game start. Works also on Falcons
+with FPU and no DSP. Start from TT-low resolution.</td>
     </tr>
     <tr>
       <td>Oxyd 2 TT</td>
@@ -1940,10 +2065,21 @@ this section lists only TT-specific games and demos.</p>
       <td>(Works also on Falcon)</td>
     </tr>
     <tr>
+      <td>Daroou:
+      <a href="http://atari.daroou.fr/">Daroou's GEM Demos</a></td>
+      <td>2.0</td>
+      <td>Need TT-low mode. Work also on Falcon (with music).
+          Boing demo bus errors on startup on both</td>
+    </tr>
+    <tr>
       <td>gwEm:
       <a href="http://www.pouet.net/prod.php?which=24961">4getful</a></td>
-      <td>1.0</td>
-      <td>TT-version of gwEm's 4K demo</td>
+      <td class="major">2.0</td>
+      <td>TT-version of gwEm's 4K demo. Works with earlier Hatari
+          versions and old UAE CPU core, but crashes with Hatari
+	  &gt;=v1.9 WinUAE CPU core unless CPU exact + compatible
+	  modes are disabled (or EmuTOS &lt;v0.9.0 is used instead
+	  of TOS v3)</td>
     </tr>
     <tr>
       <td>Moving Pixels:
@@ -1959,27 +2095,33 @@ this section lists only TT-specific games and demos.</p>
     </tr>
     <tr>
       <td>tSCc:
-      <a href="http://www.pouet.net/groups.php?which=234">256mbrot, Bragg256, Glasstro, Orion-B, Yabt</a></td>
-      <td class="minor">before 1.0</td>
-      <td>TT/Falcon intros, with later Hatari versions, Bragg 256 freezes at startup</td>
+      <a href="http://s390174849.online.de/ray.tscc.de/demos.htm">256mbrot, Bragg256, Glasstro, Orion-B, Yabt</a></td>
+      <td>1.8</td>
+      <td>TT/Falcon intros, Bragg256 requires WinUAE CPU core</td>
     </tr>
     <tr>
       <td>tSCc:
-      <a href="http://freenet-homepage.de/ray.tscc/demos.htm">Beams</a></td>
-      <td class="major">1.0</td>
-      <td>TT-version.  Doesn't work, stops at startup screen!</td>
+      <a href="http://www.pouet.net/prod.php?which=16426">Beams</a></td>
+      <td class="major">2.0</td>
+      <td>TT-version.  Doesn't work, stops at startup screen (line-F panic with EmuTOS)</td>
     </tr>
     <tr>
       <td>tSCc:
-      <a href="http://freenet-homepage.de/ray.tscc/misc.htm#cryview">CrY image viewer</a></td>
-      <td class="major">1.2</td>
-      <td>Complains that allocation fails (support grayscale mode, needs fast RAM?)</td>
+      <a href="http://s390174849.online.de/ray.tscc.de/misc.htm#cryview">CrY image viewer</a></td>
+      <td class="minor">2.0</td>
+      <td>Needs at least some TT-RAM.  interlaced 16bpp CrY mode flickers badly + colors are wrong</td>
     </tr>
     <tr>
       <td>tSCc:
-      <a href="http://freenet-homepage.de/ray.tscc/misc.htm#tthires">TT-hires</a></td>
-      <td class="major">1.2</td>
-      <td>Slideshow flickers badly + graphics and colors are wrong</td>
+      <a href="http://s390174849.online.de/ray.tscc.de/misc.htm#ttruecol">TC fish / blobs</a></td>
+      <td class="minor">2.0</td>
+      <td>Flickers badly</td>
+    </tr>
+    <tr>
+      <td>tSCc:
+      <a href="http://s390174849.online.de/ray.tscc.de/misc.htm#tthires">TT-hires</a></td>
+      <td class="major">2.0</td>
+      <td>Needs 8MB. Slideshow flickers badly + graphics and colors are wrong</td>
     </tr>
     <tr>
       <td>Xanth FX:
@@ -1998,8 +2140,8 @@ the Hatari "--dsp" option:
 <ul>
   <li><b>none</b>: No emulation.
       If program doesn't need/use DSP, this is the best option.</li>
-  <li><b>emu</b>: Experimental DSP emulation.  Needed if program
-      requires DSP. On by default for Falcon. Slow.</li>
+  <li><b>emu</b>: DSP emulation.  Needed if program requires DSP.
+      On by default for Falcon. Slow.</li>
   <li><b>dummy</b>: Faked DSP response to DSP commands.
       Some rare programs that need DSP may also work with faked DSP.
       This is much faster than the real DSP emulation.</li>
@@ -2011,12 +2153,16 @@ the column contains "-". The column for whether the program works and
 for whether it has (working) sound have "yes" when this is true and
 otherwise "-".</p>
 
-<p>Due to incomplete VIDEL emulation and some remaining emulation
-cycle accuracy issues, some Falcon programs don't work yet.
-<b>Note:</b> more timing critical demos (for example ones using
+<p>If something works only with either WinUAE or oldUAE CPU core,
+that's documented.  Many timing critical demos (for example ones using
 NoCrew's DSP MP2-player) that are marked as working in the list below,
-<em>work only with the experimental WinUAE core</em>. Please see
-Hatari readme.txt on how to enable that.</p>
+<em>work only with the (default) WinUAE CPU core</em>.</p>
+
+<p>Due to incomplete VIDEL emulation and some remaining emulation
+cycle accuracy issues, some Falcon programs don't work yet.  Most
+games and demos work with RGB monitor, those requiring VGA one are
+indicated separately.</p>
+
 
 <h3>Falcon games</h3>
 
@@ -2037,7 +2183,8 @@ Hatari readme.txt on how to enable that.</p>
       <td>1.3</td>
       <td>-</td>
       <td>emu</td>
-      <td>Use joypad.  Black screen without DSP emu</td>
+      <td>Use joypad. 8MB RAM. Black screen without DSP emu.
+          Full version doesn't work if auto-started</td>
     </tr>
     <tr>
       <td><a href="http://nature.atari.org/">Aces High preview</a></td>
@@ -2048,29 +2195,42 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td>Addsub</td>
-      <td class="minor">1.6</td>
+      <td class="minor">2.0</td>
       <td>-</td>
       <td>-</td>
-      <td>Exits when joystick is used</td>
+      <td>Cannot be played. Exits when joystick up is used,
+          often also on second startup</td>
     </tr>
     <tr>
-      <td><a href="http://devilsdoorbell.com/">Bad Mood (game)</a></td>
-      <td class="minor">1.7</td>
+      <td><a href="https://demozoo.org/productions/59217/">Ausbruch</a></td>
+      <td>1.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Use STE joypad. Background music if DSP emu enabled</td>
+    </tr>
+    <tr>
+      <td><a href="http://devilsdoorbell.com/">Bad Mood (2016 game)</a></td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Playable + enhanced Doom I/II port/remake.  Requires WinUAE
-      CPU core, DSP and 14 MB RAM. Statusbar doesn't show due to Videl
-      emulation omissions and some parts have clear speed differences
-      to real Falcon due to CPU (data cache) and Videl emulation
-      inaccuracies</td>
+      <td>Enhanced Doom I/II port and engine rewrite. Game requires WinUAE
+      CPU core, DSP and 14 MB RAM. WAD cache creation crashes/freezes,
+      so one needs to get pre-built cache. Statusbar doesn't show due
+      to Videl emulation omissions, unless "--natfeats yes" is used to
+      tell game to use Hatari specific/heavier statusbar drawing mode.
+      Some parts have clear speed differences to real Falcon due to
+      CPU, FPU (instruction too fast) and Videl emulation
+      (screen updated only at VBL) inaccuracies</td>
     </tr>
     <tr>
-      <td><a href="http://www.klockars.net/bad_mood.html">Bad Mood (viewer)</a></td>
+      <td><a href="http://www.klockars.net/bad_mood.html">Bad Mood<br />(90's demo)</a></td>
       <td>1.3</td>
       <td>-</td>
       <td>emu</td>
-      <td>Old Doom level viewer. All tested versions (v2.14a, v307a)
-          work with Doom wad, but look wrong with Heretic wad</td>
+      <td>Old Doom level viewer. All tested versions (v2.14a, v307a) work
+          with Doom1 WAD, but look wrong with Heretic WAD (although it's
+	  <a href="http://files.dhs.nu/party/sillyventure2013/mag2013/Magstuff/badmood.htm">claimed</a>
+	  to work also with that)</td>
     </tr>
     <tr>
       <td>Blackhole</td>
@@ -2102,49 +2262,64 @@ Hatari readme.txt on how to enable that.</p>
     </tr> 
     <tr>
       <td><a href="http://pouet.net/prod.php?which=28910">Boom preview</a></td>
-      <td>1.3</td>
+      <td class="minor">1.3</td>
       <td>yes</td>
       <td>emu</td>
-      <td></td>
+      <td>With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
     </tr> 
     <tr>
       <td><a href="http://rg.atari.org/game.htm">Bugger</a></td>
       <td>1.4</td>
       <td>yes</td>
-      <td>-</td>
-      <td>Background music if DSP emu enabled</td>
+      <td>emu</td>
+      <td>If DSP emulation is disabled, game play pauses randomly</td>
     </tr> 
     <tr>
       <td><a href="http://rg.atari.org/game.htm">Bunion</a></td>
       <td>1.4</td>
       <td>yes</td>
-      <td>-</td>
-      <td>Background music if DSP emu enabled</td>
+      <td>emu</td>
+      <td>If DSP emulation is disabled, game play pauses randomly</td>
+    </tr>
+    <tr>
+      <td><a href="http://yescrew.atari.org/eng/products.htm#capy">Capy</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>VGA/TT-medium (640x480x16) only</td>
     </tr>
     <tr>
       <td><a href="http://pouet.net/prod.php?which=29351">Cavemania (demo)</a></td>
-      <td class="minor">1.6</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>-</td>
       <td>Some menus are black (space gets through them).
-          After playing a while: "IKBD buffer is full!" (with WinUAE).
-	  Screen bottom has garbage. Background music with DSP emu</td>
+          Game area bottom shows garbage. Background music with DSP emu</td>
     </tr>
     <tr>
       <td><a href="http://paradize.final-memory.org/games.shtml">ChainZ</a></td>
-      <td>1.4</td>
-      <td>yes</td>
-      <td>emu</td>
-      <td>Keep space pressed while game is starting, or use DSP emu
-          to get background music. VGA only</td>
-    </tr> 
-    <tr>
-      <td>Conquest of Elysium II</td>
-      <td>1.0</td>
+      <td>2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td></td>
-    </tr> 
+      <td>Background music with DSP emu (keep space pressed while game is
+          starting to disable that). VGA only</td>
+    </tr>
+    <tr>
+      <td><a href="http://atari-forum.com/viewtopic.php?f=68&amp;t=24111&amp;start=350#p270895">Chorensha</a></td>
+      <td>1.8</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Needs 14MB</td>
+    </tr>
+    <tr>
+      <td><a href="http://demozoo.org/productions/55648/">Color runner</a></td>
+      <td class="major">2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Unable to start game (only joypad fire works, not directions).
+          Music with DSP. 14MB, joypad only. VGA for correct screen height</td>
+    </tr>
     <tr>
       <td>Columns by Deadheart (demo)</td>
       <td>1.0</td>
@@ -2153,6 +2328,13 @@ Hatari readme.txt on how to enable that.</p>
       <td>Nice. Background music if DSP emu enabled</td>
     </tr>
     <tr>
+      <td>Conquest of Elysium II</td>
+      <td>1.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td></td>
+    </tr> 
+    <tr>
       <td>Confusion (demo)</td>
       <td>1.3</td>
       <td>yes</td>
@@ -2160,7 +2342,7 @@ Hatari readme.txt on how to enable that.</p>
       <td>Background music if DSP emu enabled.  Both demos 1 &amp; 2 work</td>
     </tr> 
     <tr>
-      <td>Corsair</td>
+      <td><a href="http://www.pouet.net/prod.php?which=1046">Corsair</a></td>
       <td>1.0</td>
       <td>yes</td>
       <td>-</td>
@@ -2182,18 +2364,35 @@ Hatari readme.txt on how to enable that.</p>
     </tr> 
     <tr>
       <td><a href="http://rg.atari.org/game.htm">Double Bobble 2000</a></td>
-      <td>1.4</td>
+      <td>1.9</td>
       <td>yes</td>
-      <td>-</td>
-      <td>Background music if DSP emu enabled</td>
+      <td>emu</td>
+      <td>With earlier Hatari versions (1.4) worked also without DSP emulation</td>
     </tr> 
     <tr>
-      <td><a href="http://reboot.atari.org/downfall-f030/downfall-falcon.html">DownFall</a></td>
+      <td><a http://reboot.atari.org/new-reboot/downfallfalcon.html">DownFall</a></td>
       <td>1.5</td>
       <td>yes</td>
       <td>-</td>
-      <td>Music is rather noisy.</td>
+      <td>Music is very noisy</td>
     </tr> 
+    <tr>
+      <td><a href="https://demozoo.org/productions/65504/">Dry Egg</a></td>
+      <td>1.8</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Music with DSP.  Use joypad for control.
+          Bus Error writing at address $e00000 with TOS v4,
+          works with EmuTOS</td>
+    </tr>
+    <tr>
+      <td><a href="https://demozoo.org/productions/65505/">DuSau</a></td>
+      <td>1.9</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Music with DSP. Use "--gemdos-drive e",
+          expects to be run from E:</td>
+    </tr>
     <tr>
       <td>Epi-Lepsie</td>
       <td>1.4</td>
@@ -2203,11 +2402,12 @@ Hatari readme.txt on how to enable that.</p>
     </tr> 
    <tr>
       <td>Evolution Dino Dudes<br />(aka. Humans)</td>
-      <td class="major">1.3</td>
+      <td class="major">2.0</td>
+      <td>yes</td>
       <td>-</td>
-      <td>-</td>
-      <td>Intro and menu work, but graphics are distorted in game.<br />
-          (Game writes twice to the $ff820e register during one VBL!)</td>
+      <td>Needs joypad. Sound with DSP. Intro and menu work,
+          but graphics are distorted in game itself (writes
+	  twice to the $ff820e register during one VBL!)</td>
     </tr>
     <tr>
       <td>Falcon Fighter II</td>
@@ -2233,11 +2433,20 @@ Hatari readme.txt on how to enable that.</p>
       <td>Use F1 to start game. With DSP emu there's bg music</td>
     </tr>
     <tr>
-      <td>Golden Island (demo)</td>
-      <td>1.6</td>
+      <td><a href="http://atari-forum.com/viewtopic.php?f=68&amp;t=24111">Galaga 88</a></td>
+      <td>1.9</td>
+      <td>-</td>
+      <td>-</td>
+      <td>Needs 14MB RAM</td>
+    </tr>
+    <tr>
+      <td>Golden Island (v1.24 demo)</td>
+      <td>2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>VGA only.  Doesn't work with WinUAE</td>
+      <td>VGA only.  Works fully with old UAE CPU emulation. With WinUAE CPU core
+          v1.8 or later, freezes due to CPU-DSP emulation cycle inaccuracy
+	  (0xFFFFA202 access), unless music is disabled at start</td>
     </tr>
     <tr>
       <td>Gravon (demo)</td>
@@ -2254,11 +2463,19 @@ Hatari readme.txt on how to enable that.</p>
       <td>Atoms clone</td>
     </tr>
     <tr>
-      <td>H2O</td>
+      <td><a href="http://www.pouet.net/prod.php?which=50840">Grenzüberschreitung</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Tron, using Lua-interpreter. In game menu,
+          joypad directions work, fire doesn't</td>
+    </tr>
+    <tr>
+      <td><a href="http://www.pouet.net/prod.php?which=17762">H2O</a></td>
       <td>1.4</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Nice.</td>
+      <td>Nice</td>
     </tr>
     <tr>
       <td>Hexogan (v0.6)</td>
@@ -2275,19 +2492,25 @@ Hatari readme.txt on how to enable that.</p>
       <td>Nice breakout clone.  Background music if DSP emu enabled</td>
     </tr>
     <tr>
-      <td>Ishar 3 (CD)</td>
-      <td>1.3</td>
+      <td>Ishar 1, 2</td>
+      <td>2.0+</td>
       <td>yes</td>
       <td>-</td>
-      <td>Nice adventure game.</td>
+      <td>Work only from a floppy</td>
+    </tr>
+    <tr>
+      <td>Ishar 3</td>
+      <td>2.0+</td>
+      <td>yes</td>
+      <td>-</td>
+      <td></td>
     </tr>
     <tr>
       <td><a href="http://paradize.final-memory.org/games.shtml">Jewelz</a></td>
-      <td>1.4</td>
+      <td>2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>With RGB mode freezes at startup, VGA mode fine.
-          Background music with DSP emu</td>
+      <td>Background music with DSP emu (game F1 / Falcon option). VGA only</td>
     </tr>
     <tr>
       <td><a href="http://www.pouet.net/prod.php?which=25919">"K"</a></td>
@@ -2298,19 +2521,25 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td><a href="http://www.sebastien-pastore.com/killing/">Killing Impact</a></td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>-</td>
       <td>Modern version of Joust, up to 4 players.  Sound with DSP.
-          Game screen colors etc are all wrong.
-    </td>
+          Game screen colors etc are all wrong</td>
+    </tr>
+    <tr>
+      <td>King Solitaire</td>
+      <td>1.9</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Nice gfx</td>
     </tr>
     <tr>
       <td>Kwiks.pd</td>
-      <td>1.0</td>
+      <td>1.9</td>
+      <td>yes</td>
       <td>-</td>
-      <td>-</td>
-      <td>Nice Quix clone.</td>
+      <td>Nice Quix clone</td>
     </tr>
     <tr>
       <td>Lamemine</td>
@@ -2321,10 +2550,11 @@ Hatari readme.txt on how to enable that.</p>
     </tr> 
     <tr>
       <td>Lasers and Hommes (DLDH2)</td>
-      <td>1.6</td>
+      <td class="minor">2.0+</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Slow</td>
+      <td>With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
     </tr>
     <tr>
       <td>Les Dinosaures (demo)</td>
@@ -2352,15 +2582,17 @@ Hatari readme.txt on how to enable that.</p>
       <td>1.1</td>
       <td>-</td>
       <td>-</td>
-      <td>2-4 player "Dungeon Master". 4 players needs MIDI.</td>
+      <td>2-4 player "Dungeon Master". 4 players needs MIDI. Works only with 1-2MB of RAM</td>
     </tr>
     <tr>
       <td><a href="http://pouet.net/prod.php?which=28903">Men at War (preview)</a></td>
-      <td class="minor">1.6</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Requires now both WinUAE CPU core and DSP to be enabled. Bullets aren't visible.
-          Separate intro program bus errors</td>
+      <td>Requires both WinUAE CPU core and DSP to be enabled and 4/8MB.
+          Bullets aren't visible. Cannot be auto-started (freezes like
+          without DSP). Separate intro program flickers, and double bus
+          errors at end</td>
     </tr>
     <tr>
       <td>Milanopol</td>
@@ -2371,39 +2603,41 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td>Mini F1 demo</td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>-</td>
       <td>-</td>
-      <td>Freezes when the game would start.  Sound is just noise</td>
+      <td>Freezes when the game would start.  Sound is just noise.
+          Constant "crossbar DMA Play: Illegal buffer size" messages</td>
     </tr>
     <tr>
       <td>Moongame</td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>-</td>
       <td>emu</td>
       <td>Pointer cannot be moved in the game menu</td>
     </tr>
     <tr>
       <td>Moonspeeder (preview 2)</td>
-      <td class="major">1.6</td>
-      <td>-</td>
+      <td>2.0+</td>
+      <td>Yes</td>
       <td>emu</td>
-      <td>Exits in the starting phase
-          (preview 1 works, but is non-interactive)</td>
+      <td>lst*.* files need to be renamed with GEMDOS HD emulation as
+          game searches them with different name (space before dot).
+	  Preview 1 worked already earlier, but is non-interactive</td>
     </tr>
     <tr>
       <td>Mouse trap</td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Screen lines are doubled</td>
+      <td>Initial game screen looks OK, then suddenly screen mode gets wrong</td>
     </tr>
     <tr>
       <td>Multi Briques</td>
       <td>1.6</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Some versions work, some get stuck at start with white screen</td>
+      <td>v1.50 of game works, v1.00 gets stuck at start with white screen</td>
     </tr>
     <tr>
       <td>Neurobot.108</td>
@@ -2414,17 +2648,17 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td>Nibe2</td>
-      <td class="minor">1.4</td>
+      <td class="minor">2.0</td>
       <td>-</td>
       <td>-</td>
       <td>Videl emu doesn't support rasters in title screen</td>
     </tr>
     <tr>
-      <td>Offworld</td>
-      <td>1.3</td>
+      <td>Offworld Security</td>
+      <td>1.9</td>
       <td>yes</td>
       <td>-</td>
-      <td>Press fire in black screen to start game</td>
+      <td>In earlier Hatari versions startup screen was black</td>
     </tr>
     <tr>
       <td><a href="http://logitron.atari.online.fr/skuum_english.htm">Operation Skuum</a></td>
@@ -2441,22 +2675,29 @@ Hatari readme.txt on how to enable that.</p>
       <td>Nice</td>
     </tr>
     <tr>
+      <td><a href="http://atari-forum.com/viewtopic.php?f=68&amp;t=24111">Pacmania X68000</a></td>
+      <td>1.9</td>
+      <td>-</td>
+      <td>-</td>
+      <td>Needs 14MB RAM.  Original resolution version flickers, PM*.TOS versions don't</td>
+    </tr>
+    <tr>
       <td>Painium Disaster</td>
       <td>1.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Some display problems</td>
+      <td>Some garbage temporarily visible in screen changes</td>
     </tr>
     <tr>
       <td><a href="http://www.fatal-design.com/pinball/">Pinball Dreams</a></td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Main menu works only with WinUAE core.  Actual game screen is scrambled / doesn't work.</td>
+      <td>Main menu works only with WinUAE core.  Actual game screen is scrambled / doesn't work</td>
     </tr>
     <tr>
       <td>Pingo98</td>
-      <td class="minor">1.6</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
       <td>Colors wrong in classic version, TC version just exits.
@@ -2495,7 +2736,7 @@ Hatari readme.txt on how to enable that.</p>
       <td>1.4</td>
       <td>yes</td>
       <td>-</td>
-      <td>Background music if DSP emu enabled</td>
+      <td>Crashes if auto-started. Background music if DSP emu enabled</td>
     </tr>
     <tr>
       <td>Q-Blue</td>
@@ -2530,14 +2771,14 @@ Hatari readme.txt on how to enable that.</p>
       <td>1.8</td>
       <td>yes</td>
       <td>-</td>
-      <td>(required proper emulation of Videl palette registers at startup)</td>
+      <td>(Required proper emulation of Videl palette registers at startup)</td>
     </tr>
     <tr>
       <td>Risk 030</td>
       <td>1.3.1</td>
       <td>-</td>
       <td>-</td>
-      <td>VGA (640x480) only</td>
+      <td>VGA (640x480) only.  If auto-started, resolution isn't correct</td>
     </tr>
     <tr>
       <td>Running</td>
@@ -2545,21 +2786,15 @@ Hatari readme.txt on how to enable that.</p>
       <td>yes</td>
       <td>emu</td>
       <td>A Doom like game.  Both the 1996 preview and 1997 shareware
-          versions work fine.  Latter one doesn't work if auto-started.</td>
+          versions work fine.  Doesn't work if auto-started</td>
     </tr>
     <tr>
-      <td>SBM v0.8</td>
-      <td>1.0</td>
-      <td>-</td>
-      <td>-</td>
-      <td>Nice Bomberman clone</td>
-    </tr>
-    <tr>
-      <td>SBM v1.03</td>
+      <td>SBM</td>
       <td>1.6</td>
       <td>-</td>
       <td>-</td>
-      <td>Requires WinUAE CPU core</td>
+      <td>Nice bomberman clone. v0.8 works fine, v1.03
+          crashes randomly and requires WinUAE core</td>
     </tr>
     <tr>
       <td>Shangai (demo)</td>
@@ -2584,10 +2819,10 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td><a href="http://rg.atari.org/game.htm">Sky Fall</a></td>
-      <td>1.4</td>
+      <td>1.9</td>
       <td>yes</td>
-      <td>-</td>
-      <td>Background music if DSP emu enabled</td>
+      <td>emu</td>
+      <td>If auto-started, wants to access also A: and B: drives</td>
     </tr>
     <tr>
       <td><a href="http://pouet.net/prod.php?which=29341">Slippery Sam</a></td>
@@ -2598,10 +2833,10 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td>Sokoban by FUN</td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>VGA 640x480x16 only, black screen after loading data</td>
+      <td>VGA 640x480x16 only, Exception 2 + Pterm(-1) after loading data</td>
     </tr>
     <tr>
       <td>Space Taxi</td>
@@ -2625,14 +2860,7 @@ Hatari readme.txt on how to enable that.</p>
       <td>Play solitaire against computer</td>
     </tr>
     <tr>
-      <td>Steinbruch</td>
-      <td>1.0</td>
-      <td>yes</td>
-      <td>-</td>
-      <td>Use STE joypad. Background music if DSP emu enabled</td>
-    </tr>
-    <tr>
-      <td>Sweety Things</td>
+      <td><a href="http://paradize.final-memory.org/games.shtml">Sweety Thingies</a></td>
       <td>1.6</td>
       <td>yes</td>
       <td>-</td>
@@ -2647,17 +2875,18 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td><a href="http://rg.atari.org/game.htm">Sworm</a></td>
-      <td>1.4</td>
+      <td>1.9</td>
       <td>yes</td>
-      <td>-</td>
-      <td>Background music if DSP emu enabled</td>
+      <td>emu</td>
+      <td>If auto-started, wants to access also A: and B: drives</td>
     </tr>
     <tr>
       <td>Tank Blaster</td>
-      <td>1.3</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td></td>
+      <td>With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
     </tr>
     <tr>
       <td>TeknoBalls</td>
@@ -2667,8 +2896,15 @@ Hatari readme.txt on how to enable that.</p>
       <td>Breakout clone</td>
     </tr>
     <tr>
+      <td><a href="http://rg.atari.org/game.htm">Tautology</a></td>
+      <td>1.9</td>
+      <td>yes</td>
+      <td>-</td>
+      <td></td>
+    </tr>
+    <tr>
       <td><a href="http://rg.atari.org/game.htm">Tautology II</a></td>
-      <td>1.4</td>
+      <td>1.9</td>
       <td>yes</td>
       <td>-</td>
       <td>Nice Mahjongg variant. Supports Joypad (configurable).
@@ -2696,19 +2932,26 @@ Hatari readme.txt on how to enable that.</p>
       <td>Pacman</td>
     </tr>
     <tr>
+      <td><a href="http://www.atari-forum.com/viewtopic.php?f=26&t=29216">Trinoids</a></td>
+      <td>1.9</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Columns clone, sound with DSP</td>
+    </tr>
+    <tr>
       <td><a href="http://pouet.net/prod.php?which=28905">Tron 2</a></td>
-      <td class="major">1.6</td>
+      <td>2.0</td>
       <td>yes</td>
       <td>dummy emu</td>
-      <td>Screen scrambled in v1.6, worked fine in v1.0 - v1.4. Background music if DSP emu enabled</td>
+      <td>VGA only. Background music if DSP emu enabled</td>
     </tr>
     <tr>
       <td>TsccTron (preview)</td>
-      <td class="minor">1.6</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Works only occasionally, bottom screen black.
-          Background music if DSP emu enabled</td>
+      <td>Requires WinUAE CPU core, bottom screen black
+          (palette tricks?). Background music if DSP emu enabled</td>
     </tr>
     <tr>
       <td>TUM</td>
@@ -2719,10 +2962,14 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td>Ufo War</td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Screen scrambled. With DSP emu, bg music for a while</td>
+      <td>256-color, 80-column, no interlace video mode only.
+          Screen scrambled.  With GEMDOS HD, after a while does
+	  invalid Fread() and terminates with error code.  With disk
+	  image, lot of "pBank flags mismatch" and FDC DMA warnings.
+	  Background music with DSP emu</td>
     </tr>
     <tr>
       <td>Ultimate Arena (demo)</td>
@@ -2740,10 +2987,10 @@ Hatari readme.txt on how to enable that.</p>
     </tr>
     <tr>
       <td>Watership</td>
-      <td class="minor">1.6</td>
+      <td>2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Some glitches at the bottom of the screen</td>
+      <td>Use VGA display, RGB has glitches at screen bottom</td>
     </tr>
     <tr>
       <td><a href="http://newbeat.atari.org/main.php?page=productions">Willie Adventurer</a></td>
@@ -2765,7 +3012,7 @@ Hatari readme.txt on how to enable that.</p>
       <td>1.7</td>
       <td>yes</td>
       <td>-</td>
-      <td>Works only with WinUAE core. Needs Joypad. Game stop while fire is pressed. Background music if DSP emu enabled</td>
+      <td>Works only with WinUAE core. Needs Joypad. Background music if DSP emu enabled</td>
     </tr>
     <tr>
       <td>Zodiax (demo)</td>
@@ -2782,8 +3029,8 @@ Hatari readme.txt on how to enable that.</p>
 
 <p>Some demos require FPU, although normal Falcon's don't have a one.
 Old UAE CPU core always emulates FPU both for TT and Falcon machines.
-WinUAE CPU core does that only for TT, but but you can enable FPU
-also for Falcon if demo is stated to require that.</p>
+With the (default) WinUAE CPU core you need to enable FPU separately
+if demo is stated to require that.</p>
 
 <table>
   <caption>Falcon demos</caption>
@@ -2808,28 +3055,49 @@ also for Falcon if demo is stated to require that.</p>
     <tr>
       <td>Aggression:
       <a href="http://pouet.net/prod.php?which=15723">Motion</a></td>
-      <td>1.3</td>
+      <td class="minor">2.0</td>
       <td>-</td>
       <td>emu</td>
       <td>Unfinished Aggression demo with 030 and DSP source code.
-          Almost all screens work now, some have visual glitches.</td>
+          Almost all screens work. Susie screen requires MMU, but
+	  dies to $e001c8 write bus error and Torus screen just exits</td>
     </tr>
     <tr>
       <td>An cool:
       <a href="http://pouet.net/prod.php?which=24781">The Keff demo</a></td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Sinwave scroller leaves garbage pixels on screen,
-          gets stuck after dragons pic with black screen</td>
+      <td>Gets stuck after dragons pic + bus error on black screen
+          when tunnel screen should start</td>
+    </tr>
+    <tr>
+      <td>Archangel:
+      <a href="http://pouet.net/prod.php?which=25543">1600 x 600</a></td>
+      <td>1.6</td>
+      <td>-</td>
+      <td>-</td>
+      <td>Widest known Videl mode</td>
     </tr>
     <tr>
       <td>Aura:
       <a href="http://pouet.net/prod.php?which=15730">E.X.Illusion</a></td>
-      <td>1.6</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Needs WinUAE core in Hatari v1.6</td>
+      <td>Needs WinUAE CPU core.  CPU prefetch + cycle exact mode need
+          to be disabled, otherwise demo freezes to DSP stack overflow
+	  or to illegal instruction 4afc (if DSP player is disabled at
+	  demo startup by keeping CTRL down). Worked without these in
+	  Hatari v1.6</td>
+    </tr>
+    <tr>
+      <td>Avena:
+      <a href="http://pouet.net/prod.php?which=15737">DSP fishes</a></td>
+      <td>2.0</td>
+      <td>-</td>
+      <td>emu</td>
+      <td>3K</td>
     </tr>
     <tr>
       <td>Avena:
@@ -2837,7 +3105,8 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.3</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Nice</td>
+      <td>Works fine, but warns at some point about
+          "Dsp: Modulo addressing result unpredictable</td>
     </tr>
     <tr>
       <td>Avena:
@@ -2853,7 +3122,7 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.3</td>
       <td>yes</td>
       <td>emu</td>
-      <td>plasma50.prg has screen update issues</td>
+      <td>plasma50.prg (50Hz) has screen update issues</td>
     </tr>
     <tr>
       <td>Brainstorm:
@@ -2861,32 +3130,76 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.4</td>
       <td>yes</td>
       <td>-</td>
-      <td>AVR animation/music with Brainstorm player.
-          Background music with DSP emu</td>
+      <td>AVR animation+music with Brainstorm player</td>
+    </tr>
+    <tr>
+      <td>Cerebral Vortex / Dune / Sector One
+      <a href="http://www.pouet.net/prod.php?which=64515">Tere Ra'I</a></td>
+      <td>1.8</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Music with DSP</td>
     </tr>
     <tr>
       <td>Collapze:
       <a href="http://www.pouet.net/prod.php?which=54343">Sidetracked</a></td>
-      <td class="major">1.4</td>
-      <td>-</td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
       <td>emu</td>
-      <td>Musicdemo GFA interface looks completely broken + mouse doesn't work properly</td>
+      <td>VGA-only GFA musicdemo with DSP playback. Screen isn't
+          cleared properly when switching between text outputs</td>
+    </tr>
+    <tr>
+      <td>Crac:
+      <a href="http://www.pouet.net/prod.php?which=16681">Bound</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>none</td>
+      <td>Works with oldUAE CPU core, with WinUAE CPU core
+          DSP needs to be disabled</td>
+    </tr>
+    <tr>
+      <td>Crac:
+      <a href="http://www.pouet.net/prod.php?which=23587">Bound 2</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>With WinUAE CPU core, requires disabling CPU exact mode</td>
     </tr>
     <tr>
       <td>Crac:
       <a href="http://www.pouet.net/prod.php?which=23588">Bound 3</a></td>
-      <td>1.3</td>
+      <td>2.0+</td>
       <td>yes</td>
       <td>emu</td>
       <td></td>
     </tr>
     <tr>
-      <td>Cream:
-      <a href="http://jfhaslam.atari.org/downloads/bin_vga.zip">Binliner preview</a></td>
-      <td class="minor">1.6</td>
+      <td>Crac:
+      <a href="http://www.pouet.net/prod.php?which=23589">Bound 4</a></td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Freaky screen works only with old UAE core. Land &amp; Worship screens bomb</td>
+      <td>Freezes waiting on DSP interrupt</td>
+    </tr>
+    <tr>
+      <td>Crac:
+      <a href="http://www.pouet.net/prod.php?which=25559">Bound 5</a>
+      </td>
+      <td class="major">2.0+</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>Freezes in tiger screen</td>
+    </tr>
+    <tr>
+      <td>Cream:
+      <a href="http://jfhaslam.atari.org/downloads/bin_vga.zip">Binliner preview</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>Freaky screen works. Land &amp; Worship screens die to
+          illegal instruction 4afc. Readme says these work only
+	  with 100Hz VGA</td>
     </tr>
     <tr>
       <td>Cruor:
@@ -2898,11 +3211,19 @@ also for Falcon if demo is stated to require that.</p>
     </tr>
     <tr>
       <td>Cruor:
-      <a href="http://www.pouet.net/prod.php?which=15453">The mountains flight</a></td>
+      <a href="http://www.pouet.net/prod.php?which=15454">The mountains flight</a></td>
       <td>1.3</td>
       <td>yes</td>
       <td>emu</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>Dekadence:
+      <a href="http://www.pouet.net/prod.php?which=64683">Payback 2015</a></td>
+      <td class="major">2.0</td>
+      <td>-</td>
+      <td>-</td>
+      <td>Doesn't continue from startup logo</td>
     </tr>
     <tr>
       <td>DHS:
@@ -2938,36 +3259,59 @@ also for Falcon if demo is stated to require that.</p>
     </tr>
     <tr>
       <td>DHS:
+      <a href="http://www.pouet.net/prod.php?which=54432">Amanita</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>Music disk, DSP playback</td>
+    </tr>
+    <tr>
+      <td>DHS:
       <a href="http://www.pouet.net/prod.php?which=985">A.T.S</a></td>
       <td>1.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Fast. Needs FPU. Background music with DSP emu.
-          Sometimes crashes with WinUAE CPU core</td>
+      <td>Fast. Needs FPU. Music with DSP</td>
+    </tr>
+    <tr>
+      <td>DHS:
+      <a href="http://pouet.net/prod.php?which=53186">Codein</a>,
+      <a href="http://pouet.net/prod.php?which=25677">Derealization</a>
+      </td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>WinUAE CPU only. 030 + cycle exact disabled + internal FPU and
+          4MB + 32MB TT-RAM (less for Codein). Supposed to work with 060,
+	  but that dies to FPU exception at start. Music with DSP emu</td>
     </tr>
     <tr>
       <td>DHS:
       <a href="http://pouet.net/prod.php?which=2165">Don't Break The Oath</a></td>
       <td>1.5</td>
-      <td>-</td>
-      <td>-</td>
-      <td>Needs 14MB RAM and FPU. Uses NoCrew DSP MP2-player</td>
-    </tr>
-    <tr>
-      <td>DHS:
-      <a href="http://files.dhs.nu/demos/dreamdim11.zip">Dream Dimension</a></td>
-      <td>1.7</td>
       <td>yes</td>
-      <td>emu</td>
-      <td>Requires FPU</td>
+      <td>-</td>
+      <td>Needs 14MB RAM + FPU, music with DSP (NoCrew DSP MP2-player)</td>
     </tr>
     <tr>
       <td>DHS:
+      <a href="http://www.pouet.net/prod.php?which=987">Dream Dimension</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Music with DSP. Requires FPU, and with WinUAE CPU core also MMU
+          (otherwise complains "Sorry, you don't have enough free ST-RAM
+	  to run this demo")</td>
+    </tr>
+    <tr>
+      <td>DHS / Evolution / New Beat:
       <a href="http://www.pouet.net/prod.php?which=9662">Echos</a></td>
-      <td>1.7</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Requires FPU. Uses DSP for the music</td>
+      <td>96k. Requires FPU, and with WinUAE CPU core, disabling
+          CPU prefect and cycle exact mode.
+          Music missing. DSP is used for the (ACE) music</td>
     </tr>
     <tr>
       <td>DHS:
@@ -2981,11 +3325,9 @@ also for Falcon if demo is stated to require that.</p>
       <td>DHS:
       <a href="http://pouet.net/prod.php?which=24780">Outline 2006 invite</a></td>
       <td>1.5</td>
+      <td>yes</td>
       <td>-</td>
-      <td>-</td>
-      <td>Needs 14MB RAM, uses NoCrew DSP MP2-player
-      (recommended: --memory 14 --cpuclock 32 --dsp none --monitor vga
-      --sound off --fast-forward yes)</td>
+      <td>Needs 14MB RAM + FPU, music with DSP (NoCrew DSP MP2-player)</td>
     </tr>
     <tr>
       <td>Digital Chaos:
@@ -2998,43 +3340,75 @@ also for Falcon if demo is stated to require that.</p>
     <tr>
       <td>DNT Crew:
       <a href="http://pouet.net/prod.php?which=16806">Agony</a></td>
-      <td class="minor">1.4</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>After few screens freezes with black screen</td>
+      <td>After few screens freezes when bouncing ball fades to black</td>
     </tr>
     <tr>
       <td>DNT Crew:
       <a href="http://www.pouet.net/prod.php?which=16807">Chaos A.D.</a>*</td>
-      <td class="minor">1.5</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
       <td>Uses its own IKBD 6301 routine to decode the demo's protection.
-	Demo runs correctly but sound is rather noisy</td>
+	  Sound is rather noisy. First plasma is half the correct height
+	  (and doubled with oldUAE CPU core). WinUAE CPU core freezes in
+	  rotating DNT logo screen, just before end credits</td>
+    </tr>
+    <tr>
+      <td>DrTypo:
+      <a href="http://atari-forum.com/viewtopic.php?f=68&amp;t=28152">Voxel</a></td>
+      <td>1.9</td>
+      <td>-</td>
+      <td>emu</td>
+      <td>At least 4MB RAM, FPU and VGA monitor</td>
+    </tr>
+    <tr>
+      <td>Dune
+      <a href="http://www.pouet.net/prod.php?which=68566">Electric Night</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>With WinUAE CPU core max frameskip isn't enough on most
+          screens on 3GHz i3-540, although with oldAUE CPU core
+	  it works without frameskip (except for credits at end)</td>
+    </tr>
+    <tr>
+      <td>Dune / Sector One
+      <a href="http://www.pouet.net/prod.php?which=63713">Silly Venture 2k14 invitro</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Music with DSP</td>
     </tr>
     <tr>
       <td>EKO:
       <a href="http://www.pouet.net/prod.php?which=1180">Are You Experienced?</a></td>
-      <td>1.6</td>
+      <td>2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Requires WinUAE CPU core</td>
+      <td>Works fully only with WinUAE CPU emu.
+          Requires MMU, otherwise crashes at start</td>
     </tr>
     <tr>
       <td>EKO:
       <a href="http://www.pouet.net/prod.php?which=8572">E.K.O System</a></td>
-      <td>1.6</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Requires WinUAE CPU core</td>
+      <td>Requires WinUAE CPU core. In middle of demo (e.g. mech screen)
+          and just before greets, there's "crossbar DMA Play: Illegal buffer size"
+	  error, noise and in first case, music missing for new minutes</td>
     </tr>
     <tr>
       <td>EKO:
       <a href="http://www.pouet.net/prod.php?which=25916">Epidemic musicdisk</a></td>
-      <td class="major">1.4</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Bombs out when it comes to the menu</td>
+      <td>Bus error for $fffffd write when drawing menu, if space pressed
+          in EKO logo screen, otherwise illegal instruction $7bf1 earlier</td>
     </tr>
     <tr>
       <td>EKO:
@@ -3042,7 +3416,9 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.3</td>
       <td>yes</td>
       <td>emu</td>
-      <td></td>
+      <!-- All screens in Pouet.net screenshot work, but there's no
+           video of this, so don't know whether end is OK -->
+      <td>Ends in "Illegal instruction: 0049"</td>
     </tr>
     <tr>
       <td>EKO:
@@ -3055,18 +3431,21 @@ also for Falcon if demo is stated to require that.</p>
     <tr>
       <td>Escape:
       <a href="http://pouet.net/prod.php?which=15676">_</a></td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Freezes or exits after few screens</td>
+      <td>With WinUAE CPU emu, crashes at start without MMU.
+          Freezes or exits after few screens to illegal DSP instructions</td>
     </tr>
     <tr>
       <td>Escape:
       <a href="http://pouet.net/prod.php?which=3192">Hmmm...</a></td>
-      <td>1.3</td>
+      <td class="minor">1.3</td>
       <td>yes</td>
       <td>emu</td>
-      <td>"Classic" from 2001</td>
+      <td>Classic from 2001. With WinUAE CPU emu, requires disabling
+          CPU prefetch and cycle exact mode (otherwise crashes in
+	  screen that comes after "stone spiral")</td>
     </tr> 
    <tr>
       <td>Escape:
@@ -3078,11 +3457,27 @@ also for Falcon if demo is stated to require that.</p>
     </tr>
     <tr>
       <td>EXA:
-      <a href="http://www.pouet.net/prod.php?which=17784">Entcarte</a></td>
-      <td class="major">1.6</td>
+      <a href="http://www.pouet.net/prod.php?which=17784">Entracte</a></td>
+      <td class="major">2.0</td>
       <td>-</td>
       <td>-</td>
-      <td>Bombs immediately</td>
+      <td>Uses MMU. Terminates immediately</td>
+    </tr>
+    <tr>
+      <td>EXA:
+      <a href="http://www.pouet.net/prod.php?which=17778">Evolution</a></td>
+      <td class="major">2.0</td>
+      <td>-</td>
+      <td>-</td>
+      <td>Uses MMU. Terminates immediately</td>
+    </tr>
+    <tr>
+      <td>Extream:
+      <a href="http://pouet.net/prod.php?which=64617">Old Stuff</a></td>
+      <td>1.8</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Music with DSP</td>
     </tr>
     <tr>
       <td>Extream:
@@ -3094,11 +3489,28 @@ also for Falcon if demo is stated to require that.</p>
     </tr>
     <tr>
       <td>Fit:
-      <a href="http://pouet.net/prod.php?which=990">Mahabharata</a></td>
-      <td>1.3</td>
+      <a href="http://www.pouet.net/prod.php?which=17311">Hex Pistols</a></td>
+      <td>1.9</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Bombay-style...</td>
+      <td>14MB + MMU + FPU, .tSCc port from Amiga</td>
+    </tr>
+    <tr>
+      <td>Fit:
+      <a href="http://pouet.net/prod.php?which=990">Mahabharata</a></td>
+      <td>2.0+</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>Bombay-style... With some HW / 3D drivers, SDL2 fails to create
+          wide enough screen texture, workaround added to 2.0+</td>
+    </tr>
+    <tr>
+      <td>Fit:
+      <a href="http://www.pouet.net/prod.php?which=26083">Stercus Accidit</a></td>
+      <td>1.9</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>8MB + internal FPU, .tSCc port from Amiga</td>
     </tr>
     <tr>
       <td>Fun Industries:
@@ -3111,10 +3523,10 @@ also for Falcon if demo is stated to require that.</p>
     <tr>
       <td>Fun Industries:
       <a href="http://pouet.net/prod.php?which=1172">Fungle Beats</a></td>
-      <td>1.6</td>
+      <td>1.8</td>
       <td>yes</td>
       <td>-</td>
-      <td>Needs WinUAE CPU core.  Background music with DSP emu</td>
+      <td>Background music with DSP emu</td>
     </tr>
     <tr>
       <td>Gaston:
@@ -3135,11 +3547,11 @@ also for Falcon if demo is stated to require that.</p>
     <tr>
       <td>ICE:
       <a href="http://www.umich.edu/%7Earchive/atari/Falcon/Games/tron2001.lzh">Tron2001</a></td>
-      <td class="minor">1.4</td>
+      <td>2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Bus error at startup unless IDE enabled. Screen resolution or
-          update issues. Non-interactive game(?) demo.</td>
+      <td>Bus error at startup unless IDE enabled.
+          Non-interactive game(?) demo</td>
     </tr>
     <tr>
       <td>Impulse:
@@ -3150,12 +3562,38 @@ also for Falcon if demo is stated to require that.</p>
       <td></td>
     </tr>
     <tr>
+      <td>Lamers:
+      <a href="http://www.pouet.net/prod.php?which=68503">Polygon discount</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>14MB, RGB. Music with DSP. Cube and torus objecs vertices are broken</td>
+    </tr>
+    <tr>
+      <td>Lamers &uml; Mystic Bytes:
+      <a href="http://www.pouet.net/prod.php?which=62082">SillyVenture 2k13 Invitro</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>MP2 music with DSP</td>
+    </tr>
+    <tr>
       <td>Lazer:
       <a href="http://pouet.net/prod.php?which=17782">Autowaschen Verboten</a></td>
-      <td>1.3</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td></td>
+      <td>With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
+    </tr>
+    <tr>
+      <td>Lazer:
+      <a href="http://pouet.net/prod.php?which=17965">Dan's Lustiges Kinderfest</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>emu</td> 
+      <td>With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
     </tr>
     <tr>
       <td>Lazer:
@@ -3163,7 +3601,7 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.3</td>
       <td>-</td>
       <td>emu</td>
-      <td>4K</td>
+      <td>4K.  Ends in static starfield</td>
     </tr>
     <tr>
       <td>Lazer:
@@ -3171,31 +3609,41 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.6</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Requires WinUAE CPU core</td>
+      <td>Nice. Requires WinUAE CPU core</td>
     </tr>
     <tr>
       <td>Lazer:
       <a href="http://pouet.net/prod.php?which=28749">Oergs</a></td>
-      <td>1.3</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
-      <td>emu</td>
-      <td>Barely an intro</td>
+      <td>emu</td> 
+      <td>With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
     </tr>
     <tr>
       <td>Lazer:
       <a href="http://pouet.net/prod.php?which=8585">Warum</a></td>
-      <td>1.3</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Nice</td>
+      <td>With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
+    </tr>
+    <tr>
+      <td>Level 42:
+      <a href="http://www.pouet.net/prod.php?which=28750">Apollo 13</a></td>
+      <td>2.0</td>
+      <td>-</td>
+      <td>emu</td>
+      <td></td>
     </tr>
     <tr>
       <td>Light:
       <a href="http://www.pouet.net/prod.php?which=17189">680xx</a></td>
-      <td>1.3</td>
+      <td>2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Music is broken</td>
+      <td></td>
     </tr>
     <tr>
       <td>Lineout:
@@ -3222,29 +3670,46 @@ also for Falcon if demo is stated to require that.</p>
       <td></td>
     </tr>
     <tr>
+      <td>MadWizards:
+      <a href="http://pouet.net/prod.php?which=59135">Kioea</a></td>
+      <td class="major">2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>060 + 14MB + 64MB TT-RAM.  Freezes on loading screen</td>
+    </tr>
+    <tr>
       <td>Mind Design:
       <a href="http://www.pouet.net/prod.php?which=28761">4some</a></td>
-      <td>1.7</td>
+      <td>2.0</td>
       <td>-</td>
       <td>-</td>
-      <td>Requires FPU. Sometimes hangs with WinUAE CPU core</td>
+      <td>Requires FPU + 8MB RAM</td>
     </tr>
     <tr>
       <td>MJJ Prod:
       <a href="http://pouet.net/prod.php?which=28764">Bound 42</a></td>
-      <td>1.4</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
       <td>Crashes at cyan millstone screen</td>
     </tr>
     <tr>
-      <td>Mystic bytes:
-      <a href="http://pouet.net/prod.php?which=24801">Chosneck Supplement (e5)</a></td>
-      <td>1.4</td>
+      <td>Mugwumps:
+      <a href="http://pouet.net/prod.php?which=15917">Cycedelic knockout</a></td>
+      <td class="minor">1.9</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Needs 14MB RAM.  Music notes screen colors aren't right
-          (Hatari Videl emu doesn't support palette cycling?)</td>
+      <td>With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
+    </tr>
+    <tr>
+      <td>Mystic bytes:
+      <a href="http://pouet.net/prod.php?which=24801">Chosneck Supplement (e5)</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>Needs 14MB RAM. Intro shows only with oldUAE CPU core.
+          RGB 50Hz mode doesn't work, others do</td>
     </tr>
     <tr>
       <td>Mystic bytes:
@@ -3252,7 +3717,7 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.4</td>
       <td>yes</td>
       <td>emu</td>
-      <td>14MB RAM + (EC)030 + FPU. Works only with old CPU.</td>
+      <td>14MB RAM + FPU</td>
     </tr>
     <tr>
       <td>Mystic bytes:
@@ -3260,15 +3725,15 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.6</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Requires WinUAE CPU core</td>
+      <td>Requires WinUAE CPU core. Ends in black screen after plasma tunnel</td>
     </tr>
     <tr>
       <td>Mystic bytes:
       <a href="http://www.pouet.net/prod.php?which=28778">Virtual Dream</a></td>
-      <td class="major">1.7</td>
+      <td>2.0</td>
       <td>-</td>
       <td>-</td>
-      <td>Requires FPU. Crashes with bus error after a few seconds</td>
+      <td>4K. Requires FPU. Needs to be started from HiColor mode</td>
     </tr>
     <tr>
       <td>New Beat:
@@ -3276,7 +3741,8 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.1</td>
       <td>-</td>
       <td>-</td>
-      <td>Very nice 4K demo from New Beat</td>
+      <td>Nice 4K demo from New Beat (Flu and Blue are
+          emulation-wise both very lightweight)</td>
     </tr>
     <tr>
       <td>New Beat:
@@ -3284,7 +3750,7 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.1</td>
       <td>yes</td>
       <td>-</td>
-      <td>Very nice 4K demo from New Beat. Flu requires FPU</td>
+      <td>Nice 4K demo from New Beat. Flu requires FPU</td>
     </tr>
     <tr>
       <td>New Beat:
@@ -3300,23 +3766,25 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.4</td>
       <td>-</td>
       <td>emu</td>
-      <td>Uses DSP play / DMA record in handshake mode.  Doesn't work if auto-started.</td>
+      <td>Uses DSP play / DMA record in handshake mode.  Doesn't work if auto-started</td>
     </tr>
     <tr>
       <td>NoCrew:
       <a href="http://www.pouet.net/prod.php?which=15140">Stocasto</a></td>
-      <td class="major">1.6</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Bombs on startup (in v1.5 it froze, but in later stage)</td>
+      <td>No sound, otherwise works</td>
     </tr>
     <tr>
       <td>Opium:
       <a href="http://www.pouet.net/prod.php?which=17822">Chrome Dragon</a></td>
-      <td>1.0</td>
+      <td class="minor">2.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>With Hatari v1.6, needs WinUAE core</td>
+      <td>Requires RGB. At least since v1.8, music is missing and
+         freezes late in demo, when textured donut zooms out
+	  (waiting $2581c content to change)</td>
     </tr>
     <tr>
       <td>Opium:
@@ -3327,9 +3795,44 @@ also for Falcon if demo is stated to require that.</p>
       <td></td>
     </tr>
     <tr>
+      <td>Orion_:
+      <a href="http://www.pouet.net/prod.php?which=64508">Unexpected Fun</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>needs 8 MB TT ram, music with DSP.
+          Swimming screen colors are wrong</td>
+    </tr>
+    <tr>
+      <td>Orion_:
+      <a href="http://www.pouet.net/prod.php?which=58045">We Reached Stars</a></td>
+      <td class="major">2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>needs 060, 8 MB TT ram, music with DSP. Polygon mountains
+          part is missing all details and demo freezes after that</td>
+    </tr>
+    <tr>
+      <td>Paradox:
+      <a href="http://pouet.net/prod.php?which=60896">2x1287</a></td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Scenes from the demo scene. Music with DSP.
+          With WinUAE CPU core, starts only with VGA</td>
+    </tr>
+    <tr>
       <td>Paranoia:
       <a href="http://www.pouet.net/prod.php?which=6659">Illusion 64</a></td>
       <td>1.3</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Background music with DSP emu</td>
+    </tr>
+    <tr>
+      <td>Paranoia:
+      <a href="http://www.pouet.net/prod.php?which=3297">Rock Solid +</a></td>
+      <td>2.0</td>
       <td>yes</td>
       <td>-</td>
       <td>Background music with DSP emu</td>
@@ -3360,11 +3863,12 @@ also for Falcon if demo is stated to require that.</p>
     </tr>
     <tr>
       <td>Reservoir Gods:
-      <a href="http://rg.atari.org/demos.htm">Ascii, SnowStorm, HongTron</a></td>
+      <a href="http://rg.atari.org/demos.htm">ASCII Art Intro, SnowStorm, Snowtro</a></td>
       <td>1.0</td>
-      <td>-</td>
-      <td>-</td>
-      <td>Intros by RG</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>Intros by RG. Require DSP (for music) with newer Hatari versions.
+          "Snowtro" cannot be auto-started</td>
     </tr>
     <tr>
       <td>Shadows:
@@ -3372,7 +3876,7 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.0</td>
       <td>yes</td>
       <td>-</td>
-      <td>Background music with DSP emu, slow otherwise</td>
+      <td>Background music with DSP emu, slow otherwise. Doesn't work if auto-started</td>
     </tr>
     <tr>
       <td>STAX:
@@ -3383,9 +3887,35 @@ also for Falcon if demo is stated to require that.</p>
       <td>Doesn't work with 020 CPU</td>
     </tr>
     <tr>
+      <td>TBL:
+      <a href="http://www.pouet.net/groups.php?which=1">Ocean Machine, Rift, Silkcut, Startstruck</a></td>
+      <td>1.9</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Require 060 + FPU + 4MB / 64MB TT-RAM.  Music with DSP
+         (DSP + sound can be disabled to speed up emulation a lot)</td>
+    </tr>
+    <tr>
+      <td>The Pixel Twins:
+      <a href="http://www.pouet.net/prod.php?which=66760">Wee Gift</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>Needs FPU. Real time ray-tracing. After about ten minutes,
+          animation starts to slow down a lot</td>
+    </tr>
+    <tr>
+      <td>The Pixel Twins:
+      <a href="http://www.pouet.net/prod.php?which=66698">Zero Three Zero</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>emu</td>
+      <td>Needs FPU. Real time ray-tracing</td>
+    </tr>
+    <tr>
       <td>The Respectables:
       <a href="http://www.pouet.net/prod.php?which=28806">Cebit 93 demo</a></td>
-      <td class="minor">1.6</td>
+      <td>1.9</td>
       <td>yes</td>
       <td>-</td>
       <td>Requires WinUAE CPU core for screen to be drawn correctly</td>
@@ -3401,28 +3931,34 @@ also for Falcon if demo is stated to require that.</p>
     <tr>
       <td>Trio:
       <a href="http://www.pouet.net/prod.php?which=15974">X-tasie</a></td>
-      <td class="minor">1.7</td>
-      <td>-</td>
-      <td>-</td>
+      <td class="minor">2.0</td>
+      <td>yes</td>
+      <td>emu</td>
       <td>Demo requires 030 MMU, i.e. it only runs with WinUAE CPU core and when
-          MMU has been enabled. There is a Videl emulation problem left when
-          the user moves the mouse during the first screen.</td>
+          MMU has been enabled. There's a Videl emulation problem left when
+          user moves mouse (before clicking) in the first screen</td>
     </tr>
     <tr>
       <td>tSCc:
-      <a href="http://pouet.net/prod.php?which=1015">30L Coke</a> &amp;
-      <a href="http://pouet.net/prod.php?which=1014">A Rh positive</a></td>
+      <a href="http://pouet.net/prod.php?which=1015">30L Coke</a>
       <td>1.3</td>
       <td>-</td>
       <td>emu</td>
-      <td>4K demos. Rh positive flickers a bit</td>
+      <td>4K demo</td>
     </tr>
     <tr>
       <td>tSCc:
-      <a href="http://www.pouet.net/prod.php?which=16426">Beams</a>
-      (Falcon version)</td>
-      <td>1.5</td>
+      <a href="http://pouet.net/prod.php?which=1014">A Rh positive</a></td>
+      <td class="minor">2.0</td>
       <td>-</td>
+      <td>emu</td>
+      <td>4K. With WinUAE CPU core, requires CPU prefetch and
+          cycle exact mode to be disabled</td>
+    <tr>
+      <td>tSCc:
+      <a href="http://www.pouet.net/prod.php?which=16426">Beams</a> (Falcon version)</td>
+      <td>1.5</td>
+      <td>yes</td>
       <td>-</td>
       <td>Nice demo, NoCrew DSP MP2-music</td>
     </tr>
@@ -3430,35 +3966,39 @@ also for Falcon if demo is stated to require that.</p>
       <td>tSCc:
       <a href="http://pouet.net/prod.php?which=977">Six Sievert</a></td>
       <td>1.3</td>
-      <td>-</td>
-      <td>-</td>
+      <td>yes</td>
+      <td>emu</td>
       <td></td>
     </tr>
     <tr>
       <td>tSCc:
       <a href="http://pouet.net/prod.php?which=1013">Terrorize your soul</a></td>
-      <td>1.3</td>
+      <td class="major">2.0</td>
       <td>yes</td>
       <td>emu</td>
-      <td></td>
+      <td>Music is mostly silent or noise and demo doesn't run until
+          end. With WinUAE CPU core it crashes after red blobs screen
+	  to illegal DSP instruction, with oldUAE, it doesn't advance
+	  from that screen</td>
     </tr>
     <tr>
       <td>Tony Benett:
       <a href="http://pouet.net/prod.php?which=28853">Virtual City</a></td>
-      <td>1.1</td>
+      <td class="minor">2.0</td>
       <td>-</td>
       <td>emu</td>
-      <td>HiColor + &gt;4MB only, drawing the city requires DSP
-          emulation. Doesn't work if auto-started.</td>
+      <td>HiColor, drawing the city requires DSP emulation.
+          With WinUAE CPU core, requires CPU prefetch and cycle exact
+          mode to be disabled</td>
     </tr>
     <tr>
       <td>Toons:
       <a href="http://pouet.net/prod.php?which=8584">Yepyha</a></td>
-      <td class="major">1.6</td>
+      <td>2.0</td>
       <td>yes</td>
-      <td>-</td>
-      <td>Strange screen sizes, stops in middle.  With DSP, has
-          background music, but stops earlier to DSP stack overflow</td>
+      <td>emu</td>
+      <td>Strange screen sizes + black screen after 3D ant screen
+          which just waits for Enter key before showing credits</td>
     </tr>
     <tr>
       <td>T.O.Y.S:
@@ -3466,7 +4006,8 @@ also for Falcon if demo is stated to require that.</p>
       <td>1.6</td>
       <td>yes</td>
       <td>emu</td>
-      <td>Uses NoCrew DSP MP2-player</td>
+      <td>Uses NoCrew DSP MP2-player.  60Hz RGB mode shows garbage,
+          other mode selections work</td>
     </tr>
     <tr>
       <td>Wildfire:
@@ -3485,11 +4026,28 @@ also for Falcon if demo is stated to require that.</p>
       <td>Requires FPU and DSP</td>
     </tr>
     <tr>
-      <td>Birdshow</td>
+      <td>Wildfire:
+      <a href="http://www.pouet.net/prod.php?which=16819">ALT-party invtro</a></td>
+      <td>2.0</td>
+      <td>yes</td>
+      <td>-</td>
+      <td>Music with DSP</td>
+    </tr>
+    <tr>
+      <td>Unknown:
+      <a href="http://falcdemos.atari.org/archive/unknown/1993.birdshow/">Birdshow</a></td>
       <td>1.0</td>
       <td>-</td>
       <td>-</td>
       <td>A simple FLE animation player</td>
+    </tr>
+    <tr>
+      <td>Unknown:
+      <a href="http://falcdemos.atari.org/archive/unknown/1993.rot3dbmp/">ROT3DBMP</a></td>
+      <td>1.9</td>
+      <td>-</td>
+      <td>emu</td>
+      <td>Streams data to DSP without synchronization</td>
     </tr>
   </tbody>
 </table>
@@ -3519,13 +4077,15 @@ site.</p>
           (demo)</td>
       <td>1.6</td>
       <td>emu</td>
-      <td>DSP generated softsynth sounds need Hatari at least v1.6 to sound OKish</td>
+      <td>DSP generated softsynth sounds need Hatari at least v1.6 to
+          sound OKish, and 2.0 to sound good</td>
     </tr>
     <tr>
       <td><a href="http://newbeat.atari.org/main.php?page=productions">AceTracker v2</a></td>
-      <td class="minor">1.8</td>
+      <td>2.0</td>
       <td>emu</td>
-      <td>Individual synthetized sounds are fine with WinUAE CPU core, but AM module playback audio quality is bad</td>
+      <td>Sounds good with WinUAE CPU core, but needs beefy machine
+          for fast enough DSP emulation</td>
     </tr>
     <tr>
       <td>AFM (audio fun machine)</td>
@@ -3535,49 +4095,51 @@ site.</p>
     </tr>
     <tr>
       <td>Apex (demo)</td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>-</td>
       <td>Crashes with a &quot;MOVE.W $fff20000,D0&quot; instruction.
         It's unclear why this works on a real Falcon.
-        The separate imageviewers work fine.</td>
+        The separate imageviewers work fine</td>
     </tr>
     <tr>
       <td><a href="http://pagesperso-orange.fr/didierm/index-e.htm">Aniplayer</a></td>
-      <td class="minor">1.4</td>
+      <td class="minor">2.0</td>
       <td>emu</td>
-      <td>DSP stack underflow on switching JPG images, synchronization
+      <td>(Harmless) DSP stack underflow on switching JPG images. Synchronization
           doesn't work when DSP used with DMA transfers to play MP3</td>
     </tr>
     <tr>
       <td><a href="http://deunstg.free.fr/sct1/s_avi030.htm">AVI 030</a></td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>-</td>
-      <td>Worked with Hatari v1.1, freezes with v1.6</td>
+      <td>TTP worked with Hatari v1.1, freezes with v1.6, exits with v1.8+</td>
     </tr>
     <tr>
       <td><a href="http://centek.free.fr/atari/softs/s_cent_1.htm">Centview</a></td>
       <td>1.3</td>
       <td>emu</td>
-      <td>The included Brainstorm DSP JPEG decoder works also fine.</td>
+      <td>Remember to run included JPEGD.PRG first (or put it to AUTO-folder)</td>
     </tr>
     <tr>
       <td><a href="http://centek.free.fr/atari/softs/s_centbe.htm">Centurbo bench</a></td>
-      <td>1.6</td>
+      <td class="minor">1.9</td>
       <td>emu</td>
-      <td>Gives inaccurate FPS (190%) and CPU (14Mhz) speed values.
-          Without WinUAE core, numbers are off even more</td>
+      <td>New WinUAE CPU core: FPU 812 Mhz, DSP 56 Mhz, CPU 26 Mhz<br>
+          Old WinUAE CPU core: FPU 221 Mhz, DSP 32 Mhz, CPU 15 Mhz<br>
+          Old UAE CPU core: FPU 403 Mhz, DSP 32 Mhz, CPU 78 Mhz<br>
+	  (moving mouse drops FPU and CPU numbers slightly)</td>
     </tr>
     <tr>
       <td>Chronos 3D player</td>
-      <td class="major">1.6</td>
+      <td class="major">2.0</td>
       <td>-</td>
-      <td>Complains about wrong resolution, requires 15-bit</td>
+      <td>Requires 15-bit display (e.g. NOVA)</td>
     </tr>
     <tr>
       <td><a href="http://pouet.net/prod.php?which=29344">Delmpaint</a></td>
       <td>1.0</td>
       <td>-</td>
-      <td>Errors at exit if started in other than 256-color low rez.</td>
+      <td>Errors at exit if started in other than 256-color low rez</td>
     </tr>
     <tr>
       <td><a href="http://pouet.net/prod.php?which=25328">Escapepaint</a></td>
@@ -3587,29 +4149,29 @@ site.</p>
     </tr>
     <tr>
       <td><a href="http://deunstg.free.fr/sct1/falcamp/">FalcAMP</a></td>
-      <td class="minor">1.6</td>
+      <td class="minor">2.0</td>
       <td>emu</td>
-      <td>MODs playing works fine, MP3s have no sound / complain about DSP timeout</td>
+      <td>MOD playing works fine, MP3s have no sound / complain about DSP timeout</td>
     </tr>
     <tr>
-      <td><a href="http://deunstg.free.fr/sct1/flaysid/">FlaySID</a></td>
-      <td class="minor">1.6</td>
+      <td><a href="http://deunstg.free.fr/sct1/flaysid/">FlaySID (v3.01)</a></td>
+      <td class="minor">2.0</td>
       <td>emu</td>
-      <td>No sound.</td>
+      <td>No sound from SID playback with DSP engine, only with YM engine</td>
     </tr>
     <tr>
       <td><a href="http://newbeat.atari.org/main.php?page=productions">FlexTrax</a></td>
-      <td class="minor">1.6</td>
+      <td class="minor">2.0</td>
       <td>emu</td>
       <td>Freezes with old UAE core, but even with WinUAE core, sounds is noise.
-          Startup graphics look OK only in VGA mode.</td>
+          Startup graphics look OK only in VGA mode</td>
     </tr>
     <tr>
       <td><a href="http://yescrew.atari.org/eng/index_e.htm">GemPLAY</a></td>
-      <td class="minor">1.6</td>
+      <td>2.0</td>
       <td>emu</td>
-      <td>MOD/SND/XMS formats sound fine, AM/AON/GT2 formats sound bad.
-          Fileselector dir selection doesn't work for the latest 1.92 version</td>
+      <td>Requires v2.0 WinUAE CPU core and beefy machine for AM playback.
+          Fileselector dir selection doesn't work with v1.92 or newer (GemPlay bug)</td>
     </tr>
     <tr>
       <td><a href="http://rg.atari.org/utils.htm">Godpaint</a></td>
@@ -3618,10 +4180,10 @@ site.</p>
       <td></td>
     </tr>
     <tr>
-      <td><a href="http://www.pouet.net/prod.php?which=56822">Hextracker</a></td>
-      <td class="major">1.7</td>
+      <td><a href="http://dhs.nu/files.php?t=single&ID=135">Hextracker</a></td>
+      <td>2.0+</td>
       <td>-</td>
-      <td>Freezes at start waiting Videl screen address counter to change</td>
+      <td>Crashes if auto-started with TOS v4 (works with other TOS versions)</td>
     </tr>
     <tr>
       <td><a href="http://pouet.net/prod.php?which=29348">Indypaint</a></td>
@@ -3643,6 +4205,15 @@ site.</p>
           bombs immediately at startup (MMU not emulated in old UAE).
           Mouse cannot traverse whole screen unless mouse grab or
           fullscreen mode is used</td>
+    </tr>
+    <tr>
+      <td><a href="http://atari-forum.com/viewtopic.php?f=26&amp;t=27728&amp;start=25">ScummVm</a></td>
+      <td>1.9</td>
+      <td>-</td>
+      <td>Very slow, needs FPU, a lot of TT-RAM and user-specified config file name
+          ("hatari-prg-args.sh -s 14 --ttram 256 --machine falcon --tos tos404.img
+          --dsp none --addr24 off --fpu internal -- ./scummvm-m68020-olivier.ttp
+          -c scummvm.cfg")</td>
     </tr>
     <tr>
       <td>Whip</td>
@@ -3685,10 +4256,17 @@ support or work only on them.</p>
       <td>Calamus SL (1991 demo)</td>
       <td>1.0</td>
       <td>Nice with Hatari TT or 32Mhz Falcon emulation at
-      e.g. 1024x768x1 VDI resolution...  The latest
-      <a href="http://www.calamus.net/download/lite_tos.php">Calamus
-      SL2006 Lite edition</a> doesn't work though, it needs at least
-      32MB RAM</td>
+          e.g. 1024x768x1 VDI resolution...</td>
+    </tr>
+    <tr>
+      <td><a href="http://www.calamus.net/download/lite_tos.php">Calamus SL lite 20xx</a></td>
+      <td>1.9</td>
+      <td>Newer versions work only with EmuTOS (2015-04-26 git version or newer),
+          FPU, lot of both ST and TT-RAM and at least 800x600 resolution.
+	  ("--machine tt -m -s 14 --ttram 32 --tos etos512k.img", or
+	   "--machine falcon --dsp none --fpu 68882
+	    --vdi-width 896 --vdi-height 608 --vdi-planes 4
+	    -s 14 --addr24 off --ttram 32 --tos etos512k.img")</td>
     </tr>
     <tr>
       <td><a href="http://centek.free.fr/atari/softs/s_cecile.htm">Cecile</a></td>
@@ -3705,11 +4283,19 @@ support or work only on them.</p>
     </tr>
     <tr>
       <td><a href="http://www.seimet.de/atari/en/hddriver.html">HD Driver</a></td>
-      <td>1.4</td>
-      <td>Hard disk driver.  In Hatari works only with IDE emulation.
-      Doesn't work with EmuTOS.  With TOS v4, CPU needs to be set to
-      EC030 or better, with TOS v3 works also with 020 CPU (used by
-      earlier Hatari versions for TOS &ge; v3)</td>
+      <td>1.9</td>
+      <td>Hard disk driver. Works with native ACSI, IDE and SCSI on
+          machines supporting those interfaces + NF_SCSI driver.
+	  Native SCSI bus support requires at least 020 CPU, rest
+	  work with any 680x0 CPU</td>
+    </tr>
+    <tr>
+      <td><a href="http://www.seimet.de/atari/en/index.html">ROMSPEED</a></td>
+      <td class="minor">1.9</td>
+      <td>Utility to copy and run ROM from Fast-RAM to accelerate its working.
+      Requires TT-RAM / WinUAE CPU core to work.  Different memory
+      timings on different memory areas aren't emulated yet, so no
+      speed changes are visible</td>
     </tr>
   </tbody>
 </table>

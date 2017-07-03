@@ -12,33 +12,38 @@
 {
 	// Preferences window
 	IBOutlet NSWindow *window ;
-	IBOutlet NSView   *partage ;						// add
-	IBOutlet NSView   *hartage ;						// add
+	IBOutlet NSView   *partage ;
+	IBOutlet NSView   *hartage ;
 
 	// Disks
-	IBOutlet NSTextField *floppyImageA;					// T
-	IBOutlet NSTextField *floppyImageB;					// T
-	IBOutlet NSButton *autoInsertB;
-	IBOutlet NSButton *fastFDC;
-	IBOutlet NSMatrix *floppyWriteProtection;
-	IBOutlet NSTextField *defaultImagesLocation;		// T
-	IBOutlet NSTextField *hdImage;						// T
-	IBOutlet NSTextField *ideMasterHdImage;				// T
-	IBOutlet NSTextField *ideSlaveHdImage;				// T
-	IBOutlet NSTextField *gemdosImage;					// T
-	IBOutlet NSButton *bootFromHD ;
-	IBOutlet NSMatrix *HDWriteProtection;
+	IBOutlet NSTextField *floppyImageA;
+	IBOutlet NSButton    *enableDriveA;
+	IBOutlet NSButton    *driveA_NumberOfHeads;
+	IBOutlet NSTextField *floppyImageB;
+	IBOutlet NSButton    *enableDriveB;
+	IBOutlet NSButton    *driveB_NumberOfHeads;
+	IBOutlet NSButton    *autoInsertB;
+	IBOutlet NSButton    *fastFDC;
+	IBOutlet NSMatrix    *floppyWriteProtection;
+	IBOutlet NSTextField *defaultImagesLocation;
+	IBOutlet NSTextField *hdImage;
+	IBOutlet NSTextField *ideMasterHdImage;
+	IBOutlet NSTextField *ideSlaveHdImage;
+	IBOutlet NSTextField *gemdosImage;
+	IBOutlet NSButton    *bootFromHD ;
+	IBOutlet NSMatrix    *HDWriteProtection;
 
+	IBOutlet NSButton *bFilenameConversion;
+	IBOutlet NSButton *nGemdosDrive;
 	// ROM
-	IBOutlet NSTextField *tosImage;						// T
-	IBOutlet NSTextField *cartridgeImage;				// T
+	IBOutlet NSTextField *tosImage;
+	IBOutlet NSTextField *cartridgeImage;
 	
 	// Atari screen
 	IBOutlet NSMatrix *monitor;
 	IBOutlet NSButton *useBorders;
 	IBOutlet NSButton *falconTTRatio;
 	IBOutlet NSButton *zoomSTLowRes;
-	IBOutlet NSButton *force8bpp;
 	IBOutlet NSButton *useVDIResolution;
 	IBOutlet NSMatrix *resolution;
 	IBOutlet NSMatrix *colorDepth;
@@ -51,26 +56,41 @@
 	IBOutlet NSTextField *maxZoomedWidth;				// N
 	IBOutlet NSTextField *maxZoomedHeight;				// N
 	IBOutlet NSButton *keepDesktopResolution;
-		// Hidestatus, Capture only, Avi codec, Avi FPS
+	IBOutlet NSButton *SDL2UseLinearScaling;
+	IBOutlet NSButton *SDL2UseVSync;
 
+	// Hidestatus, Capture only, Avi codec, Avi FPS
 	// Sound
 	IBOutlet NSButton *enableSound;
 	IBOutlet NSMatrix *playbackQuality;
 	IBOutlet NSMatrix *YMVoicesMixing;
 
 	// System
+    
 	IBOutlet NSMatrix *cpuType;
 	IBOutlet NSMatrix *cpuClock;
 	IBOutlet NSMatrix *machineType;
 	IBOutlet NSMatrix *ramSize;
-	IBOutlet NSButton *compatibleCpu;
+	IBOutlet NSButton *compatibleCpu; //bCompatibleCpu
 	IBOutlet NSButton *blitter;
 	IBOutlet NSButton *realTime;
 	IBOutlet NSButton *patchTimerD;
 	IBOutlet NSButton *FastBootPatch;
-		// load/save state
-	IBOutlet NSPopUpButton *enableDSP;
+	IBOutlet NSPopUpButton *videoTiming;
+	// for ENABLE_WINUAE_CPU CORE
+	IBOutlet NSButton *cycleExactCPU; //bCycleExactCpu
+	IBOutlet NSButton *MMU_Emulation;
+	IBOutlet NSButton *adressSpace24; //bAddressSpace24
+	IBOutlet NSStepper *TTRAMSizeStepper;
+	IBOutlet NSTextField *TTRAMSizeValue;
+	//IBOutlet NSButton *CompatibleFPU;
+	IBOutlet NSMatrix *FPUType;
 
+	IBOutlet NSButtonCell *bCell68060;
+
+	// load/save state
+	IBOutlet NSPopUpButton *enableDSP;
+ 
 	// Joysticks
 	IBOutlet NSPopUpButton *currentJoystick;
 	IBOutlet NSMatrix *joystickMode;
@@ -84,7 +104,8 @@
 
 	// Keyboard
 	IBOutlet NSMatrix *keyboardMapping;
-	IBOutlet NSTextField *keyboardMappingFile;			// T
+	IBOutlet NSTextField *keyboardMappingFile;
+        // T
 		// Disable Key Repeat
 
 	// Peripheral
@@ -98,12 +119,13 @@
 
 	// Other
 
+	__unsafe_unretained IBOutlet NSButtonCell *confirmQuit;
 	IBOutlet NSButton *captureOnChange;
 	IBOutlet NSButton *interleaved;
 	IBOutlet NSSlider *nSpec512Treshold;
 	IBOutlet NSStepper *widthStepper;
 	IBOutlet NSStepper *heightStepper;
-	IBOutlet NSTextField *configFile;					// T ??
+	IBOutlet NSTextField *configFile;		// T ??
 
 	BOOL		bInitialized;
 	int			cRealJoysticks;
@@ -169,6 +191,9 @@
 - (IBAction)updateEnabledStates:(id)sender;
 - (IBAction)setWidth:(id)sender;
 - (IBAction)setHeight:(id)sender;
+//System RAM Stepper
+- (IBAction)setTTRAMSize:(id)sender;
+
 
 +(PrefsController*)prefs ;
 

@@ -18,6 +18,7 @@ const char SDLGui_fileid[] = "Hatari sdlgui.c : " __DATE__ " " __TIME__;
 //RETRO DEF
 
 #include "gui-retro.h"
+#define SDLGui_DoDialog(a,b) SDLGui_DoDialog(SGOBJ *dlg, SDL_Event *pEventOut, bool KeepCurrentObject)
 
 extern int touch;
 int gmx,gmy;

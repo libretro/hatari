@@ -42,7 +42,14 @@ int pre_main(const char *argv)
    if(Only1Arg)
    {
       Add_Option("hatari");
-      Add_Option("--disk-a");
+
+      //backport retroup cfg load
+      if (strlen(RPATH) >= strlen("cfg")){
+	if(!strcasecmp(&RPATH[strlen(RPATH)-strlen("cfg")], "cfg"))
+			Add_Option("-c");
+      }
+      else Add_Option("--disk-a");
+
       Add_Option(RPATH/*ARGUV[0]*/);
    }
    else
@@ -60,6 +67,8 @@ int pre_main(const char *argv)
    hmain(PARAMCOUNT,( char **)xargv_cmd); 
 
    xargv_cmd[PARAMCOUNT - 2] = NULL;
+
+   return 0;
 }
 
 void parse_cmdline(const char *argv)

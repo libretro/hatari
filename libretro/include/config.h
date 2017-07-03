@@ -106,7 +106,10 @@
 #define ENABLE_DSP_EMU 1
 
 /* Define to 1 to enable WINUAE cpu  */
-//#define ENABLE_WINUAE_CPU 1
+
+#ifdef NEW_WCPU 
+#define ENABLE_WINUAE_CPU 1
+#endif
 
 /* Define to 1 to use less memory - at the expense of emulation speed */
 //#define ENABLE_SMALL_MEM 1

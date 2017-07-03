@@ -3,7 +3,7 @@
 # Classes for Hatari emulator instance and mapping its congfiguration
 # variables with its command line option.
 #
-# Copyright (C) 2008-2012 by Eero Tamminen
+# Copyright (C) 2008-2015 by Eero Tamminen
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -598,11 +598,25 @@ class HatariConfigMapping(ConfigStore):
         self.set("[HardDisk]", "nGemdosCase", value)
         self._change_option("--gemdos-case %s" % values[value])
 
-    def get_gemdos_dir(self):
+    def get_hd_drives(self):
+        return ['skip ACSI/IDE'] + [("%c:" % x) for x in range(ord('C'), ord('Z')+1)]
+
+    def get_hd_drive(self):
+        return self.get("[HardDisk]", "nGemdosDrive") + 1
+
+    def set_hd_drive(self, value):
+        value -= 1
+        self.set("[HardDisk]", "nGemdosDrive", value)
+        drive = chr(ord('C') + value)
+        if value < 0:
+            drive = "skip"
+        self._change_option("--gemdos-drive %s" % drive)
+
+    def get_hd_dir(self):
         self.get("[HardDisk]", "bUseHardDiskDirectory") # for validation
         return self.get("[HardDisk]", "szHardDiskDirectory")
 
-    def set_gemdos_dir(self, dirname):
+    def set_hd_dir(self, dirname):
         if dirname and os.path.isdir(dirname):
             self.set("[HardDisk]", "bUseHardDiskDirectory", True)
         self.set("[HardDisk]", "szHardDiskDirectory", dirname)
@@ -671,6 +685,23 @@ class HatariConfigMapping(ConfigStore):
             memsize = 1
         self.set("[Memory]", "nMemorySize", memsize)
         self._change_option("--memsize %d" % memsize)
+
+    def get_ttram(self):
+        return self.get("[Memory]", "nTTRamSize")
+
+    def set_ttram(self, memsize):
+        # guarantee correct type (Gtk float -> config int)
+        memsize = int(memsize)
+        self.set("[Memory]", "nTTRamSize", memsize)
+        self._change_option("--ttram %d" % memsize)
+        if memsize:
+            # TT-RAM need 32-bit addressing (i.e. disable 24-bit)
+            self.set("[System]", "bAddressSpace24", False)
+            self._change_option("--addr24 off")
+        else:
+            # switch 24-bit addressing back for compatibility
+            self.set("[System]", "bAddressSpace24", True)
+            self._change_option("--addr24 on", False)
 
     # ------------ monitor ---------------
     def get_monitor_types(self):

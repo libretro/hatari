@@ -8,12 +8,12 @@
 - Thomas Huth <huth at tuxfamily.org> : Project initiator and
   admin, currently more or less in hibernation mode.
 
-- Eero Tamminen <oak at helsinkinet fi> : Speed improvements & code
-  cleanup, small parts of the STE emulation, Python CLI, UI & TOS
-  tester + Hatari window embedding & remote control API, pause & auto
-  frameskip support, statusbar & overlay led, conditional breakpoints
-  and other debugger features, GEMDOS HD emulation improvements, PNG
-  saving.
+- Eero Tamminen <oak at helsinkinet fi> : Speedups, small parts of the
+  STE, TT & Falcon emulation, Python CLI & GUI, TOS tester + Hatari
+  window embedding & remote control API, pause & auto frameskip
+  support, statusbar & overlay led, profiling and conditional
+  breakpoint support and other debugger features, GEMDOS HD emulation
+  improvements, PNG saving.
 
 - Laurent Sallafranque: Many fixes and speedups to DSP emulation,
   DSP debugging support, crossbar emulation, falcon microphone
@@ -97,7 +97,8 @@ is missing here, please remind me!):
   working.
 
 - Cyprian Konador: Found some bugs in the blitter cycles emulation,
-  duochrome and samplehold modes for TT video emulation.
+  duochrome and samplehold modes for TT video emulation, reported some
+  infos about alt-ram and dma ranges.
 
 - Jerome Vernet: Some updates to the OS X Xcode project file and OS X
   GUI, supplied a french keymapping file for OS X.
@@ -105,8 +106,8 @@ is missing here, please remind me!):
 - Kenneth Kaufman: MS VC6 & C++ compiler and multiple GEMDOS HD
   partition support patches.
 
-- Uwe Seimet: HD Driver related IDE emulation improvements and
-  GEMDOS HD emulation improvement suggestions.
+- Uwe Seimet: IDE emulation improvements, GEMDOS HD emulation
+  improvement suggestions and NatFeats SCSI Driver code for Linux.
 
 - Anders Eriksson (Evil/DHS): Helped improving STE's emulation by
   running many tests programs and providing the source code for some
@@ -127,25 +128,52 @@ is missing here, please remind me!):
 - Gilles Fetis: fixes to MMU emulation (from NeXT emulator project
   using Hatari code).
 
-- Peter Putnik (Petari, AtariZoll): for helping with tracking the cause
-  of the crash  in Microprose Golf (FDC emulation). Also wrote some useful tools
-  to handle floppies (flofor, floimg), as well as opcovat.tos to report
-  valid/invalid opcodes with a real CPU and under emulation by testing all possible
-  opcode combinations.
+- Peter Putnik (Petari, AtariZoll): Helped tracking the
+  cause of the crash in Microprose Golf (FDC emulation). Also wrote
+  some useful tools to handle floppies (flofor, floimg), as well as
+  opcovat.tos to report valid/invalid opcodes with a real CPU and
+  under emulation by testing all possible opcode combinations.
 
-- Jean Louis Guerin (DrCoolZic): for the 'Panzer' program, very useful to test
-  some FDC behaviours and timings on real hardware and to compare them
-  with the emulated system. Also wrote some nice docs on WD1772
-  and methods commonly used for games' protections.
+- Jean Louis Guerin (DrCoolZic): 'Panzer' program, very useful
+  for testing some FDC behaviours and timings on real hardware and to
+  compare them with the emulated system. Also wrote some nice docs on
+  WD1772 and methods commonly used for games' protections.
 
-- Christer Solskogen: for setting up an automatic build script on his site,
-  with up to date binary versions for Linux and Windows in 32 and 64 bit mode.
-  Very useful for end users wishing to try the devel version of Hatari, and
-  lots of interesting build logs too for various cpu architectures.
-  See http://antarctica.no/~hatari/latest
+- Christer Solskogen: Set up an automatic build script on his site,
+  providing up to date Hatari binaries for Linux and Windows in 32
+  and 64 bit mode. Very useful for end users wishing to try the devel
+  versions of Hatari, and lots of interesting build logs too for
+  various cpu architectures. See http://antarctica.no/~hatari/latest
 
 - Max Böhm: host <-> Atari filename encoding conversion routines and
   related changes needed to gemdos.c.
+
+- Douglas Little: wrote and run some test programs for 030 cycle
+  accuracy, tested & gave feedback on Hatari CPU & DSP profiler
+  features, debugged Hatari DSP emulation issues.
+
+- Roger Burrows: EmuTOS maintainer, reported bugs in several areas
+  including I/O memory access & TT emulation (timer-C, video).  Ran
+  some test programs on real hardware and wrote some test programs
+  himself.
+
+- Jorge Cwik (Ijor): creator of Pasti STX disk image. Reverse-engineered
+  some decapped STF chips (GLUE, MMU, Shifter) and many low level description
+  of the STF inner work, very useful to improve emulation accuracy.
+
+- Paulo Simoes (ljkb): made some of the first descriptions of wakestates,
+  as well as documenting all positions where hi/lo and 50/60 switches
+  can create specific lines' length.
+
+- Troed Sangberg (Troed of Sync): accurate description of the GLUE state
+  machine for STF/STE in all wakestates (display signal, sync signal, ...)
+  and the resulting lines' length used in overscan / hardscroll. Coder
+  of the '{Closure}' demo which makes huge use of these techniques.
+
+- Christian Zietz: recovered many original ASIC schemas for Atari's chips
+  and helped in reverse-engineering the behaviour of those chips.
+
+- Thorsten Otto: Some improvements to the code that patches the TOS ROMs.
 
 
  Code from other projects
@@ -154,6 +182,9 @@ is missing here, please remind me!):
 As a true open source project, Hatari also uses some code from other
 projects which we would like to acknowledge here:
 
+- Hatari binary releases include latest version of EmuTOS:
+  http://emutos.sourceforge.net/
+
 - Most of the original ST hardware emulation comes from the WinSTon
   source code which has been written by Paul Bates.
   (http://www.sourceforge.net/projects/winston/)
@@ -161,8 +192,10 @@ projects which we would like to acknowledge here:
 - The original CPU core has been taken from UAE which has been written
   by Bernd Schmidt and others. (http://uae.coresystems.de/)
 
-- The new alternative CPU core has been taken from WinUAE.
-  (http://www.winuae.net/)
+- The new alternative CPU core has been taken from WinUAE which is
+  maintained by Toni Wilen. Huge thanks to Toni for accepting ideas
+  and patches not specific to Amiga emulation, as well as keeping on
+  improving the accuracy of 68000/20/30 CPU. (http://www.winuae.net/)
 
 - Some parts have been taken from the emulator STonX that has been
   written by Marinos Yannikos and Martin Griffiths.
@@ -191,5 +224,6 @@ projects which we would like to acknowledge here:
   (http://www.qemu.org/)
 
 - The MMU emulation for the 68030 has been taken from the NeXT emulator
-  Previous (thanks to Andreas Grabher!)
+  Previous (thanks to Andreas Grabher!). Since Hatari 1.9, this is now
+  taken from WinUAE which uses the same code base.
 

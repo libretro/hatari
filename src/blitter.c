@@ -68,6 +68,11 @@ const char Blitter_fileid[] = "Hatari blitter.c : " __DATE__ " " __TIME__;
 #define REG_CONTROL 	0xff8a3c
 #define REG_SKEW		0xff8a3d
 
+
+#define	BLITTER_READ_WORD_BUS_ERR	0x0000	/* This value is returned when the blitter try to read a word */
+						/* in a region that would cause a bus error */
+						/* [NP] FIXME : for now we return a constant, but it should depend on the bus activity */
+
 /* Blitter registers */
 typedef struct
 {
@@ -130,22 +135,32 @@ static BLITTER_OP_FUNC Blitter_ComputeLOP;
 
 /*-----------------------------------------------------------------------*/
 /**
- * Count blitter cycles
+ * Count blitter cycles (this assumes blitter and CPU runs at the same freq)
  */
 
 static void Blitter_AddCycles(int cycles)
 {
-	int all_cycles = cycles + nWaitStateCycles;
+	int all_cycles = cycles + WaitStateCycles;
 
 	BlitterVars.op_cycles += all_cycles;
 
+#ifdef OLD_CPU_SHIFT
 	nCyclesMainCounter += all_cycles >> nCpuFreqShift;
-	nWaitStateCycles = 0;
+	CyclesGlobalClockCounter += all_cycles >> nCpuFreqShift;
+#else
+	nCyclesMainCounter += all_cycles;
+	CyclesGlobalClockCounter += all_cycles;
+#endif
+	WaitStateCycles = 0;
 }
 
 static void Blitter_FlushCycles(void)
 {
+#ifdef OLD_CPU_SHIFT
+	int op_cycles = INT_CONVERT_TO_INTERNAL(BlitterVars.op_cycles >> nCpuFreqShift, INT_CPU_CYCLE);
+#else
 	int op_cycles = INT_CONVERT_TO_INTERNAL(BlitterVars.op_cycles, INT_CPU_CYCLE);
+#endif
 
 	BlitterVars.pass_cycles += BlitterVars.op_cycles;
 	BlitterVars.op_cycles = 0;
@@ -155,6 +170,64 @@ static void Blitter_FlushCycles(void)
 		CALL_VAR(PendingInterruptFunction);
 }
 
+
+/*-----------------------------------------------------------------------*/
+/**
+ * Handle bus arbitration when switching between CPU and Blitter
+ * When a write is made to FF8A3C to start the blitter, it will take a few cycles
+ * before doing the bus arbitration. During this time the CPU will be able to
+ * partially execute the next instruction in parallel to the blitter
+ * (until an access to the BUS is needed by the CPU).
+ *
+ * NOTE [NP] : this is mostly handled with hardcoded cases for now, as it
+ * requires cycle exact emulation to exactly know when bus is accessed
+ * by the CPU to prefetch the next word.
+ * More tests are needed on a real STE to have a proper model of this.
+ *
+ * Based on several examples, possible sequence when starting the blitter seems to be :
+ *  - t+0 : write to FF8A3C
+ *  - t+0 : CPU can still run during 4 cycles and access bus
+ *  - t+4 : bus arbitration takes 4 cycles (no access for cpu and blitter during this time)
+ *  - t+8 : blitter owns the bus and starts tranferring data
+ * (in case of MegaSTE bus arbitration takes 8 cycles instead of 4)
+ *
+ * When blitter stops owning the bus in favor of the cpu, this seems to always take 4 cycles
+ */
+static void Blitter_BusArbitration ( int RequestBusMode )
+{
+	int	cycles;
+
+	if ( RequestBusMode == BUS_MODE_BLITTER )	/* Bus is requested by the blitter */
+	{
+//fprintf ( stderr , "blitter start pc %x %x\n" , M68000_GetPC() , M68000_InstrPC );
+		if ( ConfigureParams.System.nMachineType == MACHINE_MEGA_STE )
+			cycles = 8;			/* MegaSTE blitter needs 4 extra cycles when requesting the bus */
+		else
+			cycles = 4;			/* Default case : take 4 cycles when going from cpu to blitter */
+
+		/* Different timing for some specific cases */
+
+		/* 'Relapse - Graphix Sound 2' by Cybernetics (overscan plasma using blitter) */
+		/* $e764 : move.b  d5,(a4) + dbra d1,$fff2 : 4 cycles of the dbra can be executed while blitter starts */
+		if ( STMemory_ReadLong ( M68000_InstrPC ) == 0x188551c9 )	/* PC = E764 */
+			cycles -= 4;			/* 4 cycles less than default case */
+	}
+
+	else						/* Bus is requested by the cpu */
+	{
+		cycles = 4;				/* Always 4 cycles (even for MegaSTE) */
+	}
+
+	/* Add arbitration cycles and update BusMode */
+	if ( cycles > 0 )
+	{
+		Blitter_AddCycles(cycles);
+		Blitter_FlushCycles();
+	}	
+	BusMode = RequestBusMode;
+}
+
+
 /*-----------------------------------------------------------------------*/
 /**
  * Read & Write operations
@@ -163,7 +236,12 @@ static Uint16 Blitter_ReadWord(Uint32 addr)
 {
 	Uint16 value;
 
-	value = (Uint16)get_word ( addr );
+	/* When reading from a bus error region, just return a constant */
+	if ( STMemory_CheckRegionBusError ( addr ) )
+		value = BLITTER_READ_WORD_BUS_ERR;
+	else
+		value = (Uint16)get_word ( addr );
+//fprintf ( stderr , "read %x %x %x\n" , addr , value , STMemory_CheckRegionBusError(addr) );
 
 	Blitter_AddCycles(4);
 
@@ -172,7 +250,11 @@ static Uint16 Blitter_ReadWord(Uint32 addr)
 
 static void Blitter_WriteWord(Uint32 addr, Uint16 value)
 {
-	put_word ( addr , (Uint32)(value) );
+	/* Call put_word only if the address doesn't point to a bus error region */
+	/* (also see SysMem_wput for addr < 0x8) */
+	if ( STMemory_CheckRegionBusError ( addr ) == false )
+		put_word ( addr , (Uint32)(value) );
+//fprintf ( stderr , "write %x %x %x\n" , addr , value , STMemory_CheckRegionBusError(addr) );
 
 	Blitter_AddCycles(4);
 }
@@ -522,9 +604,10 @@ static void Blitter_Start(void)
 	BlitterVars.src_words_reset = BlitterVars.dst_words_reset + BlitterVars.fxsr - BlitterVars.nfsr;
 
 	/* bus arbitration */
-	BusMode = BUS_MODE_BLITTER;		/* bus is now owned by the blitter */
-	Blitter_AddCycles(4);
-	Blitter_FlushCycles();
+	Blitter_BusArbitration ( BUS_MODE_BLITTER );
+
+	/* Busy=1, set line to high/1 and clear interrupt */
+	MFP_GPIP_Set_Line_Input ( MFP_GPIP_LINE_GPU_DONE , MFP_GPIP_STATE_HIGH );
 
 	/* Now we enter the main blitting loop */
 	do
@@ -536,24 +619,26 @@ static void Blitter_Start(void)
 	       && (BlitterVars.hog || BlitterVars.pass_cycles < NONHOG_CYCLES));
 
 	/* bus arbitration */
-	Blitter_AddCycles(4);
-	Blitter_FlushCycles();
-	BusMode = BUS_MODE_CPU;			/* bus is now owned by the cpu again */
+	Blitter_BusArbitration ( BUS_MODE_CPU );
 
 	BlitterRegs.ctrl = (BlitterRegs.ctrl & 0xF0) | BlitterVars.line;
 
 	if (BlitterRegs.lines == 0)
 	{
-		/* We're done, clear busy bit */
-		BlitterRegs.ctrl &= ~0x80;
+		/* We're done, clear busy and hog bits */
+		BlitterRegs.ctrl &= ~(0x80|0x40);
 
-		/* Blitter done interrupt */
-		MFP_InputOnChannel ( MFP_INT_GPU_DONE , 0 );
+		/* Busy=0, set line to low/0 and request interrupt */
+		MFP_GPIP_Set_Line_Input ( MFP_GPIP_LINE_GPU_DONE , MFP_GPIP_STATE_LOW );
 	}
 	else
 	{
 		/* Continue blitting later */
+#ifdef OLD_CPU_SHIFT
 		CycInt_AddRelativeInterrupt(NONHOG_CYCLES, INT_CPU_CYCLE, INTERRUPT_BLITTER);
+#else
+		CycInt_AddRelativeInterrupt(NONHOG_CYCLES, INT_CPU_CYCLE, INTERRUPT_BLITTER);
+#endif
 	}
 }
 
@@ -770,7 +855,10 @@ void Blitter_SourceYInc_WriteWord(void)
  */
 void Blitter_SourceAddr_WriteLong(void)
 {
-	BlitterRegs.src_addr = IoMem_ReadLong(REG_SRC_ADDR) & 0xFFFFFE;
+	if ( ConfigureParams.System.bAddressSpace24 == true )
+		BlitterRegs.src_addr = IoMem_ReadLong(REG_SRC_ADDR) & 0x00FFFFFE;	/* Normal STF/STE */
+	else
+		BlitterRegs.src_addr = IoMem_ReadLong(REG_SRC_ADDR) & 0xFFFFFFFE;	/* Falcon with extra TT RAM */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -824,7 +912,10 @@ void Blitter_DestYInc_WriteWord(void)
  */
 void Blitter_DestAddr_WriteLong(void)
 {
-	BlitterRegs.dst_addr = IoMem_ReadLong(REG_DST_ADDR) & 0xFFFFFE;
+	if ( ConfigureParams.System.bAddressSpace24 == true )
+		BlitterRegs.dst_addr = IoMem_ReadLong(REG_DST_ADDR) & 0x00FFFFFE;	/* Normal STF/STE */
+	else
+		BlitterRegs.dst_addr = IoMem_ReadLong(REG_DST_ADDR) & 0xFFFFFFFE;	/* Falcon with extra TT RAM */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -923,14 +1014,19 @@ void Blitter_Control_WriteByte(void)
 	{
 		if (BlitterRegs.lines == 0)
 		{
-			/* We're done, clear busy bit */
-			BlitterRegs.ctrl &= ~0x80;
+			/* We're done, clear busy and hog bits */
+			BlitterRegs.ctrl &= ~(0x80|0x40);
 		}
 		else
 		{
-			/* Start blitting after some CPU cycles */
-			CycInt_AddRelativeInterrupt((CurrentInstrCycles+nWaitStateCycles)>>nCpuFreqShift,
+			/* Start blitting after the end of current instruction */
+#ifdef OLD_CPU_SHIFT
+			CycInt_AddRelativeInterrupt((CurrentInstrCycles+WaitStateCycles)>>nCpuFreqShift,
 							 INT_CPU_CYCLE, INTERRUPT_BLITTER);
+#else
+			CycInt_AddRelativeInterrupt( CurrentInstrCycles+WaitStateCycles, INT_CPU_CYCLE, INTERRUPT_BLITTER);
+			/* [NP] TODO : use CycInt_AddRelativeInterrupt(0) instead to get an immediate interrupt */
+#endif
 		}
 	}
 }
@@ -978,10 +1074,9 @@ void Blitter_MemorySnapShot_Capture(bool bSave)
 /**
  * Show Blitter register values.
  */
-void Blitter_Info(Uint32 dummy)
+void Blitter_Info(FILE *fp, Uint32 dummy)
 {
 	BLITTERREGS *regs = &BlitterRegs;
-	FILE *fp = stderr;
 
 	fprintf(fp, "src addr:  0x%06x\n", regs->src_addr);
 	fprintf(fp, "dst addr:  0x%06x\n", regs->dst_addr);

@@ -55,13 +55,6 @@ const char Unzip_fileid[] = "Hatari unzip.c : " __DATE__ " " __TIME__;
 #define UNZ_MAXFILENAMEINZIP (256)
 #endif
 
-#ifndef ALLOC
-# define ALLOC(size) (malloc(size))
-#endif
-#ifndef TRYFREE
-# define TRYFREE(p) {if (p) free(p);}
-#endif
-
 #define SIZECENTRALDIRITEM (0x2e)
 #define SIZEZIPLOCALHEADER (0x1e)
 
@@ -80,8 +73,7 @@ const char Unzip_fileid[] = "Hatari unzip.c : " __DATE__ " " __TIME__;
 #define SEEK_SET    0
 #endif
 
-const char unz_copyright[] =
-   " unzip 0.15 Copyright 1998 Gilles Vollant ";
+static const char unz_copyright[] = " unzip 0.15 Copyright 1998 Gilles Vollant";
 
 /* unz_file_info_interntal contain internal info about a file in zipfile*/
 typedef struct unz_file_info_internal_s
@@ -265,8 +257,8 @@ local uLong unzlocal_SearchCentralDir(FILE *fin)
 	if (uMaxBack>uSizeFile)
 		uMaxBack = uSizeFile;
 
-	buf = (unsigned char*)ALLOC(BUFREADCOMMENT+4);
-	if (buf==NULL)
+	buf = malloc(BUFREADCOMMENT + 4);
+	if (!buf)
 		return 0;
 
 	uBackRead = 4;
@@ -299,7 +291,7 @@ local uLong unzlocal_SearchCentralDir(FILE *fin)
 		if (uPosFound!=0)
 			break;
 	}
-	TRYFREE(buf);
+	free(buf);
 	return uPosFound;
 }
 
@@ -314,7 +306,7 @@ local uLong unzlocal_SearchCentralDir(FILE *fin)
  */
 unzFile ZEXPORT unzOpen (const char *path)
 {
-	unz_s us;
+	unz_s us = { 0 };
 	unz_s *s;
 	uLong central_pos,uL;
 	FILE * fin ;
@@ -396,9 +388,8 @@ unzFile ZEXPORT unzOpen (const char *path)
 		                    (us.offset_central_dir+us.size_central_dir);
 	us.central_pos = central_pos;
 	us.pfile_in_zip_read = NULL;
-	
 
-	s=(unz_s*)ALLOC(sizeof(unz_s));
+	s = malloc(sizeof(unz_s));
 	*s=us;
 	unzGoToFirstFile((unzFile)s);
 	return (unzFile)s;
@@ -422,7 +413,7 @@ int ZEXPORT unzClose (unzFile file)
 		unzCloseCurrentFile(file);
 
 	fclose(s->file);
-	TRYFREE(s);
+	free(s);
 	return UNZ_OK;
 }
 
@@ -862,19 +853,18 @@ int ZEXPORT unzOpenCurrentFile (unzFile file)
 				&offset_local_extrafield,&size_local_extrafield)!=UNZ_OK)
 		return UNZ_BADZIPFILE;
 
-	pfile_in_zip_read_info = (file_in_zip_read_info_s*)
-									    ALLOC(sizeof(file_in_zip_read_info_s));
-	if (pfile_in_zip_read_info==NULL)
+	pfile_in_zip_read_info = malloc(sizeof(file_in_zip_read_info_s));
+	if (!pfile_in_zip_read_info)
 		return UNZ_INTERNALERROR;
 
-	pfile_in_zip_read_info->read_buffer=(char*)ALLOC(UNZ_BUFSIZE);
+	pfile_in_zip_read_info->read_buffer = malloc(UNZ_BUFSIZE);
 	pfile_in_zip_read_info->offset_local_extrafield = offset_local_extrafield;
 	pfile_in_zip_read_info->size_local_extrafield = size_local_extrafield;
 	pfile_in_zip_read_info->pos_local_extrafield=0;
 
 	if (pfile_in_zip_read_info->read_buffer==NULL)
 	{
-		TRYFREE(pfile_in_zip_read_info);
+		free(pfile_in_zip_read_info);
 		return UNZ_INTERNALERROR;
 	}
 
@@ -1057,6 +1047,7 @@ int ZEXPORT unzReadCurrentFile  (unzFile file, voidp buf, unsigned len)
 /**
  * Give the current position in uncompressed data
  */
+#if 0
 z_off_t ZEXPORT unztell (unzFile file)
 {
 	unz_s* s;
@@ -1071,11 +1062,12 @@ z_off_t ZEXPORT unztell (unzFile file)
 
 	return (z_off_t)pfile_in_zip_read_info->stream.total_out;
 }
-
+#endif
 
 /**
  * return 1 if the end of file was reached, 0 elsewhere
  */
+#if 0
 int ZEXPORT unzeof (unzFile file)
 {
 	unz_s* s;
@@ -1093,60 +1085,7 @@ int ZEXPORT unzeof (unzFile file)
 	else
 		return 0;
 }
-
-
-
-/**
- * Read extra field from the current file (opened by unzOpenCurrentFile)
- * This is the local-header version of the extra field (sometimes, there is
- *   more info in the local-header version than in the central-header)
- *
- * if buf==NULL, it return the size of the local extra field that can be read
- *
- * if buf!=NULL, len is the size of the buffer, the extra header is copied in
- *	buf.
- * the return value is the number of bytes copied in buf, or (if <0) 
- *	the error code
- */
-int ZEXPORT unzGetLocalExtrafield (unzFile file, voidp buf, unsigned len)
-{
-	unz_s* s;
-	file_in_zip_read_info_s* pfile_in_zip_read_info;
-	uInt read_now;
-	uLong size_to_read;
-
-	if (file==NULL)
-		return UNZ_PARAMERROR;
-	s=(unz_s*)file;
-	pfile_in_zip_read_info=s->pfile_in_zip_read;
-
-	if (pfile_in_zip_read_info==NULL)
-		return UNZ_PARAMERROR;
-
-	size_to_read = (pfile_in_zip_read_info->size_local_extrafield - 
-				pfile_in_zip_read_info->pos_local_extrafield);
-
-	if (buf==NULL)
-		return (int)size_to_read;
-	
-	if (len>size_to_read)
-		read_now = (uInt)size_to_read;
-	else
-		read_now = (uInt)len ;
-
-	if (read_now==0)
-		return 0;
-	
-	if (fseek(pfile_in_zip_read_info->file,
-	          pfile_in_zip_read_info->offset_local_extrafield + 
-	          pfile_in_zip_read_info->pos_local_extrafield,SEEK_SET)!=0)
-		return UNZ_ERRNO;
-
-	if (fread(buf,(uInt)size_to_read,1,pfile_in_zip_read_info->file)!=1)
-		return UNZ_ERRNO;
-
-	return (int)read_now;
-}
+#endif
 
 /**
  * Close the file in zip opened with unzipOpenCurrentFile
@@ -1174,48 +1113,15 @@ int ZEXPORT unzCloseCurrentFile (unzFile file)
 	}
 
 
-	TRYFREE(pfile_in_zip_read_info->read_buffer);
+	free(pfile_in_zip_read_info->read_buffer);
 	pfile_in_zip_read_info->read_buffer = NULL;
 	if (pfile_in_zip_read_info->stream_initialised)
 		inflateEnd(&pfile_in_zip_read_info->stream);
 
 	pfile_in_zip_read_info->stream_initialised = 0;
-	TRYFREE(pfile_in_zip_read_info);
+	free(pfile_in_zip_read_info);
 
 	s->pfile_in_zip_read=NULL;
 
 	return err;
-}
-
-
-/**
- *  Get the global comment string of the ZipFile, in the szComment buffer.
- * uSizeBuf is the size of the szComment buffer.
- * return the number of byte copied or an error code <0
- */
-int ZEXPORT unzGetGlobalComment (unzFile file, char *szComment, uLong uSizeBuf)
-{
-	unz_s* s;
-	uLong uReadThis ;
-	if (file==NULL)
-		return UNZ_PARAMERROR;
-	s=(unz_s*)file;
-
-	uReadThis = uSizeBuf;
-	if (uReadThis>s->gi.size_comment)
-		uReadThis = s->gi.size_comment;
-
-	if (fseek(s->file,s->central_pos+22,SEEK_SET)!=0)
-		return UNZ_ERRNO;
-
-	if (uReadThis>0)
-	{
-	  *szComment='\0';
-	  if (fread(szComment,(uInt)uReadThis,1,s->file)!=1)
-		return UNZ_ERRNO;
-	}
-
-	if ((szComment != NULL) && (uSizeBuf > s->gi.size_comment))
-		*(szComment+s->gi.size_comment)='\0';
-	return (int)uReadThis;
 }

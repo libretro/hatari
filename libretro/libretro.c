@@ -4,8 +4,13 @@
 
 #include "STkeymap.h"
 
+#if defined(HAVE_LIBCO) 
 cothread_t mainThread;
 cothread_t emuThread;
+#else
+extern void RetroLoop();
+int CPULOOP=1;
+#endif
 
 int CROP_WIDTH;
 int CROP_HEIGHT;
@@ -26,6 +31,7 @@ extern void texture_init(void);
 extern void texture_uninit(void);
 extern void Emu_init();
 extern void Emu_uninit();
+extern void Quit_Hatari();
 
 const char *retro_save_directory;
 const char *retro_system_directory;
@@ -35,22 +41,6 @@ static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
 static retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
-
-static struct retro_input_descriptor input_descriptors[] = {
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Fire" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Enter GUI" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Mouse mode toggle" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Keyboard overlay" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Toggle m/k status" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "Joystick number" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Mouse speed" },
-   // Terminate
-   { 255, 255, 255, 255, NULL }
-};
 
 void retro_set_environment(retro_environment_t cb)
 {
@@ -101,7 +91,7 @@ static void update_variables(void)
 static void retro_wrap_emulator()
 {
    pre_main(RPATH);
-
+#if defined(HAVE_LIBCO)
    pauseg=-1;
 
    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, 0); 
@@ -115,6 +105,7 @@ static void retro_wrap_emulator()
       LOGI("Running a dead emulator.");
       co_switch(mainThread);
    }
+#endif
 }
 
 void Emu_init()
@@ -130,13 +121,15 @@ void Emu_init()
 
    memset(Key_Sate,0,512);
    memset(Key_Sate2,0,512);
-
+#if defined(HAVE_LIBCO)
    if(!emuThread && !mainThread)
    {
       mainThread = co_active();
       emuThread = co_create(65536*sizeof(void*), retro_wrap_emulator);
    }
-
+#else
+   retro_wrap_emulator();
+#endif
 }
 
 void Emu_uninit()
@@ -200,27 +193,28 @@ void retro_init(void)
       exit(0);
    }
 
-	struct retro_input_descriptor inputDescriptors[] = {
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "A" },
+struct retro_input_descriptor inputDescriptors[] = {
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "A = fire" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "B" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "X" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Y" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Select" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Start" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Y = enter gui" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Select = mouse mode toggle" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Start = kbd overlay" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "R" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "L" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "R = mouse speed" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "L = joystick number" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "R2" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "L2" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "L2 = toggle M/K status" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "R3" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3, "L3" }
 	};
 	environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, &inputDescriptors);
-
-   Emu_init();
+#if defined(HAVE_LIBCO)
+Emu_init();
+#endif
    texture_init();
 }
 
@@ -228,12 +222,15 @@ void retro_deinit(void)
 {	 
    Emu_uninit(); 
 
+#if defined(HAVE_LIBCO)
    if(emuThread)
    {	 
       co_delete(emuThread);
       emuThread = 0;
    }
-
+#else
+   Quit_Hatari();
+#endif
    LOGI("Retro DeInit\n");
 }
 
@@ -252,13 +249,10 @@ void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = "Hatari";
-#ifndef GIT_VERSION
-#define GIT_VERSION ""
-#endif
-   info->library_version  = "1.8" GIT_VERSION;
-   info->valid_extensions = "ST|MSA|ZIP|STX|DIM|IPF";
+   info->library_version  = "2.0";
+   info->valid_extensions = "ST|MSA|ZIP|STX|DIM|IPF|CFG";
    info->need_fullpath    = true;
-   info->block_extract = false;
+   info->block_extract = true;
 
 }
 
@@ -301,12 +295,16 @@ void retro_run(void)
    {
       update_input();
 
+#if !defined(HAVE_LIBCO)
+      RetroLoop();
+#endif
       if(SND==1)
       {
+	audio_batch_cb(SNDBUF, snd_sampler);/*
          int16_t *p=(int16_t*)SNDBUF;
 
          for(x = 0; x < snd_sampler; x++)
-            audio_cb(*p++,*p++);
+            audio_cb(*p++,*p++);*/
       }
    }
 
@@ -316,14 +314,13 @@ void retro_run(void)
       height = retroh;
    }
    video_cb(bmp, width, height, retrow<< 1);
-
+#if defined(HAVE_LIBCO)
    co_switch(emuThread);
+#endif
 }
 
 bool retro_load_game(const struct retro_game_info *info)
 {
-   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);
-
    const char *full_path;
 
    (void)info;
@@ -331,9 +328,11 @@ bool retro_load_game(const struct retro_game_info *info)
    full_path = info->path;
 
    strcpy(RPATH,full_path);
-
+#if defined(HAVE_LIBCO)
    co_switch(emuThread);
-
+#else
+   Emu_init();
+#endif
    return true;
 }
 

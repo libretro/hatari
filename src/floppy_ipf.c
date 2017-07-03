@@ -53,9 +53,9 @@ typedef struct
 
 	bool			DriveEnabled[ MAX_FLOPPYDRIVES ];/* Is drive ON or OFF */
 	bool			DoubleSided[ MAX_FLOPPYDRIVES ];/* Is drive double sided or not */
+#endif
 
 	Sint64			FdcClock;			/* Current value of CyclesGlobalClockCounter */
-#endif
 } IPF_STRUCT;
 
 
@@ -122,12 +122,12 @@ fprintf ( stderr , "ipf load %d\n" , StructSize );
 			/* For IPF structures, we need to update some pointers in Fdc/Drive/CapsImage */
 			/* drive : PUBYTE trackbuf, PUDWORD timebuf */
 			/* fdc : PCAPSDRIVE driveprc, PCAPSDRIVE drive, CAPSFDCHOOK callback functions */
-			CAPSFdcInvalidateTrack ( &IPF_State.Fdc , 0 );	/* Invalidate buffered track data for drive 0 */
-			CAPSFdcInvalidateTrack ( &IPF_State.Fdc , 1 );	/* Invalidate buffered track data for drive 1 */
-
 			IPF_State.Fdc.drive = IPF_State.Drive;		/* Connect drives array to the FDC */
 			if ( IPF_State.Fdc.driveprc != NULL )		/* Recompute active drive's pointer */
 				IPF_State.Fdc.driveprc = IPF_State.Fdc.drive + IPF_State.Fdc.driveact;
+
+			CAPSFdcInvalidateTrack ( &IPF_State.Fdc , 0 );	/* Invalidate buffered track data for drive 0 */
+			CAPSFdcInvalidateTrack ( &IPF_State.Fdc , 1 );	/* Invalidate buffered track data for drive 1 */
 
 			/* Set callback functions */
 			IPF_State.Fdc.cbirq = IPF_CallBack_Irq;
@@ -318,7 +318,9 @@ bool	IPF_Insert ( int Drive , Uint8 *pImageBuffer , long ImageSize )
 
 #else
 	CapsLong	ImageId;
+#if CAPS_LIB_REL_REV >= 501
 	CapsLong	ImageType;
+#endif
 
 	ImageId = CAPSAddImage();
 	if ( ImageId < 0 )
@@ -332,11 +334,13 @@ bool	IPF_Insert ( int Drive , Uint8 *pImageBuffer , long ImageSize )
 	if ( ImageType == citError )
 	{
 		fprintf ( stderr , "IPF : error CAPSGetImageTypeMemory\n" );
+		CAPSRemImage ( ImageId ) ;
 		return false;
 	}
 	else if ( ImageType == citUnknown )
 	{
 		fprintf ( stderr , "IPF : unknown image type\n" );
+		CAPSRemImage ( ImageId ) ;
 		return false;
 	}
 
@@ -586,7 +590,9 @@ void	IPF_Drive_Set_DoubleSided ( int Drive , bool value )
 #ifdef HAVE_CAPSIMAGE
 static void	IPF_Drive_Update_Enable_Side ( void )
 {
+#if CAPS_LIB_REL_REV >= 501
 	int	i;
+#endif
 
 	if ( IPF_State.DriveEnabled[ 1 ] )
 	        IPF_State.Fdc.drivemax = MAX_FLOPPYDRIVES;		/* Should be 2 */

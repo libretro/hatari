@@ -12,9 +12,9 @@
 
 #define localize(laklef) [[NSBundle mainBundle] localizedStringForKey:laklef value:(laklef != nil ? laklef : @"???") table:@"Localizable"]
 
-// disk extensions alowed in open box
+// disk extensions allowed in open box
 #define allF	@"st",@"msa",@"dim",@"gz",@"zip",@"stx",@"ipf",@"raw",@"ctr"
-// cartdridge extensions
+// cartridge extensions
 #define allC	@"img",@"rom",@"bin",@"cart"
 // TOS extensions
 #define allT	@"img",@"rom",@"bin"
@@ -36,7 +36,7 @@
 void GuiOsx_ExportPathString(NSString* path, char* szTarget, size_t cchTarget);
 
 // Pauses emulation and gets ready to use Cocoa UI
-void GuiOsx_Pause(void);
+void GuiOsx_Pause(bool);
 
 // Switches back to emulation mode and resume emulation
 void GuiOsx_Resume(void);
@@ -46,7 +46,7 @@ void GuiOsx_Resume(void);
 //
 @interface NSApplication (service)
 
-// Some usefull tools
+// Some useful tools
 // choose file to open
 - (NSString *)hopenfile:(BOOL)chooseDir defoDir:(NSString *)defoDir defoFile:(NSString *)defoFile types:(NSArray *)types ;
 - (NSString *)hopenfile:(BOOL)chooseDir defoDir:(NSString *)defoDir defoFile:(NSString *)defoFile types:(NSArray *)types titre:(NSString *)titre ;

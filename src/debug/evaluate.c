@@ -21,7 +21,7 @@ const char Eval_fileid[] = "Hatari calculate.c : " __DATE__ " " __TIME__;
 #include <stdlib.h>
 #include <stdbool.h>
 #include <SDL_types.h>
-#include "breakcond.h"
+#include <inttypes.h>
 #include "configuration.h"
 #include "dsp.h"
 #include "debugcpu.h"
@@ -30,6 +30,8 @@ const char Eval_fileid[] = "Hatari calculate.c : " __DATE__ " " __TIME__;
 #include "m68000.h"
 #include "stMemory.h"
 #include "symbols.h"
+#include "vars.h"
+
 
 /* define which character indicates which type of number on expression  */
 #define PREFIX_BIN '%'                            /* binary decimal     */
@@ -58,7 +60,7 @@ const char Eval_fileid[] = "Hatari calculate.c : " __DATE__ " " __TIME__;
 static struct {
 	const char *error;		/* global error code		*/
 	bool valid;			/* value validation		*/
-} id = {0, 0};
+} id = { NULL, 0 };
 
 /* parenthesis and function stacks					*/
 static struct {
@@ -219,7 +221,7 @@ static int getValue(const char *str, Uint32 *number, int *base, bool bForDsp)
 	*base = 0; /* no base (e.g. variable) */
 
 	/* internal Hatari variable? */
-	if (BreakCond_GetHatariVariable(name, number)) {
+	if (Vars_GetVariableValue(name, number)) {
 		return len;
 	}
 
@@ -725,7 +727,8 @@ static long long close_bracket (long long value)
 			/* fetch the indirect ST RAM value */
 			addr = val.buf[val.idx];
 			value = STMemory_ReadLong(addr);
-			fprintf(stderr, "  value in RAM at ($%x).l = $%llx\n", addr, value);
+			fprintf(stderr, "  value in RAM at ($%x).l = $%"PRIx64"\n",
+				addr, (uint64_t)value);
 			/* restore state before parenthesis */
 			op.idx = par.opx[par.idx] - 1;
 			val.idx = par.vax[par.idx] - 1;

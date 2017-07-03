@@ -91,7 +91,7 @@ static SGOBJ fsdlg[] =
 	{ SGCHECKBOX, SG_EXIT, 0, 2,23, 19,1, "_Show hidden files" },
 	{ SGBUTTON, SG_DEFAULT, 0, 32,23, 8,1, "OK" },
 	{ SGBUTTON, SG_CANCEL, 0, 50,23, 8,1, "Cancel" },
-	{ -1, 0, 0, 0,0, 0,0, NULL }
+	{ SGSTOP, 0, 0, 0,0, 0,0, NULL }
 };
 
 
@@ -465,9 +465,9 @@ static int get_dtype(const char *name)
 {
 	struct stat buf;
 	char path[FILENAME_MAX];
+
 	snprintf(path, sizeof(path), "%s%c%s", dirpath, PATHSEP, name);
-	stat(path, &buf);
-	if (S_ISDIR(buf.st_mode))
+	if (stat(path, &buf) == 0 && S_ISDIR(buf.st_mode))
 		return DT_DIR;
 	else
 		return DT_REG;
@@ -576,6 +576,7 @@ char* SDLGui_FileSelect(const char *title, const char *path_and_name, char **zip
 		char *mtxt;
 		const char *ctxt;
 	} dlgtitle;                         /* A hack to silent recent GCCs warnings */
+	bool KeepCurrentObject;
 
 	dlgtitle.ctxt = title;
 
@@ -643,6 +644,10 @@ char* SDLGui_FileSelect(const char *title, const char *path_and_name, char **zip
 	File_ShrinkName(dlgpath, path, DLGPATH_SIZE);
 	File_ShrinkName(dlgfname, fname, DLGFNAME_SIZE);
 
+	/* The first time we display the dialog, we reset the current position */
+	/* On next calls, current_object's value will be kept to handle scrolling */
+	KeepCurrentObject = false;
+
 	do
 	{
 		if (reloaddir)
@@ -663,7 +668,7 @@ char* SDLGui_FileSelect(const char *title, const char *path_and_name, char **zip
 				/* for get_dtype() */
 				dirpath = path;
 				/* Load directory entries: */
-				entries = scandir(path, &files, 0, filesort);
+				entries = scandir(path, &files, NULL, filesort);
 			}
 
 			/* Remove hidden files from the list if necessary: */
@@ -719,7 +724,8 @@ char* SDLGui_FileSelect(const char *title, const char *path_and_name, char **zip
 		}
 
 		/* Show dialog: */
-		retbut = SDLGui_DoDialog(fsdlg, &sdlEvent);
+		retbut = SDLGui_DoDialog(fsdlg, &sdlEvent, KeepCurrentObject);
+		KeepCurrentObject = true;				/* Don't reset current_object for next calls */
 
 		/* Has the user clicked on a file or folder? */
 		if (retbut>=SGFSDLG_ENTRYFIRST && retbut<=SGFSDLG_ENTRYLAST && retbut-SGFSDLG_ENTRYFIRST+ypos<entries)
@@ -945,15 +951,6 @@ char* SDLGui_FileSelect(const char *title, const char *path_and_name, char **zip
 	while (retbut!=SGFSDLG_OKAY && retbut!=SGFSDLG_CANCEL
 	       && retbut!=SDLGUI_QUIT && retbut != SDLGUI_ERROR && !bQuitProgram);
 
-	files_free(files);
-
-	if (browsingzip)
-	{
-		/* free zip file entries */
-		ZIP_FreeZipDir(zipfiles);
-		zipfiles = NULL;
-	}
-
 	if (retbut == SGFSDLG_OKAY)
 	{
 		if (zip_path)
@@ -962,9 +959,19 @@ char* SDLGui_FileSelect(const char *title, const char *path_and_name, char **zip
 	}
 	else
 		retpath = NULL;
+
 clean_exit:
 	SDL_ShowCursor(bOldMouseVisibility);
+
+	if (browsingzip && zipfiles != NULL)
+	{
+		/* free zip file entries */
+		ZIP_FreeZipDir(zipfiles);
+		zipfiles = NULL;
+	}
+	files_free(files);
 	free(pStringMem);
+
 	return retpath;
 }
 

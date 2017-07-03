@@ -35,6 +35,8 @@ const char TOS_fileid[] = "Hatari tos.c : " __DATE__ " " __TIME__;
 #include "vdi.h"
 #include "falcon/dsp.h"
 #include "clocks_timings.h"
+#include "screen.h"
+#include "video.h"
 
 bool bIsEmuTOS;
 Uint16 TosVersion;                      /* eg. 0x0100, 0x0102 */
@@ -109,7 +111,9 @@ enum
 	TP_ALWAYS,            /* Patch should alway be applied */
 	TP_HDIMAGE_OFF,       /* Apply patch only if HD emulation is off */
 	TP_ANTI_STE,          /* Apply patch only if running on plain ST */
-	TP_ANTI_PMMU          /* Apply patch only if no PMMU is available */
+	TP_ANTI_PMMU,         /* Apply patch only if no PMMU is available */
+	TP_FIX_060,           /* Apply patch only if CPU is 68060 */
+	TP_VDIRES,            /* Apply patch only if VDI is used */
 };
 
 /* This structure is used for patching the TOS ROMs */
@@ -130,7 +134,10 @@ static const char pszMouse[] = "big resolutions mouse driver";
 static const char pszRomCheck[] = "ROM checksum";
 static const char pszNoSteHw[] = "disable STE hardware access";
 static const char pszNoPmmu[] = "disable PMMU access";
-static const char pszHwDisable[] = "disable hardware access";
+static const char pszFix060[] = "replace code for 68060";
+static const char pszFalconExtraRAM[] = "enable extra TT RAM on Falcon";
+static const char pszAtariLogo[] = "draw Atari Logo";
+static const char pszSTbook[] = "disable MCU access on ST-Book";
 
 //static Uint8 pRtsOpcode[] = { 0x4E, 0x75 };  /* 0x4E75 = RTS */
 static const Uint8 pNopOpcodes[] = { 0x4E, 0x71, 0x4E, 0x71, 0x4E, 0x71, 0x4E, 0x71,
@@ -141,6 +148,91 @@ static const Uint8 pRomCheckOpcode206[] = { 0x60, 0x00, 0x00, 0x98 };  /* BRA $e
 static const Uint8 pRomCheckOpcode306[] = { 0x60, 0x00, 0x00, 0xB0 };  /* BRA $e00886 */
 static const Uint8 pRomCheckOpcode404[] = { 0x60, 0x00, 0x00, 0x94 };  /* BRA $e00746 */
 static const Uint8 pBraOpcode[] = { 0x60 };  /* 0x60XX = BRA */
+
+/*
+ * Routine for drawing the Atari logo.
+ * When this function is called, A0 contains a pointer to a 96x86x1 image.
+ * We cannot use the vdi yet (the screen workstation has not yet been opened),
+ * but we can take into account extended VDI modes.
+ */
+static const Uint8 pAtariLogo[] = {
+	0x3e, 0x3c, 0x00, 0x01,     /* move.w    #planes, d7; number will be patched below */
+	0x2c, 0x3c, 0, 0, 1, 64,    /* move.l    #linewidth, d6; number will be patched below */
+	0x22, 0x78, 0x04, 0x4e,     /* movea.l   (_v_bas_ad).w,a1 */
+	0xd3, 0xc6,                 /* adda.l    d6,a1 ; start drawing at 5th line */
+	0xd3, 0xc6,                 /* adda.l    d6,a1 */
+	0xd3, 0xc6,                 /* adda.l    d6,a1 */
+	0xd3, 0xc6,                 /* adda.l    d6,a1 */
+	0xd3, 0xc6,                 /* adda.l    d6,a1 */
+	0x30, 0x3c, 0x00, 0x55,     /* move.w    #$0055,d0 ; 86 lines of data */
+/* logocol1: */
+	0x72, 0x05,                 /* moveq.l   #5,d1 ; 6 words of data per line */
+	0x24, 0x49,                 /* movea.l   a1,a2 */
+/* logocol2: */
+	0x34, 0x18,                 /* move.w    (a0)+,d2 */
+	0x36, 0x07,                 /* move.w    d7,d3 */
+	0x53, 0x43,                 /* subq.w    #1,d3 */
+/* logocol3: */
+	0x34, 0xc2,                 /* move.w    d2,(a2)+ */
+	0x51, 0xcb, 0xff, 0xfc,     /* dbf       d3,logocol3 */
+	0x51, 0xc9, 0xff, 0xf2,     /* dbf       d1,logocol2 */
+	0xd3, 0xc6,                 /* adda.l    d6,a1 */
+	0x51, 0xc8, 0xff, 0xe8,     /* dbf       d0,logocol1 */
+	0x4e, 0x71,                 /* nops to end of original routine */
+	0x4e, 0x71,
+	0x4e, 0x71,
+	0x4e, 0x71,
+	0x4e, 0x71,
+	0x4e, 0x71,
+	0x4e, 0x71,
+	0x4e, 0x71
+};
+
+static const Uint8 p060movep1[] = {	/* replace MOVEP */
+	0x70, 0x0c,			/* moveq #12,d0 */
+	0x42, 0x30, 0x08, 0x00,		/* loop: clr.b 0,(d0,a0) */
+	0x55, 0x40,			/* subq  #2,d0 */
+	0x4a, 0x40,			/* tst.w d0 */
+	0x66, 0xf6,			/* bne.s loop */
+};
+static const Uint8 p060movep2[] = {		/* replace MOVEP */
+	0x41, 0xf8, 0xfa, 0x26,			/* lea    0xfffffa26.w,a0 */
+	0x20, 0xfc, 0x00, 0x00, 0x00, 0x88,	/* move.l #$00000088,(a0)+ */
+	0x20, 0xbc, 0x00, 0x01, 0x00, 0x05,	/* move.l #$00010005,(a0) */
+	0x4a, 0x38, 0x0a, 0x87			/* tst.b  $a87.w */
+};
+static const Uint8 p060movep3_1[] = {		/* replace MOVEP */
+	0x4e, 0xb9, 0x00, 0xe7, 0xf0, 0x00,	/* jsr     $e7f000 */
+	0x4e, 0x71				/* nop */
+};
+static const Uint8 p060movep3_2[] = {		/* replace MOVEP $28(a2),d7 */
+
+	0x00, 0x7c, 0x07, 0x00,			/* ori       #$700,sr */
+	0x1e, 0x2a, 0x00, 0x28,			/* move.b    $28(a2),d7 */
+	0xe1, 0x4f,				/* lsl.w     #8,d7 */
+	0x1e, 0x2a, 0x00, 0x2a,			/* move.b    $2a(a2),d7 */
+	0x48, 0x47,				/* swap      d7 */
+	0x1e, 0x2a, 0x00, 0x2c,			/* move.b    $2c(a2),d7 */
+	0xe1, 0x4f,				/* lsl.w     #8,d7 */
+	0x1e, 0x2a, 0x00, 0x2e,			/* move.b    $2e(a2),d7 */
+	0x4e, 0x75				/* rts */
+};
+
+static const Uint8 pFalconExtraRAM_1[] = {
+	0x4e, 0xb9, 0x00, 0xe7, 0xf1, 0x00	/* jsr       $e7f100 */
+};
+static const Uint8 pFalconExtraRAM_2[] = {	/* call maddalt() to declare the extra RAM */
+	0x20, 0x38, 0x05, 0xa4,			/* move.l    $05a4.w,d0 */
+	0x67, 0x18,				/* beq.s     $ba2d2 */
+	0x04, 0x80, 0x01, 0x00, 0x00, 0x00,	/* subi.l    #$1000000,d0 */
+	0x2f, 0x00,				/* move.l    d0,-(sp) */
+	0x2f, 0x3c, 0x01, 0x00, 0x00, 0x00,	/* move.l    #$1000000,-(sp) */
+	0x3f, 0x3c, 0x00, 0x14,			/* move.w    #$14,-(sp) */
+	0x4e, 0x41,				/* trap      #1 */
+	0x4f, 0xef, 0x00, 0x0a,			/* lea       $a(sp),sp */
+	0x70, 0x03,				/* moveq     #3,d0 */
+	0x4e, 0xf9, 0x00, 0xe0, 0x0b, 0xd2	/* jmp       $e00bd2 */
+};
 
 /* The patches for the TOS: */
 static const TOS_PATCH TosPatches[] =
@@ -185,32 +277,54 @@ static const TOS_PATCH TosPatches[] =
   /* as we've changed bytes in the ROM! So, just skip anyway! */
   { 0x206, -1, pszRomCheck, TP_ALWAYS, 0xE007FA, 0x2E3C0001, 4, pRomCheckOpcode206 },
   { 0x206, -1, pszDmaBoot, TP_HDIMAGE_OFF, 0xE00898, 0x610000E0, 4, pNopOpcodes }, /* BSR.W $E0097A */
+  { 0x206, -1, pszAtariLogo, TP_VDIRES, 0xE0076C, 0x1038044c, sizeof( pAtariLogo ), pAtariLogo },
+
+  { 0x208, -1, pszDmaBoot, TP_HDIMAGE_OFF, 0xE00806, 0x610000E8, 4, pNopOpcodes }, /* BSR.W $E008F0 */
+  { 0x208, -1, pszAtariLogo, TP_VDIRES, 0xE006B4, 0x1038044c, sizeof( pAtariLogo ), pAtariLogo },
+  { 0x208, -1, pszSTbook, TP_ALWAYS, 0xE00066, 0x303900d0, 18, pNopOpcodes },
+  { 0x208, -1, pszSTbook, TP_ALWAYS, 0xE000D6, 0x4a7900d0, 6, pNopOpcodes },
+  { 0x208, -1, pszSTbook, TP_ALWAYS, 0xE009FE, 0x303900d0, 14, pNopOpcodes },
 
   { 0x306, -1, pszRomCheck, TP_ALWAYS, 0xE007D4, 0x2E3C0001, 4, pRomCheckOpcode306 },
-  { 0x306, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE00068, 0xF0394000, 24, pNopOpcodes },
-  { 0x306, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE01702, 0xF0394C00, 32, pNopOpcodes },
+  { 0x306, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE00068, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
+  { 0x306, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE01702, 0xF0394C00, 32, pNopOpcodes }, /* pmove : CRP=80000002 00000700 TC=80f04445 TT0=017e8107 TT1=807e8507 -> */
+  { 0x306, -1, pszFix060, TP_FIX_060, 0xe024dc, 0x01C80000, 12, p060movep1 },
+  { 0x306, -1, pszFix060, TP_FIX_060, 0xe024fa, 0x01C80000, 12, p060movep1 },
+  { 0x306, -1, pszAtariLogo, TP_VDIRES, 0xE00754, 0x1038044c, sizeof( pAtariLogo ), pAtariLogo },
 
-  { 0x400, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE00064, 0xF0394000, 24, pNopOpcodes },
+  { 0x400, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE00064, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
   { 0x400, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE0148A, 0xF0394C00, 32, pNopOpcodes },
-  { 0x400, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE03948, 0xF0394000, 24, pNopOpcodes },
+  { 0x400, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE03948, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
   { 0x400, -1, pszRomCheck, TP_ALWAYS, 0xE00686, 0x2E3C0007, 4, pRomCheckOpcode404 },
+  { 0x400, -1, pszFix060, TP_FIX_060, 0xE0258A, 0x01C80000, 12, p060movep1 },
+  { 0x400, -1, pszFix060, TP_FIX_060, 0xE025DA, 0x41F8FA01, 20, p060movep2 },
 
-  { 0x401, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE0006A, 0xF0394000, 24, pNopOpcodes },
+  { 0x401, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE0006A, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
   { 0x401, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE014A8, 0xF0394C00, 32, pNopOpcodes },
-  { 0x401, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE03946, 0xF0394000, 24, pNopOpcodes },
+  { 0x401, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE03946, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
   { 0x401, -1, pszRomCheck, TP_ALWAYS, 0xE006A6, 0x2E3C0007, 4, pRomCheckOpcode404 },
+  { 0x401, -1, pszFix060, TP_FIX_060, 0xE02588, 0x01C80000, 12, p060movep1 },
+  { 0x401, -1, pszFix060, TP_FIX_060, 0xE025D8, 0x41F8FA01, 20, p060movep2 },
 
-  { 0x402, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE0006A, 0xF0394000, 24, pNopOpcodes },
+  { 0x402, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE0006A, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
   { 0x402, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE014A8, 0xF0394C00, 32, pNopOpcodes },
-  { 0x402, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE03946, 0xF0394000, 24, pNopOpcodes },
+  { 0x402, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE03946, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
   { 0x402, -1, pszRomCheck, TP_ALWAYS, 0xE006A6, 0x2E3C0007, 4, pRomCheckOpcode404 },
+  { 0x402, -1, pszFix060, TP_FIX_060, 0xE02588, 0x01C80000, 12, p060movep1 },
+  { 0x402, -1, pszFix060, TP_FIX_060, 0xE025D8, 0x41F8FA01, 20, p060movep2 },
 
-  { 0x404, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE0006A, 0xF0394000, 24, pNopOpcodes },
-  { 0x404, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE014E6, 0xF0394C00, 32, pNopOpcodes },
-  { 0x404, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE039A0, 0xF0394000, 24, pNopOpcodes },
+  { 0x404, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE0006A, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
+  { 0x404, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE014E6, 0xF0394C00, 32, pNopOpcodes }, /* pmove : CRP=80000002 00000700 TC=80f04445 TT0=017e8107 TT1=807e8507 -> */
+  { 0x404, -1, pszNoPmmu, TP_ANTI_PMMU, 0xE039A0, 0xF0394000, 24, pNopOpcodes }, /* pmove : TC=0 TT0=0 TT1=0 -> disable MMU */
   { 0x404, -1, pszRomCheck, TP_ALWAYS, 0xE006B0, 0x2E3C0007, 4, pRomCheckOpcode404 },
   { 0x404, -1, pszDmaBoot, TP_ALWAYS, 0xE01C9E, 0x62FC31FC, 2, pNopOpcodes },  /* Just a delay */
   { 0x404, -1, pszDmaBoot, TP_ALWAYS, 0xE01CB2, 0x62FC31FC, 2, pNopOpcodes },  /* Just a delay */
+  { 0x404, -1, pszFix060, TP_FIX_060, 0xE025E2, 0x01C80000, 12, p060movep1 },
+  { 0x404, -1, pszFix060, TP_FIX_060, 0xE02632, 0x41F8FA01, 20, p060movep2 },
+  { 0x404, -1, pszFix060, TP_FIX_060, 0xE02B1E, 0x007c0700, 8, p060movep3_1 },
+  { 0x404, -1, pszFix060, TP_FIX_060, 0xE7F000, 0xFFFFFFFF, sizeof( p060movep3_2 ), p060movep3_2 },
+  { 0x404, -1, pszFalconExtraRAM, TP_ALWAYS, 0xE0096E, 0x70036100, 6, pFalconExtraRAM_1 },
+  { 0x404, -1, pszFalconExtraRAM, TP_ALWAYS, 0xE7F100, 0xFFFFFFFF, sizeof( pFalconExtraRAM_2 ), pFalconExtraRAM_2 },
 
   { 0x492, -1, pszNoPmmu, TP_ANTI_PMMU, 0x00F946, 0xF0394000, 24, pNopOpcodes },
   { 0x492, -1, pszNoPmmu, TP_ANTI_PMMU, 0x01097A, 0xF0394C00, 32, pNopOpcodes },
@@ -249,6 +363,7 @@ static void TOS_FixRom(void)
 	int nGoodPatches, nBadPatches;
 	short TosCountry;
 	const TOS_PATCH *pPatch;
+	Uint32 logopatch_addr = 0;
 
 	/* We can't patch RAM TOS images (yet) */
 	if (bRamTosImage && TosVersion != 0x0492)
@@ -269,7 +384,8 @@ static void TOS_FixRom(void)
 		    && (pPatch->Country == TosCountry || pPatch->Country == -1))
 		{
 #if ENABLE_WINUAE_CPU
-			bool use_mmu = ConfigureParams.System.bMMU;
+			bool use_mmu = ConfigureParams.System.bMMU &&
+			               ConfigureParams.System.nCpuLevel == 3;
 #else
 			bool use_mmu = false;
 #endif
@@ -281,15 +397,18 @@ static void TOS_FixRom(void)
 				    || (pPatch->Flags == TP_HDIMAGE_OFF && !ACSI_EMU_ON
 				        && !ConfigureParams.HardDisk.bUseIdeMasterHardDiskImage
 				        && ConfigureParams.System.bFastBoot)
-				    || (pPatch->Flags == TP_ANTI_STE
-				        && ConfigureParams.System.nMachineType == MACHINE_ST)
+				    || (pPatch->Flags == TP_ANTI_STE && Config_IsMachineST())
 				    || (pPatch->Flags == TP_ANTI_PMMU && !use_mmu)
+				    || (pPatch->Flags == TP_VDIRES && bUseVDIRes)
+				    || (pPatch->Flags == TP_FIX_060 && ConfigureParams.System.nCpuLevel > 4)
 				   )
 				{
 					/* Now we can really apply the patch! */
 					Log_Printf(LOG_DEBUG, "Applying TOS patch '%s'.\n", pPatch->pszName);
 					memcpy(&RomMem[pPatch->Address], pPatch->pNewData, pPatch->Size);
 					nGoodPatches += 1;
+					if (strcmp(pPatch->pszName, pszAtariLogo) == 0)
+						logopatch_addr = pPatch->Address;
 				}
 				else
 				{
@@ -304,6 +423,13 @@ static void TOS_FixRom(void)
 			}
 		}
 		pPatch += 1;
+	}
+
+	/* patch some values into the "Draw logo" patch */
+	if (logopatch_addr != 0)
+	{
+		STMemory_WriteWord(logopatch_addr + 2, VDIPlanes);
+		STMemory_WriteLong(logopatch_addr + 6, VDIWidth * VDIPlanes / 8);
 	}
 
 	Log_Printf(LOG_DEBUG, "Applied %i TOS patches, %i patches failed.\n",
@@ -331,6 +457,9 @@ static void TOS_CreateAutoInf(void)
 	const char *contents, *infname, *prgname;
 	int offset, size, max;
 	FILE *fp;
+#if defined(WIN32)	/* unfortunately tmpfile() needs administrative privileges on windows, so this needs special care */
+	char *ptr;
+#endif
 
 	/* in case TOS didn't for some reason close it on previous boot */
 	TOS_AutoStartClose(TosAutoStart.file);
@@ -379,7 +508,16 @@ static void TOS_CreateAutoInf(void)
 	assert(offset < size);
 
 	/* create the autostart file */
+#if defined(WIN32)	/* unfortunately tmpfile() needs administrative privileges on windows, so this needs special care */
+	ptr=WinTmpFile();
+	if( ptr!=NULL )
+		fp=fopen(ptr,"w+b");
+	else
+		fp=NULL;
+#else
 	fp = tmpfile();
+#endif
+
 	if (!(fp
 	      && fwrite(contents, offset, 1, fp) == 1
 	      && fwrite(prgname, strlen(prgname), 1, fp) == 1
@@ -455,7 +593,11 @@ static void TOS_CheckSysConfig(void)
 {
 	int oldCpuLevel = ConfigureParams.System.nCpuLevel;
 	MACHINETYPE oldMachineType = ConfigureParams.System.nMachineType;
-	if (((TosVersion == 0x0106 || TosVersion == 0x0162) && ConfigureParams.System.nMachineType != MACHINE_STE)
+#if ENABLE_WINUAE_CPU
+	FPUTYPE oldFpuType = ConfigureParams.System.n_FPUType;
+#endif
+
+	if (((TosVersion == 0x0106 || TosVersion == 0x0162) && !Config_IsMachineSTE())
 	    || (TosVersion == 0x0162 && ConfigureParams.System.nCpuLevel != 0))
 	{
 		Log_AlertDlg(LOG_ERROR, "TOS versions 1.06 and 1.62 are for Atari STE only.\n"
@@ -463,38 +605,41 @@ static void TOS_CheckSysConfig(void)
 		IoMem_UnInit();
 		ConfigureParams.System.nMachineType = MACHINE_STE;
 		ClocksTimings_InitMachine ( ConfigureParams.System.nMachineType );
+		Video_SetTimings ( ConfigureParams.System.nMachineType , ConfigureParams.System.VideoTimingMode );
 		IoMem_Init();
 		ConfigureParams.System.nCpuFreq = 8;
 		ConfigureParams.System.nCpuLevel = 0;
 	}
-	else if ((TosVersion & 0x0f00) == 0x0300 && ConfigureParams.System.nMachineType != MACHINE_TT)
+	else if ((TosVersion & 0x0f00) == 0x0300 && !Config_IsMachineTT())
 	{
 		Log_AlertDlg(LOG_ERROR, "TOS versions 3.0x are for Atari TT only.\n"
 		             " ==> Switching to TT mode now.\n");
 		IoMem_UnInit();
 		ConfigureParams.System.nMachineType = MACHINE_TT;
 		ClocksTimings_InitMachine ( ConfigureParams.System.nMachineType );
+		Video_SetTimings ( ConfigureParams.System.nMachineType , ConfigureParams.System.VideoTimingMode );
 		IoMem_Init();
 		ConfigureParams.System.nCpuFreq = 32;
 		ConfigureParams.System.nCpuLevel = 3;
 	}
-	else if ((TosVersion & 0x0f00) == 0x0400 && ConfigureParams.System.nMachineType != MACHINE_FALCON)
+	else if ((TosVersion & 0x0f00) == 0x0400 && !Config_IsMachineFalcon())
 	{
 		Log_AlertDlg(LOG_ERROR, "TOS versions 4.x are for Atari Falcon only.\n"
 		             " ==> Switching to Falcon mode now.\n");
 		IoMem_UnInit();
 		ConfigureParams.System.nMachineType = MACHINE_FALCON;
 		ClocksTimings_InitMachine ( ConfigureParams.System.nMachineType );
+		Video_SetTimings ( ConfigureParams.System.nMachineType , ConfigureParams.System.VideoTimingMode );
 #if ENABLE_DSP_EMU
 		ConfigureParams.System.nDSPType = DSP_TYPE_EMU;
-		DSP_Init();
+		DSP_Enable();
 #endif
 		IoMem_Init();
 		ConfigureParams.System.nCpuFreq = 16;
 		ConfigureParams.System.nCpuLevel = 3;
 	}
 	else if (TosVersion <= 0x0104 &&
-	         (ConfigureParams.System.nCpuLevel > 0 || ConfigureParams.System.nMachineType != MACHINE_ST))
+	         (ConfigureParams.System.nCpuLevel > 0 || !Config_IsMachineST()))
 	{
 		Log_AlertDlg(LOG_ERROR, "TOS versions <= 1.4 work only in\n"
 		             "ST mode and with a 68000 CPU.\n"
@@ -502,18 +647,20 @@ static void TOS_CheckSysConfig(void)
 		IoMem_UnInit();
 		ConfigureParams.System.nMachineType = MACHINE_ST;
 		ClocksTimings_InitMachine ( ConfigureParams.System.nMachineType );
+		Video_SetTimings ( ConfigureParams.System.nMachineType , ConfigureParams.System.VideoTimingMode );
 		IoMem_Init();
 		ConfigureParams.System.nCpuFreq = 8;
 		ConfigureParams.System.nCpuLevel = 0;
 	}
-	else if ((TosVersion < 0x0300 && ConfigureParams.System.nMachineType == MACHINE_FALCON)
-	         || (TosVersion < 0x0200 && ConfigureParams.System.nMachineType == MACHINE_TT))
+	else if ((TosVersion < 0x0300 && Config_IsMachineFalcon())
+	         || (TosVersion < 0x0200 && Config_IsMachineTT()))
 	{
 		Log_AlertDlg(LOG_ERROR, "This TOS version does not work in TT/Falcon mode.\n"
 		             " ==> Switching to STE mode now.\n");
 		IoMem_UnInit();
 		ConfigureParams.System.nMachineType = MACHINE_STE;
 		ClocksTimings_InitMachine ( ConfigureParams.System.nMachineType );
+		Video_SetTimings ( ConfigureParams.System.nMachineType , ConfigureParams.System.VideoTimingMode );
 		IoMem_Init();
 		ConfigureParams.System.nCpuFreq = 8;
 		ConfigureParams.System.nCpuLevel = 0;
@@ -524,17 +671,29 @@ static void TOS_CheckSysConfig(void)
 		             " ==> Switching to 68020 mode now.\n");
 		ConfigureParams.System.nCpuLevel = 2;
 	}
+#if ENABLE_WINUAE_CPU
+	else if ((TosVersion & 0x0f00) == 0x0300 &&
+	         (ConfigureParams.System.nCpuLevel < 2 || ConfigureParams.System.n_FPUType == FPU_NONE))
+	{
+		Log_AlertDlg(LOG_ERROR, "TOS versions 3.0x require a CPU >= 68020 with FPU.\n"
+		             " ==> Switching to 68030 mode with FPU now.\n");
+		ConfigureParams.System.nCpuLevel = 3;
+		ConfigureParams.System.n_FPUType = FPU_68882;
+	}
+#else
 	else if ((TosVersion & 0x0f00) == 0x0300 && ConfigureParams.System.nCpuLevel < 3)
 	{
-		Log_AlertDlg(LOG_ERROR, "TOS versions 3.0x require a CPU >= 68030.\n"
-		             " ==> Switching to 68030 mode now.\n");
+		Log_AlertDlg(LOG_ERROR, "TOS versions 3.0x require a CPU >= 68020 with FPU.\n"
+		             " ==> Switching to 68030 mode with FPU now.\n");
 		ConfigureParams.System.nCpuLevel = 3;
 	}
+#endif
+
 	/* TOS version triggered changes? */
 	if (ConfigureParams.System.nMachineType != oldMachineType)
 	{
 #if ENABLE_WINUAE_CPU
-		if (ConfigureParams.System.nMachineType == MACHINE_TT)
+		if (Config_IsMachineTT())
 		{
 			ConfigureParams.System.bCompatibleFPU = true;
 			ConfigureParams.System.n_FPUType = FPU_68882;
@@ -549,7 +708,11 @@ static void TOS_CheckSysConfig(void)
 #endif
 		M68000_CheckCpuSettings();
 	}
-	else if (ConfigureParams.System.nCpuLevel != oldCpuLevel)
+	else if (ConfigureParams.System.nCpuLevel != oldCpuLevel
+#if ENABLE_WINUAE_CPU
+		 || ConfigureParams.System.n_FPUType != oldFpuType
+#endif
+		)
 	{
 		M68000_CheckCpuSettings();
 	}
@@ -557,6 +720,11 @@ static void TOS_CheckSysConfig(void)
 	{
 		Log_AlertDlg(LOG_ERROR, "Please use at least TOS v1.04 for the HD directory emulation "
 			     "(all required GEMDOS functionality isn't completely emulated for this TOS version).");
+	}
+	if (Config_IsMachineFalcon() && bUseVDIRes && !bIsEmuTOS)
+	{
+		Log_AlertDlg(LOG_ERROR, "Please use EmuTOS for proper VDI results in Falcon mode "
+			     "(TOS 4 doesn't fully support VDI).");
 	}
 }
 
@@ -574,6 +742,13 @@ int TOS_LoadImage(void)
 
 	bTosImageLoaded = false;
 
+	/* Calculate end of RAM */
+	if (ConfigureParams.Memory.nMemorySize > 0
+	    && ConfigureParams.Memory.nMemorySize <= 14)
+		STRamEnd = ConfigureParams.Memory.nMemorySize * 0x100000;
+	else
+		STRamEnd = 0x80000;   /* 512 KiB */
+
 	/* Load TOS image into memory so that we can check its version */
 	TosVersion = 0;
 	pTosFile = File_Read(ConfigureParams.Rom.szTosImageFileName, &nFileSize, pszTosNameExts);
@@ -581,6 +756,7 @@ int TOS_LoadImage(void)
 	if (!pTosFile || nFileSize <= 0)
 	{
 		Log_AlertDlg(LOG_FATAL, "Can not load TOS file:\n'%s'", ConfigureParams.Rom.szTosImageFileName);
+		free(pTosFile);
 		return -1;
 	}
 
@@ -613,6 +789,8 @@ int TOS_LoadImage(void)
 	/* Now, look at start of image to find Version number and address */
 	TosVersion = SDL_SwapBE16(*(Uint16 *)&pTosFile[2]);
 	TosAddress = SDL_SwapBE32(*(Uint32 *)&pTosFile[8]);
+	if (TosVersion == 0x206 && SDL_SwapBE16(*(Uint16 *)&pTosFile[30]) == 0x186A)
+		TosVersion = 0x208;
 
 	/* Check for reasonable TOS version: */
 	if (TosVersion == 0x000 && TosSize == 16384)
@@ -624,11 +802,14 @@ int TOS_LoadImage(void)
 		 * just for fun. */
 		TosAddress = 0xfc0000;
 	}
-	else if (TosVersion<0x100 || TosVersion>=0x500 || TosSize>1024*1024L
-	    || (!bRamTosImage && TosAddress!=0xe00000 && TosAddress!=0xfc0000))
+	else if (TosVersion < 0x100 || TosVersion >= 0x500 || TosSize > 1024*1024L
+	         || (TosAddress == 0xfc0000 && TosSize > 224*1024L)
+	         || (bRamTosImage && TosAddress + TosSize > STRamEnd)
+	         || (!bRamTosImage && TosAddress != 0xe00000 && TosAddress != 0xfc0000))
 	{
 		Log_AlertDlg(LOG_FATAL, "Your TOS image seems not to be a valid TOS ROM file!\n"
 		             "(TOS version %x, address $%x)", TosVersion, TosAddress);
+		free(pTosFile);
 		return -2;
 	}
 
@@ -637,22 +818,52 @@ int TOS_LoadImage(void)
 	if (!bIsEmuTOS)
 		TOS_CheckSysConfig();
 
-	/* Calculate end of RAM */
-	if (ConfigureParams.Memory.nMemorySize > 0
-	    && ConfigureParams.Memory.nMemorySize <= 14)
-		STRamEnd = ConfigureParams.Memory.nMemorySize * 0x100000;
-	else
-		STRamEnd = 0x80000;   /* 512 KiB */
+#if ENABLE_WINUAE_CPU
+	/* 32-bit addressing is supported only by CPU >= 68020, TOS v3, TOS v4 and EmuTOS */
+	if (ConfigureParams.System.nCpuLevel < 2 || (TosVersion < 0x0300 && !bIsEmuTOS))
+	{
+		ConfigureParams.System.bAddressSpace24 = true;
+		M68000_CheckCpuSettings();
+	}
+	else if (ConfigureParams.Memory.nTTRamSize)
+	{
+		switch (ConfigureParams.System.nMachineType)
+		{
+		case MACHINE_TT:
+			if (ConfigureParams.System.bAddressSpace24)
+			{
+				/* Print a message and force 32 bit addressing (keeping 24 bit with TT RAM would crash TOS) */
+				Log_AlertDlg(LOG_ERROR, "Enabling 32-bit addressing for TT-RAM access.\nThis can cause issues in some programs!\n");
+				ConfigureParams.System.bAddressSpace24 = false;
+				M68000_CheckCpuSettings();
+			}
+			break;
+		case MACHINE_FALCON:
+			if (ConfigureParams.System.bAddressSpace24)
+			{
+				/* Print a message, but don't force 32 bit addressing as 24 bit addressing is also possible under Falcon */
+				/* So, if Falcon is in 24 bit mode, we just don't add TT RAM */
+				Log_AlertDlg(LOG_ERROR, "You need to disable 24-bit addressing to use TT-RAM in Falcon mode.\n");
+			}
+			break;
+		default:
+			break;
+		}
+	}
+#endif
 
 	/* (Re-)Initialize the memory banks: */
 	memory_uninit();
-	memory_init(STRamEnd, 0, TosAddress);
+	memory_init(STRamEnd, ConfigureParams.Memory.nTTRamSize*1024*1024, TosAddress);
 
 	/* Clear Upper memory (ROM and IO memory) */
 	memset(&RomMem[0xe00000], 0, 0x200000);
 
-	/* Copy loaded image into ST memory */
-	memcpy(&RomMem[TosAddress], pTosFile, TosSize);
+	/* Copy loaded image into memory */
+	if (bRamTosImage)
+		memcpy(&STRam[TosAddress], pTosFile, TosSize);
+	else
+		memcpy(&RomMem[TosAddress], pTosFile, TosSize);
 
 	Log_Printf(LOG_DEBUG, "Loaded TOS version %i.%c%c, starting at $%x, "
 	           "country code = %i, %s\n", TosVersion>>8, '0'+((TosVersion>>4)&0x0f),
@@ -689,3 +900,4 @@ int TOS_LoadImage(void)
 
 	return 0;
 }
+

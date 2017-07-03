@@ -36,6 +36,7 @@ const char Reset_fileid[] = "Hatari reset.c : " __DATE__ " " __TIME__;
 #include "falcon/dsp.h"
 #include "debugcpu.h"
 #include "debugdsp.h"
+#include "nf_scsidrv.h"
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -55,6 +56,10 @@ static int Reset_ST(bool bCold)
 			return ret;               /* If we can not load a TOS image, return now! */
 
 		Cart_ResetImage();          /* Load cartridge program into ROM memory. */
+		Cart_Patch();
+	
+		/* Video timings can change only on cold boot (wakeup states) */
+		Video_SetTimings ( ConfigureParams.System.nMachineType , ConfigureParams.System.VideoTimingMode );
 	}
 	CycInt_Reset();               /* Reset interrupts */
 	MFP_Reset();                  /* Setup MFP chip */
@@ -69,13 +74,12 @@ static int Reset_ST(bool bCold)
 	}
 	Floppy_Reset();			/* Reset Floppy */
 
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON
-	    || ConfigureParams.System.nMachineType == MACHINE_TT)
+	if (Config_IsMachineFalcon() || Config_IsMachineTT())
 	{
 		Ncr5380_Reset();
 	}
 
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON)
+	if (Config_IsMachineFalcon())
 	{
 		DSP_Reset();                  /* Reset the DSP */
 		Crossbar_Reset(bCold);        /* Reset Crossbar sound */
@@ -87,7 +91,7 @@ static int Reset_ST(bool bCold)
 	Sound_Reset();                /* Reset Sound */
 	ACIA_Reset( ACIA_Array );     /* ACIA */
 	IKBD_Reset(bCold);            /* Keyboard (after ACIA) */
-	if (ConfigureParams.System.nMachineType == MACHINE_FALCON && !bUseVDIRes)
+	if (Config_IsMachineFalcon() && !bUseVDIRes)
 		VIDEL_reset();
 	else
 		Screen_Reset();               /* Reset screen */
@@ -97,6 +101,10 @@ static int Reset_ST(bool bCold)
 	DebugDsp_SetDebugging();
 
 	Midi_Reset();
+
+#if defined(__linux__)
+        nf_scsidrv_reset();
+#endif
 
 	/* Start HBL, Timer B and VBL interrupts with a 0 cycle delay */
 	Video_StartInterrupts( 0 );
@@ -111,7 +119,8 @@ static int Reset_ST(bool bCold)
  */
 int Reset_Cold(void)
 {
-	Main_WarpMouse(sdlscrn->w/2, sdlscrn->h/2);  /* Set mouse pointer to the middle of the screen */
+	/* Set mouse pointer to the middle of the screen */
+	Main_WarpMouse(sdlscrn->w/2, sdlscrn->h/2, false);
 
 	return Reset_ST(true);
 }

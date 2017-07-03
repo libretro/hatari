@@ -66,10 +66,16 @@ const char IKBD_fileid[] = "Hatari ikbd.c : " __DATE__ " " __TIME__;
 /*			required for the loader of 'Just Bugging' by ACF which sends 0x11 and 0x13 just	*/
 /*			after 0x80 0x01 (temporary fix, would need to be measured on a real STF to see	*/
 /*			if it's always ignored or just during a specific delay)				*/
-
+/* 2015/10/10	[NP]	When IKBD_Reset / IKBD_Boot_ROM are called, we should not restart the autosend	*/
+/*			handler INTERRUPT_IKBD_AUTOSEND if it's already set, else we can loose keyboard	*/
+/*			input if IKBD_Reset is called in a loop before any event could be processed	*/
+/*			(this could happen if a program called the 'RESET' instruction in a loop, then	*/
+/*			we lost the F12 key for example)  (fix endless RESET when doing a warm reset	*/
+/*			(alt+r) during the 'Vodka Demo' by 'Equinox', only solution was to kill Hatari)	*/
 
 
 #include "main.h"
+#include "configuration.h"
 #include "ikbd.h"
 #include "cycInt.h"
 #include "ioMem.h"
@@ -81,7 +87,6 @@ const char IKBD_fileid[] = "Hatari ikbd.c : " __DATE__ " " __TIME__;
 #include "video.h"
 #include "utils.h"
 #include "acia.h"
-#include "configuration.h"
 #include "clocks_timings.h"
 
 
@@ -337,8 +342,6 @@ static void	IKBD_Send_Byte_Delay ( Uint8 Data , int Delay_Cycles );
 
 static bool	IKBD_BCD_Check ( Uint8 val );
 static Uint8	IKBD_BCD_Adjust ( Uint8 val );
-void		IKBD_UpdateClockOnVBL ( void );
-
 
 
 /*-----------------------------------------------------------------------*/
@@ -583,12 +586,24 @@ static void	IKBD_Boot_ROM ( bool ClearAllRAM )
 	/* is stuck. We use a timer to emulate the time needed for this part */
 	/* (eg Lotus Turbo Esprit 2 requires at least a delay of 50000 cycles */
 	/* or it will crash during start up) */
+#ifdef OLD_CPU_SHIFT
 	CycInt_AddRelativeInterrupt( IKBD_RESET_CYCLES , INT_CPU_CYCLE , INTERRUPT_IKBD_RESETTIMER );
+#else
+	CycInt_AddRelativeInterrupt( IKBD_RESET_CYCLES , INT_CPU8_CYCLE , INTERRUPT_IKBD_RESETTIMER );
+#endif
 
 
 	/* Add auto-update function to the queue */
+	/* We add it only if it was not active, else this can lead to unresponsive keyboard/input */
+	/* when RESET instruction is called in a loop in less than 150000 cycles */
 	Keyboard.AutoSendCycles = 150000;				/* approx every VBL */
-	CycInt_AddRelativeInterrupt ( Keyboard.AutoSendCycles, INT_CPU_CYCLE, INTERRUPT_IKBD_AUTOSEND );
+	if ( CycInt_InterruptActive ( INTERRUPT_IKBD_AUTOSEND ) == false )
+#ifdef OLD_CPU_SHIFT
+		CycInt_AddRelativeInterrupt ( Keyboard.AutoSendCycles, INT_CPU_CYCLE, INTERRUPT_IKBD_AUTOSEND );
+#else
+		CycInt_AddRelativeInterrupt ( Keyboard.AutoSendCycles, INT_CPU8_CYCLE, INTERRUPT_IKBD_AUTOSEND );
+#endif
+
 	LOG_TRACE ( TRACE_IKBD_ALL , "ikbd reset done, starting reset timer\n" );
 }
 
@@ -1232,7 +1247,7 @@ static void IKBD_CheckForDoubleClicks(void)
 
 		Keyboard.bLButtonDown = DoubleClickPattern[Keyboard.LButtonDblClk];
 		Keyboard.LButtonDblClk++;
-		if (Keyboard.LButtonDblClk >= 13)             /* Check for end of sequence */
+		if (Keyboard.LButtonDblClk >= ARRAY_SIZE(DoubleClickPattern))
 		{
 			Keyboard.LButtonDblClk = 0;
 			Keyboard.bLButtonDown = false;
@@ -1258,7 +1273,7 @@ static void IKBD_CheckForDoubleClicks(void)
 
 		Keyboard.bRButtonDown = DoubleClickPattern[Keyboard.RButtonDblClk];
 		Keyboard.RButtonDblClk++;
-		if (Keyboard.RButtonDblClk >= 13)             /* Check for end of sequence */
+		if (Keyboard.RButtonDblClk >= ARRAY_SIZE(DoubleClickPattern))
 		{
 			Keyboard.RButtonDblClk = 0;
 			Keyboard.bRButtonDown = false;
@@ -1382,11 +1397,11 @@ static void IKBD_SendRelMousePacket(void)
 	}
 }
 
-#ifdef __LIBRETRO__
-//FIXME ADD MXjoy1
+#ifdef __LIBRETRO__		/* RETRO HACK */
+//FIXME REWRITE AND ADD MXjoy1
 extern unsigned char MXjoy0;
 extern int NUMjoy;
-#endif
+#endif	/* RETRO HACK */
 
 /**
  * Get joystick data
@@ -1394,33 +1409,31 @@ extern int NUMjoy;
 static void IKBD_GetJoystickData(void)
 {
 	/* Joystick 1 */
-	KeyboardProcessor.Joy.JoyData[1] = 
-#ifdef __LIBRETRO__
-			MXjoy0;
+	KeyboardProcessor.Joy.JoyData[1] =
+#ifdef __LIBRETRO__	/* RETRO HACK */
+		MXjoy0;
 #else
-			Joy_GetStickData(1);
-#endif
+		Joy_GetStickData(1);
+#endif	/* RETRO HACK */
 
-#ifdef __LIBRETRO__
+#ifdef __LIBRETRO__	/* RETRO HACK */
 if(NUMjoy<0){
 #endif
 	/* If mouse is on, joystick 0 is not connected */
 	if (KeyboardProcessor.MouseMode==AUTOMODE_OFF
 	        || (bBothMouseAndJoy && KeyboardProcessor.MouseMode==AUTOMODE_MOUSEREL))
 		KeyboardProcessor.Joy.JoyData[0] = 
-#ifdef __LIBRETRO__
+#ifdef __LIBRETRO__	/* RETRO HACK */
 			MXjoy0;
-#else
+#else		
 			Joy_GetStickData(0);
-#endif
+#endif	/* RETRO HACK */
 	else
 		KeyboardProcessor.Joy.JoyData[0] = 0x00;
-
-#ifdef __LIBRETRO__
+#ifdef __LIBRETRO__	/* RETRO HACK */
 	}
-#endif
+#endif	/* RETRO HACK */
 }
-
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -1469,10 +1482,10 @@ static void IKBD_SendAutoJoysticksMonitoring(void)
 	Uint8 Byte2;
 
 	Byte1 = ( ( KeyboardProcessor.Joy.JoyData[0] & 0x80 ) >> 6 )
-		|| ( ( KeyboardProcessor.Joy.JoyData[1] & 0x80 ) >> 7 );
+		| ( ( KeyboardProcessor.Joy.JoyData[1] & 0x80 ) >> 7 );
 
 	Byte2 = ( ( KeyboardProcessor.Joy.JoyData[0] & 0x0f ) << 4 )
-		|| ( KeyboardProcessor.Joy.JoyData[1] & 0x0f );
+		| ( KeyboardProcessor.Joy.JoyData[1] & 0x0f );
 
 	IKBD_Cmd_Return_Byte (Byte1);
 	IKBD_Cmd_Return_Byte (Byte2);
@@ -1765,7 +1778,11 @@ void IKBD_InterruptHandler_AutoSend(void)
 	}
 
 	/* Trigger this auto-update function again after a while */
+#ifdef OLD_CPU_SHIFT
 	CycInt_AddRelativeInterrupt(Keyboard.AutoSendCycles, INT_CPU_CYCLE, INTERRUPT_IKBD_AUTOSEND);
+#else
+	CycInt_AddRelativeInterrupt(Keyboard.AutoSendCycles, INT_CPU8_CYCLE, INTERRUPT_IKBD_AUTOSEND);
+#endif
 
 	/* We don't send keyboard data automatically within the first few
 	 * VBLs to avoid that TOS gets confused during its boot time */
@@ -2268,8 +2285,12 @@ static void IKBD_Cmd_SetJoystickMonitoring(void)
 		Rate = 1;
 
 	Cycles = 8021247 * Rate / 100;
+#ifdef OLD_CPU_SHIFT
 	Cycles <<= nCpuFreqShift;					/* Compensate for x2 or x4 cpu speed */
 	CycInt_AddRelativeInterrupt ( Cycles, INT_CPU_CYCLE, INTERRUPT_IKBD_AUTOSEND );
+#else
+	CycInt_AddRelativeInterrupt ( Cycles, INT_CPU8_CYCLE, INTERRUPT_IKBD_AUTOSEND );
+#endif
 	Keyboard.AutoSendCycles = Cycles;
 }
 

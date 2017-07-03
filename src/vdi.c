@@ -14,14 +14,15 @@
 const char VDI_fileid[] = "Hatari vdi.c : " __DATE__ " " __TIME__;
 
 #include "main.h"
+#include "configuration.h"
 #include "file.h"
 #include "gemdos.h"
 #include "m68000.h"
+#include "options.h"
 #include "screen.h"
 #include "stMemory.h"
 #include "vdi.h"
 #include "video.h"
-#include "configuration.h"
 
 
 Uint32 VDI_OldPC;                  /* When call Trap#2, store off PC */
@@ -44,7 +45,7 @@ static Uint32 VDIIntin;
 static Uint32 VDIPtsin;
 static Uint32 VDIIntout;
 static Uint32 VDIPtsout;
-#if ENABLE_TRACING
+#if defined(ENABLE_TRACING) || defined(__EMSCRIPTEN__)//#if ENABLE_TRACING
 /* Last AES opcode & vectors */
 static Uint32 AESControl;
 static Uint32 AESGlobal;
@@ -163,28 +164,6 @@ void VDI_Reset(void)
 
 /*-----------------------------------------------------------------------*/
 /**
- * Returns given value after constraining it within "min" and "max" values
- * and making it evenly divisable by "align"
- */
-int VDI_Limit(int value, int align, int min, int max)
-{
-	value = (value/align)*align;
-	if (value > max)
-	{
-		/* align down */
-		return (max/align)*align;
-	}
-	if (value < min)
-	{
-		/* align up */
-		min += align-1;
-		return (min/align)*align;
-	}
-	return value;
-}
-
-/*-----------------------------------------------------------------------*/
-/**
  * Limit width and height to VDI screen size in bytes, retaining their ratio.
  * Return true if limiting was done.
  */
@@ -239,9 +218,9 @@ void VDI_SetResolution(int GEMColor, int WidthRequest, int HeightRequest)
 	VDI_ByteLimit(&w, &h, VDIPlanes);
 
 	/* width needs to be aligned to 16 bytes */
-	VDIWidth = VDI_Limit(w, 128/VDIPlanes, MIN_VDI_WIDTH, MAX_VDI_WIDTH);
+	VDIWidth = Opt_ValueAlignMinMax(w, 128/VDIPlanes, MIN_VDI_WIDTH, MAX_VDI_WIDTH);
 	/* height needs to be multiple of cell height (either 8 or 16) */
-	VDIHeight = VDI_Limit(h, 16, MIN_VDI_HEIGHT, MAX_VDI_HEIGHT);
+	VDIHeight = Opt_ValueAlignMinMax(h, 16, MIN_VDI_HEIGHT, MAX_VDI_HEIGHT);
 
 	printf("VDI screen: request = %dx%d@%d, result = %dx%d@%d\n",
 	       WidthRequest, HeightRequest, VDIPlanes, VDIWidth, VDIHeight, VDIPlanes);
@@ -251,7 +230,7 @@ void VDI_SetResolution(int GEMColor, int WidthRequest, int HeightRequest)
 }
 
 
-#if ENABLE_TRACING
+#if defined(ENABLE_TRACING) || defined(__EMSCRIPTEN__)//#if ENABLE_TRACING
 
 /*-----------------------------------------------------------------------*/
 
@@ -402,7 +381,7 @@ static const char* AESName_10[] = {
 static const char* AES_Opcode2Name(Uint16 opcode)
 {
 	int code = opcode - 10;
-	if (code >= 0 && code < ARRAYSIZE(AESName_10) && AESName_10[code])
+	if (code >= 0 && code < ARRAY_SIZE(AESName_10) && AESName_10[code])
 		return AESName_10[code];
 	else
 		return "???";
@@ -415,7 +394,7 @@ static void AES_OpcodeInfo(FILE *fp, Uint16 opcode)
 {
 	int code = opcode - 10;
 	fprintf(fp, "AES call %3hd ", opcode);
-	if (code >= 0 && code < ARRAYSIZE(AESName_10) && AESName_10[code])
+	if (code >= 0 && code < ARRAY_SIZE(AESName_10) && AESName_10[code])
 	{
 		bool first = true;
 		int i, items;
@@ -424,7 +403,7 @@ static void AES_OpcodeInfo(FILE *fp, Uint16 opcode)
 
 		items = 0;
 		/* there are so few of these that linear search is fine */
-		for (i = 0; i < ARRAYSIZE(AESStrings); i++)
+		for (i = 0; i < ARRAY_SIZE(AESStrings); i++)
 		{
 			/* something that can be shown? */
 			if (AESStrings[i].code == opcode)
@@ -444,7 +423,7 @@ static void AES_OpcodeInfo(FILE *fp, Uint16 opcode)
 					first = false;
 				else
 					fputs(", ", fp);
-				str = (const char *)STRAM_ADDR(STMemory_ReadLong(AESAddrin+SIZE_LONG*i));
+				str = (const char *)STMemory_STAddrToPointer(STMemory_ReadLong(AESAddrin+SIZE_LONG*i));
 				fprintf(fp, "\"%s\"", str);
 			}
 		}
@@ -478,7 +457,7 @@ static void AES_OpcodeInfo(FILE *fp, Uint16 opcode)
  * If opcodes argument is set, show AES opcode/function name table,
  * otherwise AES vectors information.
  */
-void AES_Info(Uint32 bShowOpcodes)
+void AES_Info(FILE *fp, Uint32 bShowOpcodes)
 {
 	Uint16 opcode;
 	
@@ -486,42 +465,42 @@ void AES_Info(Uint32 bShowOpcodes)
 	{
 		for (opcode = 10; opcode < 0x86; opcode++)
 		{
-			fprintf(stderr, "%02x %-16s", opcode, AES_Opcode2Name(opcode));
-			if ((opcode-9) % 4 == 0) fputs("\n", stderr);
+			fprintf(fp, "%02x %-16s", opcode, AES_Opcode2Name(opcode));
+			if ((opcode-9) % 4 == 0) fputs("\n", fp);
 		}
 		return;
 	}
 	if (!bVdiAesIntercept)
 	{
-		fputs("VDI/AES interception isn't enabled!\n", stderr);
+		fputs("VDI/AES interception isn't enabled!\n", fp);
 		return;
 	}
 	if (!AESControl)
 	{
-		fputs("No traced AES calls!\n", stderr);
+		fputs("No traced AES calls!\n", fp);
 		return;
 	}
 	opcode = STMemory_ReadWord(AESControl);
 	if (opcode != AESOpCode)
 	{
-		fputs("AES parameter block contents changed since last call!\n", stderr);
+		fputs("AES parameter block contents changed since last call!\n", fp);
 		return;
 	}
 
-	fputs("Latest AES Parameter block:\n", stderr);
-	fprintf(stderr, "- Opcode: %3hd (%s)\n",
+	fputs("Latest AES Parameter block:\n", fp);
+	fprintf(fp, "- Opcode: %3hd (%s)\n",
 		opcode, AES_Opcode2Name(opcode));
 
-	fprintf(stderr, "- Control: %#8x\n", AESControl);
-	fprintf(stderr, "- Global:  %#8x, %d bytes\n",
+	fprintf(fp, "- Control: %#8x\n", AESControl);
+	fprintf(fp, "- Global:  %#8x, %d bytes\n",
 		AESGlobal, 2+2+2+4+4+4+4+4+4);
-	fprintf(stderr, "- Intin:   %#8x, %d words\n",
+	fprintf(fp, "- Intin:   %#8x, %d words\n",
 		AESIntin, STMemory_ReadWord(AESControl+2*1));
-	fprintf(stderr, "- Intout:  %#8x, %d words\n",
+	fprintf(fp, "- Intout:  %#8x, %d words\n",
 		AESIntout, STMemory_ReadWord(AESControl+2*2));
-	fprintf(stderr, "- Addrin:  %#8x, %d longs\n",
+	fprintf(fp, "- Addrin:  %#8x, %d longs\n",
 		AESAddrin, STMemory_ReadWord(AESControl+2*3));
-	fprintf(stderr, "- Addrout: %#8x, %d longs\n",
+	fprintf(fp, "- Addrout: %#8x, %d longs\n",
 		AESAddrout, STMemory_ReadWord(AESControl+2*4));
 }
 
@@ -663,30 +642,30 @@ static const char* VDI_Opcode2Name(Uint16 opcode, Uint16 subcode)
 
 	if (opcode == 5)
 	{
-		if (subcode < ARRAYSIZE(names_opcode5)) {
+		if (subcode < ARRAY_SIZE(names_opcode5)) {
 			return names_opcode5[subcode];
 		}
 		if (subcode >= 98) {
 			subcode -= 98;
-			if (subcode < ARRAYSIZE(names_opcode5_98)) {
+			if (subcode < ARRAY_SIZE(names_opcode5_98)) {
 				return names_opcode5_98[subcode];
 			}
 		}
 	}
 	else if (opcode == 11)
 	{
-		if (subcode < ARRAYSIZE(names_opcode11)) {
+		if (subcode < ARRAY_SIZE(names_opcode11)) {
 			return names_opcode11[subcode];
 		}
 	}
-	else if (opcode < ARRAYSIZE(names_0))
+	else if (opcode < ARRAY_SIZE(names_0))
 	{
 		return names_0[opcode];
 	}
 	else if (opcode >= 100)
 	{
 		opcode -= 100;
-		if (opcode < ARRAYSIZE(names_100))
+		if (opcode < ARRAY_SIZE(names_100))
 		{
 			return names_100[opcode];
 		}
@@ -698,7 +677,7 @@ static const char* VDI_Opcode2Name(Uint16 opcode, Uint16 subcode)
  * If opcodes argument is set, show VDI opcode/function name table,
  * otherwise VDI vectors information.
  */
-void VDI_Info(Uint32 bShowOpcodes)
+void VDI_Info(FILE *fp, Uint32 bShowOpcodes)
 {
 	Uint16 opcode, subcode;
 
@@ -709,57 +688,57 @@ void VDI_Info(Uint32 bShowOpcodes)
 		{
 			if (opcode == 0x28)
 			{
-				fputs("--- GDOS calls? ---\n", stderr);
+				fputs("--- GDOS calls? ---\n", fp);
 				opcode = 0x64;
 			}
-			fprintf(stderr, "%02x %-16s",
+			fprintf(fp, "%02x %-16s",
 				opcode, VDI_Opcode2Name(opcode, 0));
-			if (++opcode % 4 == 0) fputs("\n", stderr);
+			if (++opcode % 4 == 0) fputs("\n", fp);
 		}
 		return;
 	}
 	if (!bVdiAesIntercept)
 	{
-		fputs("VDI/AES interception isn't enabled!\n", stderr);
+		fputs("VDI/AES interception isn't enabled!\n", fp);
 		return;
 	}
 	if (!VDIControl)
 	{
-		fputs("No traced VDI calls!\n", stderr);
+		fputs("No traced VDI calls!\n", fp);
 		return;
 	}
 	opcode = STMemory_ReadWord(VDIControl);
 	if (opcode != VDIOpCode)
 	{
-		fputs("VDI parameter block contents changed since last call!\n", stderr);
+		fputs("VDI parameter block contents changed since last call!\n", fp);
 		return;
 	}
 
-	fputs("Latest VDI Parameter block:\n", stderr);
+	fputs("Latest VDI Parameter block:\n", fp);
 	subcode = STMemory_ReadWord(VDIControl+2*5);
-	fprintf(stderr, "- Opcode/Subcode: %hd/%hd (%s)\n",
+	fprintf(fp, "- Opcode/Subcode: %hd/%hd (%s)\n",
 		opcode, subcode, VDI_Opcode2Name(opcode, subcode));
-	fprintf(stderr, "- Device handle: %d\n",
+	fprintf(fp, "- Device handle: %d\n",
 		STMemory_ReadWord(VDIControl+2*6));
-	fprintf(stderr, "- Control: %#8x\n", VDIControl);
-	fprintf(stderr, "- Ptsin:   %#8x, %d co-ordinate word pairs\n",
+	fprintf(fp, "- Control: %#8x\n", VDIControl);
+	fprintf(fp, "- Ptsin:   %#8x, %d co-ordinate word pairs\n",
 		VDIPtsin, STMemory_ReadWord(VDIControl+2*1));
-	fprintf(stderr, "- Ptsout:  %#8x, %d co-ordinate word pairs\n",
+	fprintf(fp, "- Ptsout:  %#8x, %d co-ordinate word pairs\n",
 		VDIPtsout, STMemory_ReadWord(VDIControl+2*2));
-	fprintf(stderr, "- Intin:   %#8x, %d words\n",
+	fprintf(fp, "- Intin:   %#8x, %d words\n",
 		VDIIntin, STMemory_ReadWord(VDIControl+2*3));
-	fprintf(stderr, "- Intout:  %#8x, %d words\n",
+	fprintf(fp, "- Intout:  %#8x, %d words\n",
 		VDIIntout, STMemory_ReadWord(VDIControl+2*4));
 }
 
 #else /* !ENABLE_TRACING */
-void AES_Info(Uint32 bShowOpcodes)
+void AES_Info(FILE *fp, Uint32 bShowOpcodes)
 {
-	fputs("Hatari isn't configured with ENABLE_TRACING\n", stderr);
+	fputs("Hatari isn't configured with ENABLE_TRACING\n", fp);
 }
-void VDI_Info(Uint32 bShowOpcodes)
+void VDI_Info(FILE *fp, Uint32 bShowOpcodes)
 {
-	fputs("Hatari isn't configured with ENABLE_TRACING\n", stderr);
+	fputs("Hatari isn't configured with ENABLE_TRACING\n", fp);
 }
 #endif /* !ENABLE_TRACING */
 
@@ -789,11 +768,11 @@ bool VDI_AES_Entry(void)
 	Uint16 call = Regs[REG_D0];
 	Uint32 TablePtr = Regs[REG_D1];
 
-#if ENABLE_TRACING
+#if defined(ENABLE_TRACING) || defined(__EMSCRIPTEN__)//#if ENABLE_TRACING
 	/* AES call? */
 	if (call == 0xC8)
 	{
-		if (!STMemory_ValidArea(TablePtr, 24))
+		if ( !STMemory_CheckAreaType ( TablePtr, 24, ABFLAG_RAM ) )
 		{
 			Log_Printf(LOG_WARN, "AES call failed due to invalid parameter block address 0x%x+%i\n", TablePtr, 24);
 			return false;
@@ -806,10 +785,12 @@ bool VDI_AES_Entry(void)
 		AESAddrin  = STMemory_ReadLong(TablePtr+16);
 		AESAddrout = STMemory_ReadLong(TablePtr+20);
 		AESOpCode  = STMemory_ReadWord(AESControl);
+#if !defined(__EMSCRIPTEN__)
 		if (LOG_TRACE_LEVEL(TRACE_OS_AES))
 		{
 			AES_OpcodeInfo(TraceFile, AESOpCode);
 		}
+#endif
 		/* using same special opcode trick doesn't work for
 		 * both VDI & AES as AES functions can be called
 		 * recursively and VDI calls happen inside AES calls.
@@ -821,7 +802,7 @@ bool VDI_AES_Entry(void)
 	/* VDI call? */
 	if (call == 0x73)
 	{
-		if (!STMemory_ValidArea(TablePtr, 20))
+		if ( !STMemory_CheckAreaType ( TablePtr, 20, ABFLAG_RAM ) )
 		{
 			Log_Printf(LOG_WARN, "VDI call failed due to invalid parameter block address 0x%x+%i\n", TablePtr, 20);
 			return false;
@@ -858,21 +839,68 @@ bool VDI_AES_Entry(void)
  */
 void VDI_LineA(Uint32 linea, Uint32 fontbase)
 {
+	Uint32 fontadr, font1, font2;
+
+	LineABase = linea;
+	FontBase = fontbase;
+
 	if (bUseVDIRes)
 	{
-		int cel_ht = STMemory_ReadWord(linea-46);             /* v_cel_ht */
-		STMemory_WriteWord(linea-44, (VDIWidth/8)-1);         /* v_cel_mx (cols-1) */
+		int cel_ht, cel_wd;
+
+		fontadr = STMemory_ReadLong(linea-0x1cc); /* def_font */
+		if (fontadr == 0)
+		{
+			/* get 8x8 font header */
+			font1 = STMemory_ReadLong(fontbase + 4);
+			/* get 8x16 font header */
+			font2 = STMemory_ReadLong(fontbase + 8);
+			/* remove DEFAULT flag from 8x8 font */
+			STMemory_WriteWord(font1 + 66, STMemory_ReadWord(font1 + 66) & ~0x01);
+			/* remove DEFAULT flag from 8x16 font */
+			STMemory_WriteWord(font2 + 66, STMemory_ReadWord(font2 + 66) & ~0x01);
+			/* choose new font */
+			if (VDIHeight >= 400)
+			{
+				fontadr = font2;
+			} else
+			{
+				fontadr = font1;
+			}
+			/* make this new default font */
+			STMemory_WriteLong(linea-0x1cc, fontadr);
+			/* set DEFAULT flag for choosen font */
+			STMemory_WriteWord(fontadr + 66, STMemory_ReadWord(fontadr + 66) | 0x01);
+		}
+		cel_wd = STMemory_ReadWord(fontadr + 52);
+		cel_ht = STMemory_ReadWord(fontadr + 82);
+		if (cel_wd <= 0)
+		{
+			Log_Printf(LOG_WARN, "VDI Line-A init failed due to bad cell width!\n");
+			return;
+		}
+		if (cel_ht <= 0)
+		{
+			Log_Printf(LOG_WARN, "VDI Line-A init failed due to bad cell height!\n");
+			return;
+		}
+
+		STMemory_WriteWord(linea-46, cel_ht);                 /* v_cel_ht */
+		STMemory_WriteWord(linea-44, (VDIWidth/cel_wd)-1);    /* v_cel_mx (cols-1) */
 		STMemory_WriteWord(linea-42, (VDIHeight/cel_ht)-1);   /* v_cel_my (rows-1) */
 		STMemory_WriteWord(linea-40, cel_ht*((VDIWidth*VDIPlanes)/8));  /* v_cel_wr */
 
+		STMemory_WriteLong(linea-22, STMemory_ReadLong(fontadr + 76)); /* v_fnt_ad */
+		STMemory_WriteWord(linea-18, STMemory_ReadWord(fontadr + 38)); /* v_fnt_nd */
+		STMemory_WriteWord(linea-16, STMemory_ReadWord(fontadr + 36)); /* v_fnt_st */
+		STMemory_WriteWord(linea-14, STMemory_ReadWord(fontadr + 80)); /* v_fnt_wd */
 		STMemory_WriteWord(linea-12, VDIWidth);               /* v_rez_hz */
+		STMemory_WriteLong(linea-10, STMemory_ReadLong(fontadr + 72)); /* v_off_ad */
 		STMemory_WriteWord(linea-4, VDIHeight);               /* v_rez_vt */
 		STMemory_WriteWord(linea-2, (VDIWidth*VDIPlanes)/8);  /* bytes_lin */
 		STMemory_WriteWord(linea+0, VDIPlanes);               /* planes */
 		STMemory_WriteWord(linea+2, (VDIWidth*VDIPlanes)/8);  /* width */
 	}
-	LineABase = linea;
-	FontBase = fontbase;
 }
 
 

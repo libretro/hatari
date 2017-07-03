@@ -8,31 +8,32 @@
 */
 const char File_fileid[] = "Hatari file.c : " __DATE__ " " __TIME__;
 
+#include "main.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#if HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
 #include <fcntl.h>
 #include <unistd.h>
 #include <assert.h>
 #include <errno.h>
+#if HAVE_ZLIB_H
 #include <zlib.h>
-
+#endif
 #if defined(WIN32) && !defined(_VCWIN_)
 #include <winsock2.h>
 #endif
 
-#include "main.h"
 #include "dialog.h"
 #include "file.h"
 #include "createBlankImage.h"
 #include "str.h"
 #include "zip.h"
+#include "log.h"
 
 #ifdef HAVE_FLOCK
 # include <sys/file.h>
-#endif
-#ifndef HAVE_FTELLO
-#define ftello ftell
 #endif
 
 /*-----------------------------------------------------------------------*/
@@ -331,9 +332,9 @@ off_t File_Length(const char *pszFileName)
 	hDiskFile = fopen(pszFileName, "rb");
 	if (hDiskFile!=NULL)
 	{
-		fseek(hDiskFile, 0, SEEK_END);
+		fseeko(hDiskFile, 0, SEEK_END);
 		FileSize = ftello(hDiskFile);
-		fseek(hDiskFile, 0, SEEK_SET);
+		fseeko(hDiskFile, 0, SEEK_SET);
 		fclose(hDiskFile);
 		return FileSize;
 	}
@@ -412,7 +413,7 @@ char * File_FindPossibleExtFileName(const char *pszFileName, const char * const 
 	if (!szSrcDir)
 	{
 		perror("File_FindPossibleExtFileName");
-		return false;
+		return NULL;
 	}
 	szSrcName = szSrcDir + FILENAME_MAX;
 	szSrcExt = szSrcName + FILENAME_MAX;
@@ -532,6 +533,9 @@ char * File_MakePath(const char *pDir, const char *pName, const char *pExt)
 /**
  * Shrink a file name to a certain length and insert some dots if we cut
  * something away (useful for showing file names in a dialog).
+ * Note: maxlen is the maximum length of the destination string, _not_
+ * including the final '\0' byte! So the destination buffer has to be
+ * at least one byte bigger than maxlen.
  */
 void File_ShrinkName(char *pDestFileName, const char *pSrcFileName, int maxlen)
 {
@@ -923,3 +927,42 @@ void File_HandleDotDirs(char *path)
 		}
 	}
 }
+
+
+#if defined(WIN32)
+static TCHAR szTempFileName[MAX_PATH];
+
+/*-----------------------------------------------------------------------*/
+/**
+ * Get temporary filename for Windows
+ */
+char* WinTmpFile(void)
+{
+	DWORD dwRetVal = 0;
+	UINT uRetVal   = 0;
+	TCHAR lpTempPathBuffer[MAX_PATH];
+
+	/* Gets the temp path env string (no guarantee it's a valid path) */
+	dwRetVal = GetTempPath(MAX_PATH,		/* length of the buffer */
+                           lpTempPathBuffer);		/* buffer for path */
+	if (dwRetVal > MAX_PATH || (dwRetVal == 0))
+	{
+		Log_Printf(LOG_ERROR, "GetTempPath failed.\n");
+		return NULL;
+	}
+
+	/* Generates a temporary file name */
+	uRetVal = GetTempFileName(lpTempPathBuffer,	/* directory for tmp files */
+                              TEXT("HATARI"),		/* temp file name prefix */
+                              0,			/* create unique name */
+                              szTempFileName);		/* buffer for name */
+	if (uRetVal == 0)
+	{
+		Log_Printf(LOG_ERROR, "GetTempFileName failed.\n");
+		return NULL;
+	}
+	return (char*)szTempFileName;
+}
+#endif
+
+

@@ -15,7 +15,9 @@ extern int Reset_Warm(void);
 #include "SDL_keyboard.h"
 #include "SDL_video.h"
 
-#define SDL_GetTicks  GetTicks 
+#define HSDL_GetTicks  GetTicks 
+
+#define SDL_GetTicks  HSDL_GetTicks 
 #include "SDL_types.h"
 
 #define RGB565(r, g, b)  (((r) << (5+6)) | ((g) << 6) | (b))
@@ -48,7 +50,9 @@ Uint8 type;
 #define SDL_InitSubSystem(...) 1
 #define SDL_Init(...) 1
 //TIME
+#define HSDL_Delay(a) usleep((a)*1000)
 #define SDL_Delay(a) usleep((a)*1000)
+
 //SURFACE
 #define SDL_SetColors(a, b, c, d)
 #define SDL_MUSTLOCK(a) 0
@@ -72,7 +76,7 @@ Uint8 type;
 #define SDL_NumJoysticks() 0
 #define SDL_JoystickOpen(i) NULL
 #define SDL_JoystickName(i) "RetroWrapper"
-#define SDL_JoystickClose
+#define SDL_JoystickClose(a)
 #define SDL_JoystickGetAxis(...) 0
 #define SDL_JoystickGetButton(...) 0
 #define SDL_JoystickNumAxes(...) 0

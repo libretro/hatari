@@ -12,7 +12,7 @@ URL:          http://hatari.tuxfamily.org/
 License:      GPL
 Group:        System/Emulators/Other
 Autoreqprov:  on
-Version:      1.8.0
+Version:      2.0.0
 Release:      1
 Summary:      an Atari ST emulator suitable for playing games
 Source:       %{name}-%{version}.tar.gz
@@ -58,6 +58,12 @@ rm -rf $RPM_BUILD_ROOT
 %_docdir/%{name}/images/*.png
 
 %changelog -n hatari
+
+* Thu Nov 04 2016 - Nicolas Pomarede
+- Hatari version 2.0.0
+
+* Thu Sep 10 2015 - Nicolas Pomarede
+- Hatari version 1.9.0
 
 * Wed Jul 30 2014 - Nicolas Pomarede
 - Hatari version 1.8.0
