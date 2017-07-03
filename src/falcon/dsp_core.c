@@ -45,10 +45,10 @@ dsp_core_t dsp_core;
 static void dsp_core_dsp2host(void);
 static void dsp_core_host2dsp(void);
 
-static void (*dsp_host_interrupt)(void);   /* Function to trigger host interrupt */
+static void (*dsp_host_interrupt)(int);   /* Function to set/clear host interrupt */
 
 /* Init DSP emulation */
-void dsp_core_init(void (*host_interrupt)(void))
+void dsp_core_init(void (*host_interrupt)(int))
 {
 	int i;
 
@@ -101,14 +101,14 @@ void dsp_core_init(void (*host_interrupt)(void))
 		const Sint32 multiply_line[4]={0x40, 0x04, 0x10, 0x08};
 		const Sint32 base_values[4]={0, -1, 2, 1};
 		Uint32 pos=0x0180;
-		
+
 		for (i=0;i<8;i++) {
 			Sint32 alawbase, j;
 
 			alawbase = multiply_base[i]<<8;
 			for (j=0;j<4;j++) {
 				Sint32 alawbase1, k;
-				
+
 				alawbase1 = alawbase + ((base_values[j]*multiply_line[i & 3])<<12);
 
 				for (k=0;k<4;k++) {
@@ -146,7 +146,7 @@ void dsp_core_reset(void)
 	dsp_core.dsp_host_htx = 0;
 
 	dsp_core.bootstrap_pos = 0;
-	
+
 	/* Registers */
 	dsp_core.pc = 0x0000;
 	dsp_core.registers[DSP_REG_OMR]=0x02;
@@ -199,7 +199,7 @@ void dsp_core_reset(void)
 	dsp56k_init_cpu();
 }
 
-/* 
+/*
 	SSI INTERFACE processing
 */
 
@@ -447,7 +447,7 @@ void dsp_core_ssi_configure(Uint32 address, Uint32 value)
 			crb_te = dsp_core.periph[DSP_SPACE_X][DSP_SSI_CRB] & (1<<DSP_SSI_CRB_TE);
 			crb_re = dsp_core.periph[DSP_SPACE_X][DSP_SSI_CRB] & (1<<DSP_SSI_CRB_RE);
 			dsp_core.periph[DSP_SPACE_X][DSP_SSI_CRB] = value;
-	
+
 			dsp_core.ssi.crb_src_clock = (value>>DSP_SSI_CRB_SCKD) & 1;
 			dsp_core.ssi.crb_shifter   = (value>>DSP_SSI_CRB_SHFD) & 1;
 			dsp_core.ssi.crb_synchro   = (value>>DSP_SSI_CRB_SYN) & 1;
@@ -471,7 +471,7 @@ void dsp_core_ssi_configure(Uint32 address, Uint32 value)
 }
 
 
-/* 
+/*
 	HOST INTERFACE processing
 */
 
@@ -490,6 +490,7 @@ static void dsp_core_hostport_update_hreq(void)
 {
 	int hreq;
 
+#if 0
 	hreq = (dsp_core.hostport[CPU_HOST_ICR] & dsp_core.hostport[CPU_HOST_ISR]) & 0x3;
 
 	/* Trigger host interrupt? */
@@ -500,7 +501,27 @@ static void dsp_core_hostport_update_hreq(void)
 	/* Set HREQ bit in hostport */
 	dsp_core.hostport[CPU_HOST_ISR] &= 0x7f;
 	dsp_core.hostport[CPU_HOST_ISR] |= (hreq?1:0) << CPU_HOST_ISR_HREQ;
-} 
+#else
+	hreq = (dsp_core.hostport[CPU_HOST_ICR] & dsp_core.hostport[CPU_HOST_ISR]) & 0x3;
+
+    if ( hreq != 0 )
+		hreq = 1 << CPU_HOST_ISR_HREQ;
+
+	/* If hreq doesn't change, we do nothing */
+    if ( hreq == ( dsp_core.hostport[CPU_HOST_ISR] & 0x80 ) )
+		return;
+
+	if ( hreq )								/* 0->1 transition */
+		dsp_host_interrupt ( 1 );			/* set host interrupt */
+	else									/* 1->0 transition */
+		dsp_host_interrupt ( 0 );			/* unset host interrupt */
+
+	/* Set/clear HREQ bit in hostport */
+	dsp_core.hostport[CPU_HOST_ISR] &= 0x7f;
+	dsp_core.hostport[CPU_HOST_ISR] |= hreq;
+//fprintf ( stderr , "dsp_core_hostport_update_hreq %x\n" , hreq );
+#endif
+}
 
 /* Host port transfer ? (dsp->host) */
 static void dsp_core_dsp2host(void)
@@ -541,7 +562,7 @@ static void dsp_core_host2dsp(void)
 	if (dsp_core.hostport[CPU_HOST_ISR] & (1<<CPU_HOST_ISR_TXDE)) {
 		return;
 	}
-	
+
 	/* HRDF = 1 ==> DSP hasn't read the last value yet */
 	if (dsp_core.periph[DSP_SPACE_X][DSP_HOST_HSR] & (1<<DSP_HOST_HSR_HRDF)) {
 		return;
@@ -600,7 +621,7 @@ Uint8 dsp_core_read_host(int addr)
 		dsp_core.hostport[CPU_HOST_ISR] &= 0xff-(1<<CPU_HOST_ISR_RXDF);
 		dsp_core_dsp2host();
 		dsp_core_hostport_update_hreq();
-		
+
 		LOG_TRACE(TRACE_DSP_HOST_INTERFACE, "Dsp: (DSP->Host): Host RXDF=0\n");
 	}
 	return value;
@@ -656,7 +677,7 @@ void dsp_core_write_host(int addr, Uint8 value)
 					(dsp_core.hostport[CPU_HOST_TXH]<<16) |
 					(dsp_core.hostport[CPU_HOST_TXM]<<8) |
 					 dsp_core.hostport[CPU_HOST_TXL];
-				
+
 				LOG_TRACE(TRACE_DSP_STATE, "Dsp: bootstrap p:0x%04x = 0x%06x\n",
 								dsp_core.bootstrap_pos,
 								dsp_core.ramint[DSP_SPACE_P][dsp_core.bootstrap_pos]);

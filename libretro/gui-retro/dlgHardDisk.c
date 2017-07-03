@@ -112,9 +112,9 @@ void DlgHardDisk_Main(void)
 	SDLGui_CenterDlg(diskdlg);
 
 	/* Set up dialog to actual values: */
-printf("skip: %d\n", ConfigureParams.HardDisk.nHardDiskDrive);
+printf("skip: %d\n", ConfigureParams.HardDisk.nGemdosDrive);
 	/* Skip ACSI/IDE partitions? */
-	if (ConfigureParams.HardDisk.nHardDiskDrive == DRIVE_SKIP)
+	if (ConfigureParams.HardDisk.nGemdosDrive == DRIVE_SKIP)
 		diskdlg[DISKDLG_DRIVESKIP].state |= SG_SELECTED;
 	else
 		diskdlg[DISKDLG_DRIVESKIP].state &= ~SG_SELECTED;
@@ -228,7 +228,7 @@ printf("skip: %d\n", ConfigureParams.HardDisk.nHardDiskDrive);
 	ConfigureParams.HardDisk.bBootFromHardDisk = (diskdlg[DISKDLG_BOOTHD].state & SG_SELECTED);
 
 	if (diskdlg[DISKDLG_DRIVESKIP].state & SG_SELECTED)
-		ConfigureParams.HardDisk.nHardDiskDrive = DRIVE_SKIP;
-	else if (ConfigureParams.HardDisk.nHardDiskDrive == DRIVE_SKIP)
-		ConfigureParams.HardDisk.nHardDiskDrive = DRIVE_C;
+		ConfigureParams.HardDisk.nGemdosDrive = DRIVE_SKIP;
+	else if (ConfigureParams.HardDisk.nGemdosDrive == DRIVE_SKIP)
+		ConfigureParams.HardDisk.nGemdosDrive = DRIVE_C;
 }

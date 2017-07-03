@@ -39,8 +39,8 @@ static void Bios_RWabs(Uint32 Params)
 	RecNo = STMemory_ReadWord(Params+SIZE_WORD+SIZE_LONG+SIZE_WORD);
 	Dev = STMemory_ReadWord(Params+SIZE_WORD+SIZE_LONG+SIZE_WORD+SIZE_WORD);
 
-	LOG_TRACE(TRACE_OS_BIOS, "BIOS 0x04 Rwabs(%d,0x%lX,%d,%d,%i) at PC 0x%X\n",
-	          RWFlag, STRAM_ADDR(pBuffer), Number, RecNo, Dev,
+	LOG_TRACE(TRACE_OS_BIOS, "BIOS 0x04 Rwabs(%d,0x%x,%d,%d,%i) at PC 0x%X\n",
+	          RWFlag, pBuffer, Number, RecNo, Dev,
 		  M68000_GetPC());
 #endif
 }
@@ -97,27 +97,27 @@ static const char* Bios_Call2Name(Uint16 opcode)
 		"Rwabs",  "Setexc",  "Tickcal","Getbpb",
 		"Bcostat","Mediach", "Drvmap", "Kbshift"
 	};
-	if (opcode < ARRAYSIZE(names) && names[opcode]) {
+	if (opcode < ARRAY_SIZE(names) && names[opcode]) {
 		return names[opcode];
 	}
 	return "???";
 }
 
-void Bios_Info(Uint32 dummy)
+void Bios_Info(FILE *fp, Uint32 dummy)
 {
 	Uint16 opcode;
 	for (opcode = 0; opcode <= 0xB; ) {
-		fprintf(stderr, "%02x %-9s", opcode,
+		fprintf(fp, "%02x %-9s", opcode,
 			Bios_Call2Name(opcode));
 		if (++opcode % 6 == 0) {
-			fputs("\n", stderr);
+			fputs("\n", fp);
 		}
 	}
 }
 #else /* !ENABLE_TRACING */
-void Bios_Info(Uint32 bShowOpcodes)
+void Bios_Info(FILE *fp, Uint32 bShowOpcodes)
 {
-	        fputs("Hatari isn't configured with ENABLE_TRACING\n", stderr);
+	        fputs("Hatari isn't configured with ENABLE_TRACING\n", fp);
 }
 #endif /* !ENABLE_TRACING */
 

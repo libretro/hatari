@@ -54,7 +54,7 @@ char RPATH[512];
 //EMU FLAGS
 int NPAGE=-1, KCOL=1, BKGCOLOR=0, MAXPAS=6;
 int SHIFTON=-1,MOUSEMODE=-1,NUMJOY=0,SHOWKEY=-1,PAS=4,STATUTON=-1;
-int SND; //SOUND ON/OFF
+int SND=1; //SOUND ON/OFF
 static int firstps=0;
 int pauseg=0; //enter_gui
 
@@ -93,6 +93,23 @@ void retro_set_input_poll(retro_input_poll_t cb)
    input_poll_cb = cb;
 }
 
+size_t HSDL_strlcpy(char *dest, const char *source, size_t size)
+{
+   size_t src_size = 0;
+   size_t n = size;
+
+   if (n)
+      while (--n && (*dest++ = *source++)) src_size++;
+
+   if (!n)
+   {
+      if (size) *dest = '\0';
+      while (*source++) src_size++;
+   }
+
+   return src_size;
+}
+ 
 long GetTicks(void)
 { // in MSec
 #ifndef _ANDROID_
@@ -132,11 +149,14 @@ void gui_poll_events(void)
    Ktime = GetTicks();
 
    if(Ktime - LastFPSTime >= 1000/50)
-   { 
-	  slowdown=0;
+   {		
+      slowdown=0;
       frame++; 
-      LastFPSTime = Ktime;		
+      LastFPSTime = Ktime;	
+      //FIXME NOLIBCO
+#ifdef HAVE_LIBCO
       co_switch(mainThread);
+#endif
    }
 }
 
@@ -265,8 +285,10 @@ void texture_init(void)
 void enter_gui(void)
 {
    save_bkg();
-
+#ifdef HAVE_LIBCO
    Dialog_DoProperty();
+//FIXME NOLIBCO
+#endif
    pauseg=0;
 }
 
@@ -702,24 +724,10 @@ void input_gui(void)
       MOUSEMODE=-MOUSEMODE;
    }
 
+   if(slowdown>0)return;
+
    if(MOUSEMODE==1)
    {
-
-	  if(slowdown>0)return;
-
-#if 0
-      //TODO FIX THIS :(
-#if defined(__CELLOS_LV2__) 
-      //Slow Joypad Mouse Emulation for PS3
-      static int pair=-1;
-      pair=-pair;
-      if(pair==1)
-         return;
-      PAS=1;
-#elif defined(GEKKO) 
-      PAS=1;
-#endif
-#endif
 
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
          mouse_x += PAS;
@@ -733,7 +741,7 @@ void input_gui(void)
       mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
 
       PAS=SAVPAS;
-	  slowdown=1;
+	  
    }
    else
    {
@@ -742,6 +750,8 @@ void input_gui(void)
       mouse_l    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
       mouse_r    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
    }
+
+   slowdown=1;
 
    static int mmbL = 0, mmbR = 0;
 

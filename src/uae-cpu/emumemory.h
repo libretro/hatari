@@ -37,6 +37,12 @@ typedef int (*check_func)(uaecptr, uae_u32) REGPARAM;
 extern char *address_space, *good_address_map;
 
 
+enum
+{
+	ABFLAG_UNK = 0, ABFLAG_RAM = 1, ABFLAG_ROM = 2, ABFLAG_ROMIN = 4, ABFLAG_IO = 8,
+	ABFLAG_NONE = 16, ABFLAG_SAFE = 32, ABFLAG_INDIRECT = 64, ABFLAG_NOALLOC = 128,
+	ABFLAG_RTG = 256, ABFLAG_THREADSAFE = 512, ABFLAG_DIRECTMAP = 1024
+};
 typedef struct {
     /* These ones should be self-explanatory... */
     mem_get_func lget, wget, bget;
@@ -51,6 +57,14 @@ typedef struct {
      * that the pointer points to an area of at least the specified size.
      * This is used for example to translate bitplane pointers in custom.c */
     check_func check;
+    /* For those banks that refer to real memory, we can save the whole trouble
+    of going through function calls, and instead simply grab the memory
+    ourselves. This holds the memory address where the start of memory is
+    for this particular bank. */
+    uae_u8 *baseaddr;
+    int flags;
+    uae_u32 mask;
+    uae_u32 start;
 } addrbank;
 
 
@@ -66,6 +80,7 @@ extern addrbank mem_banks[65536];
 #define put_mem_bank(addr, b) (mem_banks[bankindex(addr)] = *(b))
 #endif
 
+extern bool memory_region_bus_error ( uaecptr addr );
 extern void memory_init(uae_u32 nNewSTMemSize, uae_u32 nNewTTMemSize, uae_u32 nNewRomMemStart);
 extern void memory_uninit (void);
 extern void map_banks(addrbank *bank, int first, int count);

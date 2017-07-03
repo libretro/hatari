@@ -28,6 +28,9 @@ void Crossbar_Compute_Ratio(void);
 /* Called by mfp.c */
 extern void Crossbar_GenerateSamples(int nMixBufIdx, int nSamplesToGenerate);
 
+/* Called by m68000.c */
+extern void Crossbar_Recalculate_Clocks_Cycles(void);
+
 extern void Crossbar_Reset(bool bCold);
 extern void Crossbar_MemorySnapShot_Capture(bool bSave);
 
@@ -81,6 +84,6 @@ void Crossbar_DmaRecordInHandShakeMode_Frame(Uint32 frame);
 void Crossbar_GetMicrophoneDatas(Sint16 *micro_bufferL, Sint16 *micro_bufferR, Uint32 microBuffer_size);
 
 /* called by debugInfo.c */
-extern void Crossbar_Info(Uint32 dummy);
+extern void Crossbar_Info(FILE *fp, Uint32 dummy);
 
 #endif /* HATARI_CROSSBAR_H */

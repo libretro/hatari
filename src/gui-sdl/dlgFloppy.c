@@ -69,7 +69,7 @@ static SGOBJ floppydlg[] =
 	{ SGRADIOBUT, 0, 0, 28,16,  4,1, "O_n" },
 	{ SGRADIOBUT, 0, 0, 34,16,  6,1, "A_uto" },
 	{ SGBUTTON, SG_DEFAULT, 0, 22,18, 20,1, "Back to main menu" },
-	{ -1, 0, 0, 0,0, 0,0, NULL }
+	{ SGSTOP, 0, 0, 0,0, 0,0, NULL }
 };
 
 
@@ -85,7 +85,7 @@ static SGOBJ alertdlg[] =
 	{ SGBUTTON, 0, 0,  3,4, 10,1, "Drive _A:" },
 	{ SGBUTTON, 0, 0, 15,4, 10,1, "Drive _B:" },
 	{ SGBUTTON, SG_CANCEL, 0, 27,4, 10,1, "_Cancel" },
-	{ -1, 0, 0, 0,0, 0,0, NULL }
+	{ SGSTOP, 0, 0, 0,0, 0,0, NULL }
 };
 
 
@@ -118,8 +118,7 @@ static void DlgDisk_BrowseDisk(char *dlgname, int drive, int diskid)
 		Floppy_SetDiskFileNameNone(drive);
 		dlgname[0] = '\0';
 	}
-	if (zip_path)
-		free(zip_path);
+	free(zip_path);
 	free(selname);
 }
 
@@ -156,7 +155,7 @@ static void DlgFloppy_QueryInsert(char *namea, int ida, char *nameb, int idb, co
 	char *dlgname;
 
 	SDLGui_CenterDlg(alertdlg);
-	switch (SDLGui_DoDialog(alertdlg, NULL))
+	switch (SDLGui_DoDialog(alertdlg, NULL, false))
 	{
 		case DLGMOUNT_A:
 			dlgname = namea;
@@ -257,7 +256,7 @@ void DlgFloppy_Main(void)
 	/* Draw and process the dialog */
 	do
 	{
-		but = SDLGui_DoDialog(floppydlg, NULL);
+		but = SDLGui_DoDialog(floppydlg, NULL, false);
 		switch (but)
 		{
 		 case FLOPPYDLG_EJECTA:                         /* Eject disk in drive A: */

@@ -28,6 +28,7 @@ const char Log_fileid[] = "Hatari log.c : " __DATE__ " " __TIME__;
 #include "screen.h"
 #include "file.h"
 #include "vdi.h"
+#include "options.h"
 
 int ExceptionDebugMask;
 
@@ -46,6 +47,7 @@ static flagname_t ExceptionFlags[] = {
 	{ EXCEPT_CHK,       "chk" },
 	{ EXCEPT_TRAPV,     "trapv" },
 	{ EXCEPT_PRIVILEGE, "privilege" },
+	{ EXCEPT_TRACE,     "trace" },
 	{ EXCEPT_NOHANDLER, "nohandler" },
 
 	{ EXCEPT_DSP,       "dsp" },
@@ -140,6 +142,10 @@ static flagname_t TraceFlags[] = {
 
 	{ TRACE_IDE		 , "ide" } ,
 
+	{ TRACE_OS_BASE		 , "os_base" } ,
+
+	{ TRACE_SCSIDRV		 , "scsidrv" } ,
+
 	{ TRACE_ALL		 , "all" }
 };
 #endif /* ENABLE_TRACING */
@@ -160,6 +166,7 @@ void Log_Default(void)
 {
 	hLogFile = stderr;
 	TraceFile = stderr;
+	TextLogLevel = LOG_INFO;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -388,7 +395,7 @@ const char* Log_SetExceptionDebugMask (const char *FlagsStr)
 	const char *errstr;
 
 	Uint64 mask = EXCEPT_NONE;
-	errstr = Log_ParseOptionFlags(FlagsStr, ExceptionFlags, ARRAYSIZE(ExceptionFlags), &mask);
+	errstr = Log_ParseOptionFlags(FlagsStr, ExceptionFlags, ARRAY_SIZE(ExceptionFlags), &mask);
 	ConfigureParams.Log.nExceptionDebugMask = mask;
 	return errstr;
 }
@@ -407,11 +414,14 @@ const char* Log_SetTraceOptions (const char *FlagsStr)
 	const char *errstr;
 
 	LogTraceFlags = TRACE_NONE;
-	errstr = Log_ParseOptionFlags(FlagsStr, TraceFlags, ARRAYSIZE(TraceFlags), &LogTraceFlags);
+	errstr = Log_ParseOptionFlags(FlagsStr, TraceFlags, ARRAY_SIZE(TraceFlags), &LogTraceFlags);
 
 	/* Enable Hatari flags needed for tracing selected items */
 	if (LogTraceFlags & (TRACE_OS_AES|TRACE_OS_VDI))
 		bVdiAesIntercept = true;
+
+	if ((LogTraceFlags & TRACE_OS_BASE) && ConOutDevice == CONOUT_DEVICE_NONE)
+		ConOutDevice = 2;
 
 	return errstr;
 }
@@ -432,7 +442,7 @@ char *Log_MatchTrace(const char *text, int state)
 		i = 0;
 	}
 	/* next match */
-	while (i < ARRAYSIZE(TraceFlags)) {
+	while (i < ARRAY_SIZE(TraceFlags)) {
 		name = TraceFlags[i++].name;
 		if (strncasecmp(name, text, len) == 0)
 			return (strdup(name));

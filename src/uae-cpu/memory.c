@@ -17,7 +17,11 @@ const char Memory_fileid[] = "Hatari memory.c : " __DATE__ " " __TIME__;
 #include "sysdeps.h"
 #include "hatari-glue.h"
 #include "maccess.h"
+#ifdef __LIBRETRO__ 	/* RETRO HACK */
 #include "emumemory.h"
+#else
+#include "memory.h"
+#endif /* RETRO HACK */
 
 #include "main.h"
 #include "tos.h"
@@ -26,6 +30,7 @@ const char Memory_fileid[] = "Hatari memory.c : " __DATE__ " " __TIME__;
 #include "reset.h"
 #include "stMemory.h"
 #include "m68000.h"
+#include "configuration.h"
 
 #include "newcpu.h"
 
@@ -35,14 +40,16 @@ const char Memory_fileid[] = "Hatari memory.c : " __DATE__ " " __TIME__;
 
 static int illegal_count = 50;
 
-static uae_u32 STmem_size, TTmem_size = 0;
+static uae_u32 STmem_size;
+uae_u32 TTmem_size = 0;
 static uae_u32 TTmem_mask;
 
 #define STmem_start  0x00000000
 #define ROMmem_start 0x00E00000
 #define IdeMem_start 0x00F00000
 #define IOmem_start  0x00FF0000
-#define TTmem_start  0x01000000
+#define TTmem_start  0x01000000			/* TOS 3 and TOS 4 always expect extra RAM at this address */
+#define TTmem_end    0x80000000			/* Max value for end of TT ram, which gives 2047 MB */
 
 #define IdeMem_size  65536
 #define IOmem_size  65536
@@ -168,7 +175,7 @@ static uae_u32 BusErrMem_lget(uaecptr addr)
 {
     print_illegal_counted("Bus error lget", addr);
 
-    M68000_BusError(addr, BUS_ERROR_READ);
+    M68000_BusError(addr, BUS_ERROR_READ, BUS_ERROR_SIZE_LONG, BUS_ERROR_ACCESS_DATA);
     return 0;
 }
 
@@ -176,7 +183,7 @@ static uae_u32 BusErrMem_wget(uaecptr addr)
 {
     print_illegal_counted("Bus error wget", addr);
 
-    M68000_BusError(addr, BUS_ERROR_READ);
+    M68000_BusError(addr, BUS_ERROR_READ, BUS_ERROR_SIZE_WORD, BUS_ERROR_ACCESS_DATA);
     return 0;
 }
 
@@ -184,7 +191,7 @@ static uae_u32 BusErrMem_bget(uaecptr addr)
 {
     print_illegal_counted("Bus error bget", addr);
 
-    M68000_BusError(addr, BUS_ERROR_READ);
+    M68000_BusError(addr, BUS_ERROR_READ, BUS_ERROR_SIZE_BYTE, BUS_ERROR_ACCESS_DATA);
     return 0;
 }
 
@@ -192,21 +199,21 @@ static void BusErrMem_lput(uaecptr addr, uae_u32 l)
 {
     print_illegal_counted("Bus error lput", addr);
 
-    M68000_BusError(addr, BUS_ERROR_WRITE);
+    M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_LONG, BUS_ERROR_ACCESS_DATA);
 }
 
 static void BusErrMem_wput(uaecptr addr, uae_u32 w)
 {
     print_illegal_counted("Bus error wput", addr);
 
-    M68000_BusError(addr, BUS_ERROR_WRITE);
+    M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_WORD, BUS_ERROR_ACCESS_DATA);
 }
 
 static void BusErrMem_bput(uaecptr addr, uae_u32 b)
 {
     print_illegal_counted("Bus error bput", addr);
 
-    M68000_BusError(addr, BUS_ERROR_WRITE);
+    M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_BYTE, BUS_ERROR_ACCESS_DATA);
 }
 
 static int BusErrMem_check(uaecptr addr, uae_u32 size)
@@ -295,83 +302,93 @@ static uae_u8 *STmem_xlate(uaecptr addr)
  */
 static uae_u32 SysMem_lget(uaecptr addr)
 {
-    if(addr < 0x800 && !regs.s)
-    {
-      M68000_BusError(addr, BUS_ERROR_READ);
-      return 0;
-    }
-
     addr -= STmem_start & STmem_mask;
     addr &= STmem_mask;
+
+    if(addr < 0x800 && !regs.s)
+    {
+      M68000_BusError(addr, BUS_ERROR_READ, BUS_ERROR_SIZE_LONG, BUS_ERROR_ACCESS_DATA);
+      return 0;
+    }
 
     return do_get_mem_long(STmemory + addr);
 }
 
 static uae_u32 SysMem_wget(uaecptr addr)
 {
-    if(addr < 0x800 && !regs.s)
-    {
-      M68000_BusError(addr, BUS_ERROR_READ);
-      return 0;
-    }
-
     addr -= STmem_start & STmem_mask;
     addr &= STmem_mask;
+
+    /* Only CPU will trigger bus error if bit S=0, not the blitter */
+    if(addr < 0x800 && !regs.s && BusMode == BUS_MODE_CPU )
+    {
+      M68000_BusError(addr, BUS_ERROR_READ, BUS_ERROR_SIZE_WORD, BUS_ERROR_ACCESS_DATA);
+      return 0;
+    }
 
     return do_get_mem_word(STmemory + addr);
 }
 
 static uae_u32 SysMem_bget(uaecptr addr)
 {
+    addr -= STmem_start & STmem_mask;
+    addr &= STmem_mask;
+
     if(addr < 0x800 && !regs.s)
     {
-      M68000_BusError(addr, BUS_ERROR_READ);
+      M68000_BusError(addr, BUS_ERROR_READ, BUS_ERROR_SIZE_BYTE, BUS_ERROR_ACCESS_DATA);
       return 0;
     }
 
-    addr -= STmem_start & STmem_mask;
-    addr &= STmem_mask;
     return STmemory[addr];
 }
 
 static void SysMem_lput(uaecptr addr, uae_u32 l)
 {
-    if(addr < 0x8 || (addr < 0x800 && !regs.s))
-    {
-      M68000_BusError(addr, BUS_ERROR_WRITE);
-      return;
-    }
-
     addr -= STmem_start & STmem_mask;
     addr &= STmem_mask;
+
+    if(addr < 0x8 || (addr < 0x800 && !regs.s))
+    {
+      M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_LONG, BUS_ERROR_ACCESS_DATA);
+      return;
+    }
 
     do_put_mem_long(STmemory + addr, l);
 }
 
 static void SysMem_wput(uaecptr addr, uae_u32 w)
 {
-    if(addr < 0x8 || (addr < 0x800 && !regs.s))
-    {
-      M68000_BusError(addr, BUS_ERROR_WRITE);
-      return;
-    }
-
     addr -= STmem_start & STmem_mask;
     addr &= STmem_mask;
+
+    /* Only CPU will trigger bus error if bit S=0, not the blitter */
+    if(addr < 0x8 || (addr < 0x800 && !regs.s))
+    {
+      if ( BusMode == BUS_MODE_CPU )
+      {
+	M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_WORD, BUS_ERROR_ACCESS_DATA);
+	return;
+      }
+      /* If blitter writes < 0x8 then it should be ignored, else the write should be made */
+      else if ( ( BusMode == BUS_MODE_BLITTER ) && ( addr < 0x8 ) )
+	return;
+    }
 
     do_put_mem_word(STmemory + addr, w);
 }
 
 static void SysMem_bput(uaecptr addr, uae_u32 b)
 {
+    addr -= STmem_start & STmem_mask;
+    addr &= STmem_mask;
+
     if(addr < 0x8 || (addr < 0x800 && !regs.s))
     {
-      M68000_BusError(addr, BUS_ERROR_WRITE);
+      M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_BYTE, BUS_ERROR_ACCESS_DATA);
       return;
     }
 
-    addr -= STmem_start & STmem_mask;
-    addr &= STmem_mask;
     STmemory[addr] = b;
 }
 
@@ -427,9 +444,9 @@ static uae_u8 *VoidMem_xlate (uaecptr addr)
 }
 
 
-/* **** TT fast memory (not yet supported) **** */
+/* **** TT fast memory **** */
 
-static uae_u8 *TTmemory;
+uae_u8 *TTmemory;
 
 static uae_u32 TTmem_lget(uaecptr addr)
 {
@@ -517,21 +534,21 @@ static void ROMmem_lput(uaecptr addr, uae_u32 b)
 {
     print_illegal_counted("Illegal ROMmem lput", (long)addr);
 
-    M68000_BusError(addr, BUS_ERROR_WRITE);
+    M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_LONG, BUS_ERROR_ACCESS_DATA);
 }
 
 static void ROMmem_wput(uaecptr addr, uae_u32 b)
 {
     print_illegal_counted("Illegal ROMmem wput", (long)addr);
 
-    M68000_BusError(addr, BUS_ERROR_WRITE);
+    M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_WORD, BUS_ERROR_ACCESS_DATA);
 }
 
 static void ROMmem_bput(uaecptr addr, uae_u32 b)
 {
     print_illegal_counted("Illegal ROMmem bput", (long)addr);
 
-    M68000_BusError(addr, BUS_ERROR_WRITE);
+    M68000_BusError(addr, BUS_ERROR_WRITE, BUS_ERROR_SIZE_BYTE, BUS_ERROR_ACCESS_DATA);
 }
 
 static int ROMmem_check(uaecptr addr, uae_u32 size)
@@ -596,63 +613,63 @@ static addrbank dummy_bank =
 {
     dummy_lget, dummy_wget, dummy_bget,
     dummy_lput, dummy_wput, dummy_bput,
-    dummy_xlate, dummy_check
+    dummy_xlate, dummy_check, NULL, ABFLAG_NONE
 };
 
 static addrbank BusErrMem_bank =
 {
     BusErrMem_lget, BusErrMem_wget, BusErrMem_bget,
     BusErrMem_lput, BusErrMem_wput, BusErrMem_bput,
-    BusErrMem_xlate, BusErrMem_check
+    BusErrMem_xlate, BusErrMem_check, NULL, ABFLAG_NONE
 };
 
 static addrbank STmem_bank =
 {
     STmem_lget, STmem_wget, STmem_bget,
     STmem_lput, STmem_wput, STmem_bput,
-    STmem_xlate, STmem_check
+    STmem_xlate, STmem_check, NULL, ABFLAG_RAM
 };
 
 static addrbank SysMem_bank =
 {
     SysMem_lget, SysMem_wget, SysMem_bget,
     SysMem_lput, SysMem_wput, SysMem_bput,
-    STmem_xlate, STmem_check
+    STmem_xlate, STmem_check, NULL, ABFLAG_RAM
 };
 
 static addrbank VoidMem_bank =
 {
     VoidMem_lget, VoidMem_wget, VoidMem_bget,
     VoidMem_lput, VoidMem_wput, VoidMem_bput,
-    VoidMem_xlate, VoidMem_check
+    VoidMem_xlate, VoidMem_check , NULL, ABFLAG_NONE
 };
 
 static addrbank TTmem_bank =
 {
     TTmem_lget, TTmem_wget, TTmem_bget,
     TTmem_lput, TTmem_wput, TTmem_bput,
-    TTmem_xlate, TTmem_check
+    TTmem_xlate, TTmem_check, NULL, ABFLAG_RAM
 };
 
 static addrbank ROMmem_bank =
 {
     ROMmem_lget, ROMmem_wget, ROMmem_bget,
     ROMmem_lput, ROMmem_wput, ROMmem_bput,
-    ROMmem_xlate, ROMmem_check
+    ROMmem_xlate, ROMmem_check, NULL, ABFLAG_ROM
 };
 
 static addrbank IdeMem_bank =
 {
     Ide_Mem_lget, Ide_Mem_wget, Ide_Mem_bget,
     Ide_Mem_lput, Ide_Mem_wput, Ide_Mem_bput,
-    IdeMem_xlate, IdeMem_check
+    IdeMem_xlate, IdeMem_check, NULL, ABFLAG_IO
 };
 
 static addrbank IOmem_bank =
 {
     IoMem_lget, IoMem_wget, IoMem_bget,
     IoMem_lput, IoMem_wput, IoMem_bput,
-    IOmem_xlate, IOmem_check
+    IOmem_xlate, IOmem_check, NULL, ABFLAG_IO
 };
 
 
@@ -662,6 +679,16 @@ static void init_mem_banks (void)
     int i;
     for (i = 0; i < 65536; i++)
 	put_mem_bank (i<<16, &dummy_bank);
+}
+
+
+/*
+ * Check if an address points to a memory region that causes bus error
+ * Returns true if region gives bus error
+ */
+bool memory_region_bus_error ( uaecptr addr )
+{
+	return mem_banks[bankindex(addr)] == &BusErrMem_bank;
 }
 
 
@@ -678,7 +705,7 @@ void memory_init(uae_u32 nNewSTMemSize, uae_u32 nNewTTMemSize, uae_u32 nNewRomMe
 
 #if ENABLE_SMALL_MEM
 
-    /* Allocate memory for ROM areas and IO memory space (0xE00000 - 0xFFFFFF) */
+    /* Allocate memory for ROM areas, IDE and IO memory space (0xE00000 - 0xFFFFFF) */
     ROMmemory = malloc(2*1024*1024);
     if (!ROMmemory) {
 	fprintf(stderr, "Out of memory (ROM/IO mem)!\n");
@@ -714,6 +741,20 @@ void memory_init(uae_u32 nNewSTMemSize, uae_u32 nNewTTMemSize, uae_u32 nNewRomMe
 
     init_mem_banks();
 
+    /* Set the infos about memory pointers for each mem bank, used for direct memory access in stMemory.c */
+    STmem_bank.baseaddr = STmemory;
+    STmem_bank.mask = STmem_mask;
+    STmem_bank.start = STmem_start;
+
+    SysMem_bank.baseaddr = STmemory;
+    SysMem_bank.mask = STmem_mask;
+    SysMem_bank.start = STmem_start;
+
+    dummy_bank.baseaddr = NULL;				/* No real memory allocated for this region */
+    VoidMem_bank.baseaddr = NULL;			/* No real memory allocated for this region */
+    BusErrMem_bank.baseaddr = NULL;			/* No real memory allocated for this region */
+
+
     /* Map the ST system RAM: */
     map_banks(&SysMem_bank, 0x00, 1);
     /* Between STRamEnd and 4MB barrier, there is void space: */
@@ -723,14 +764,38 @@ void memory_init(uae_u32 nNewSTMemSize, uae_u32 nNewTTMemSize, uae_u32 nNewRomMe
     /* Now map main ST RAM, overwriting the void and bus error regions if necessary: */
     map_banks(&STmem_bank, 0x01, (STmem_size >> 16) - 1);
 
-    /* TT memory isn't really supported yet */
-    if (TTmem_size > 0)
-	TTmemory = (uae_u8 *)malloc (TTmem_size);
-    if (TTmemory != 0)
-	map_banks (&TTmem_bank, TTmem_start >> 16, TTmem_size >> 16);
-    else
-	TTmem_size = 0;
-    TTmem_mask = TTmem_size - 1;
+
+    /* Handle extra RAM on TT and Falcon starting at 0x1000000 and up to 0x80000000 */
+    /* This requires the CPU to use 32 bit addressing */
+    /* NOTE : code backported from cpu/memory.c, but as bAddressSpace24 is always true with old */
+    /* UAE's core, TT RAM is not supported at the moment */
+    TTmemory = NULL;
+    if ( ConfigureParams.System.bAddressSpace24 == false )
+    {
+	/* If there's no extra RAM on a TT, region 0x01000000 - 0x80000000 (2047 MB) must return bus errors */
+	if ( ConfigureParams.System.nMachineType == MACHINE_TT )
+	    map_banks ( &BusErrMem_bank, TTmem_start >> 16, ( TTmem_end - TTmem_start ) >> 16 );
+
+	if ( TTmem_size > 0 )
+	{
+	    TTmemory = (uae_u8 *)malloc ( TTmem_size );
+
+	    if ( TTmemory != NULL )
+	    {
+		map_banks ( &TTmem_bank, TTmem_start >> 16, TTmem_size >> 16 );
+		TTmem_mask = 0xffffffff;
+		TTmem_bank.baseaddr = TTmemory;
+		TTmem_bank.mask = TTmem_mask;
+		TTmem_bank.start = TTmem_start;
+	    }
+	    else
+	    {
+		write_log ("can't allocate %d MB for TT RAM\n" , TTmem_size / ( 1024*1024 ) );
+		TTmem_size = 0;
+	    }
+	}
+    }
+
 
     /* ROM memory: */
     /* Depending on which ROM version we are using, the other ROM region is illegal! */
@@ -751,12 +816,21 @@ void memory_init(uae_u32 nNewSTMemSize, uae_u32 nNewTTMemSize, uae_u32 nNewRomMe
 
     /* Cartridge memory: */
     map_banks(&ROMmem_bank, 0xFA0000 >> 16, 0x2);
+    ROMmem_bank.baseaddr = ROMmemory;
+    ROMmem_bank.mask = ROMmem_mask;
+    ROMmem_bank.start = ROMmem_start;
 
     /* IO memory: */
     map_banks(&IOmem_bank, IOmem_start>>16, 0x1);
+    IOmem_bank.baseaddr = IOmemory;
+    IOmem_bank.mask = IOmem_mask;
+    IOmem_bank.start = IOmem_start;
 
     /* IDE controller memory region: */
     map_banks(&IdeMem_bank, IdeMem_start >> 16, 0x1);  /* IDE controller on the Falcon */
+    IdeMem_bank.baseaddr = IdeMemory;
+    IdeMem_bank.mask = IdeMem_mask;
+    IdeMem_bank.start = IdeMem_start ;
 
     /* Illegal memory regions cause a bus error on the ST: */
     map_banks(&BusErrMem_bank, 0xF10000 >> 16, 0x9);

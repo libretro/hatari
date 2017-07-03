@@ -31,6 +31,10 @@
   Pixels per NOP (high res)         : 16
 */
 
+#define	VIDEO_50HZ		50
+#define	VIDEO_60HZ		60
+#define	VIDEO_71HZ		71
+
 /* Scan lines per frame */
 #define SCANLINES_PER_FRAME_50HZ 313    /* Number of scan lines per frame in 50 Hz */
 #define SCANLINES_PER_FRAME_60HZ 263    /* Number of scan lines per frame in 60 Hz */
@@ -59,6 +63,7 @@
 
 #define VIDEO_END_HBL_50HZ	( VIDEO_START_HBL_50HZ + VIDEO_HEIGHT_HBL_COLOR )	/* 263 */
 #define VIDEO_END_HBL_60HZ	( VIDEO_START_HBL_60HZ + VIDEO_HEIGHT_HBL_COLOR )	/* 234 */
+#define VIDEO_END_HBL_71HZ	( VIDEO_START_HBL_71HZ + VIDEO_HEIGHT_HBL_MONO )	/* 434 */
 
 #define LINE_REMOVE_TOP_CYCLE_STF	504	/* switch to 60 Hz on line 33 should not occur after cycle 504 to remove top border */
 						/* switch to 50 Hz should occur after cycle 504 on line 33 */
@@ -66,6 +71,15 @@
 
 #define LINE_REMOVE_TOP_CYCLE_STE	500	/* on STE, switch can occur 4 cycles earlier than STF */
 #define LINE_REMOVE_BOTTOM_CYCLE_STE	500
+
+
+/* Values for VerticalOverscan */
+#define	V_OVERSCAN_NONE			0x00
+#define	V_OVERSCAN_NO_TOP		0x01
+#define	V_OVERSCAN_NO_BOTTOM_50		0x02
+#define	V_OVERSCAN_NO_BOTTOM_60		0x04
+#define	V_OVERSCAN_BOTTOM_SHORT_50	0x08
+#define	V_OVERSCAN_NO_DE		0x10
 
 
 #define LINE_START_CYCLE_50	56
@@ -77,6 +91,7 @@
 #define LINE_END_CYCLE_NO_RIGHT	460		/* 372 + 44*2 */
 #define LINE_END_CYCLE_50_2	(LINE_END_CYCLE_50+44*2)	/* 464, used in enchanted lands */
 #define LINE_END_CYCLE_FULL	512				/* used in enchanted lands */
+#define LINE_LEFT_STAB_LOW	16	/* remove left + med res stab using hi/med/lo switches */
 #define LINE_SCROLL_13_CYCLE_50	20	/* 13 pixels right "hardware" scrolling */
 #define LINE_SCROLL_9_CYCLE_50	24	/*  9 pixels right "hardware" scrolling */
 #define LINE_SCROLL_5_CYCLE_50	28	/*  5 pixels right "hardware" scrolling */
@@ -93,8 +108,6 @@
 #define BORDERBYTES_RIGHT	44
 #define BORDERBYTES_RIGHT_FULL	22
 
-/* Legacy defines: */
-#define CYCLES_PER_FRAME    (nScanlinesPerFrame*nCyclesPerLine)  /* Cycles per VBL @ 50fps = 160256 */
 
 
 #define VBL_VIDEO_CYCLE_OFFSET_STF	64			/* value of cycle counter when VBL signal is sent */
@@ -103,9 +116,12 @@
 #define HBL_VIDEO_CYCLE_OFFSET		0			/* cycles after end of current line (ie on every 512 cycles in 50 Hz) */
 #define TIMERB_VIDEO_CYCLE_OFFSET	24			/* cycles after last displayed pixels : 376+24 in 50 Hz or 372+24 in 60 Hz */
 
-/* This is when ff8205/07/09 are reloaded with the content of ff8201/03 (on line 310 in 50 Hz) */
-#define RESTART_VIDEO_COUNTER_CYCLE_STF	( (SCANLINES_PER_FRAME_50HZ-3) * CYCLES_PER_LINE_50HZ + 48 )
-#define RESTART_VIDEO_COUNTER_CYCLE_STE	( (SCANLINES_PER_FRAME_50HZ-3) * CYCLES_PER_LINE_50HZ + 48 + 4 )	/* 4 cycles later than STF */
+/* This is when ff8205/07/09 are reloaded with the content of ff8201/03 : on line 310 cycle 48/52 in 50 Hz and on line 260 cycle 48/52 in 60 Hz */
+/* (values were measured on real STF/STE) */
+#define RESTART_VIDEO_COUNTER_LINE_50HZ		( SCANLINES_PER_FRAME_50HZ-3 )
+#define RESTART_VIDEO_COUNTER_LINE_60HZ		( SCANLINES_PER_FRAME_60HZ-3 )
+#define RESTART_VIDEO_COUNTER_CYCLE_STF		( 48 )
+#define RESTART_VIDEO_COUNTER_CYCLE_STE		( 48 + 4 )	/* 4 cycles later than STF */
 
 /* anything above 4 uses automatic frameskip */
 #define AUTO_FRAMESKIP_LIMIT	5
@@ -118,7 +134,7 @@ extern int nVBLs;
 extern int nHBL;
 extern int nStartHBL;
 extern int nEndHBL;
-extern int OverscanMode;
+extern int VerticalOverscan;
 extern Uint16 HBLPalettes[HBL_PALETTE_LINES];
 extern Uint16 *pHBLPalettes;
 extern Uint32 HBLPaletteMasks[HBL_PALETTE_MASKS];
@@ -128,8 +144,8 @@ extern int nScreenRefreshRate;
 
 extern int nScanlinesPerFrame;
 extern int nCyclesPerLine;
-
-extern int LineTimerBCycle;
+extern int TTSpecialVideoMode;
+extern int LineTimerBPos;
 extern int TimerBEventCountCycleStart;
 
 #define HBL_JITTER_ARRAY_SIZE 5
@@ -151,6 +167,10 @@ extern void	Video_MemorySnapShot_Capture(bool bSave);
 extern void 	Video_Reset(void);
 extern void	Video_Reset_Glue(void);
 
+extern void	Video_InitTimings(void);
+extern void	Video_SetTimings( MACHINETYPE MachineType , VIDEOTIMINGMODE Mode );
+extern const char* Video_GetTimings_Name ( void );
+
 extern void	Video_ConvertPosition( int FrameCycles , int *pHBL , int *pLineCycles );
 extern void	Video_GetPosition( int *pFrameCycles , int *pHBL , int *pLineCycles );
 extern void	Video_GetPosition_OnWriteAccess( int *pFrameCycles , int *pHBL , int *pLineCycles );
@@ -167,18 +187,18 @@ extern void	Video_SetScreenRasters(void);
 extern void	Video_GetTTRes(int *width, int *height, int *bpp);
 extern bool	Video_RenderTTScreen(void);
 
-extern void	Video_AddInterruptTimerB ( int Pos );
+extern void	Video_AddInterruptTimerB ( int LineVideo , int CycleVideo , int Pos );
 
 extern void	Video_StartInterrupts ( int PendingCyclesOver );
 extern void	Video_InterruptHandler_VBL(void);
 
-extern void Video_ScreenBaseSTE_WriteByte(void);
+extern void Video_ScreenBase_WriteByte(void);
 extern void Video_ScreenCounter_ReadByte(void);
 extern void Video_ScreenCounter_WriteByte(void);
 extern void Video_Sync_ReadByte(void);
 extern void Video_BaseLow_ReadByte(void);
 extern void Video_LineWidth_ReadByte(void);
-extern void Video_ShifterMode_ReadByte(void);
+extern void Video_Res_ReadByte(void);
 extern void Video_HorScroll_Read(void);
 extern void Video_LineWidth_WriteByte(void);
 extern void Video_Color0_WriteWord(void);
@@ -213,14 +233,16 @@ extern void Video_Color12_ReadWord(void);
 extern void Video_Color13_ReadWord(void);
 extern void Video_Color14_ReadWord(void);
 extern void Video_Color15_ReadWord(void);
-extern void Video_ShifterMode_WriteByte(void);
+extern void Video_Res_WriteByte(void);
+extern void Video_HorScroll_Read_8264(void);
+extern void Video_HorScroll_Read_8265(void);
 extern void Video_HorScroll_Write_8264(void);
 extern void Video_HorScroll_Write_8265(void);
 extern void Video_HorScroll_Write(void);
 extern void Video_TTShiftMode_WriteWord(void);
-extern void Video_TTColorRegs_WriteWord(void);
-extern void Video_TTColorSTRegs_WriteWord(void);
+extern void Video_TTColorRegs_Write(void);
+extern void Video_TTColorRegs_STRegWrite(void);
 
-extern void Video_Info(Uint32 dummy);
+extern void Video_Info(FILE *fp, Uint32 dummy);
 
 #endif  /* HATARI_VIDEO_H */

@@ -18,7 +18,9 @@ typedef struct {
 extern profile_loop_t profile_loop;
 
 typedef struct {
-	Uint64 calls, count, cycles, misses;
+	Uint64 calls, count, cycles; /* common counters between CPU & DSP */
+	Uint64 i_misses, d_hits;     /* CPU specific counters */
+	Uint64 cycles_diffs;         /* DSP specific counter, not updated at run-time */
 } counters_t;
 
 typedef struct {
@@ -32,8 +34,8 @@ typedef struct {
 
 /* callee/caller information */
 typedef struct {
-	calltype_t   flags:8;	/* what kind of call it was */
-	unsigned int addr:24;	/* address for the caller */
+	calltype_t flags;	/* what kind of call it was */
+	Uint32 addr;		/* address for the caller */
 	Uint32 calls;		/* number of calls, exclusive */
 	counters_t all;		/* totals including everything called code does */
 	counters_t own;		/* totals excluding called code (=sum(all-out)) */
@@ -87,7 +89,9 @@ extern void Profile_DspGetCallinfo(callinfo_t **callinfo, const char* (**get_sym
 extern Uint32 Profile_CpuShowAddresses(Uint32 lower, Uint32 upper, FILE *out);
 extern void Profile_CpuShowCounts(int show, bool only_symbols);
 extern void Profile_CpuShowCycles(int show);
-extern void Profile_CpuShowMisses(int show);
+extern void Profile_CpuShowInstrMisses(int show);
+extern void Profile_CpuShowDataHits(int show);
+extern void Profile_CpuShowCaches(void);
 extern void Profile_CpuShowStats(void);
 extern void Profile_CpuShowCallers(FILE *fp);
 extern void Profile_CpuSave(FILE *out);

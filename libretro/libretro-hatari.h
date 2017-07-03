@@ -15,10 +15,11 @@
 
 extern const char SDLKeyToSTScanCode[512] ;
 
+#ifdef HAVE_LIBCO
 #include <libco.h>
-
 extern cothread_t mainThread;
 extern cothread_t emuThread;
+#endif
 
 extern char Key_Sate[512];
 extern char Key_Sate2[512];

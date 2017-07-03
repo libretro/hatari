@@ -229,5 +229,5 @@ void Draw_text(unsigned short *buffer,int x,int y,unsigned short fgcol,
    vsprintf(text, string, ap);	
    va_end(ap);	
 
-   Draw_string(buffer, x,y, (const unsigned char*)text,max, scalex, scaley,fgcol,bgcol);	
+   Draw_string(buffer, x,y,(unsigned char *) text,max, scalex, scaley,fgcol,bgcol);	
 }

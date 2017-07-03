@@ -3,14 +3,14 @@
 
 // only because we need 
 /*
-SDL_sem
-SDL_Thread
-SDL_SemWait
-SDL_CreateSemaphore
-SDL_CreateThread
-SDL_KillThread
-SDL_DestroySemaphore
-SDL_SemPost
+HSDL_sem
+HSDL_Thread
+HSDL_SemWait
+HSDL_CreateSemaphore
+HSDL_CreateThread
+HSDL_KillThread
+HSDL_DestroySemaphore
+HSDL_SemPost
 */
 //in rs232.c
 
@@ -21,19 +21,19 @@ SDL_SemPost
 
 extern long GetTicks(void);
 
-#define SDL_KillThread(X)
+#define HSDL_KillThread(X)
 
 #define ERR_MAX_STRLEN	128
 #define ERR_MAX_ARGS	5
 #define SDLCALL
-#define SDL_zero(x)	memset(&(x), 0, sizeof((x)))
-#define SDL_malloc	malloc
-#define SDL_MUTEX_TIMEDOUT	1
-#define SDL_MUTEX_MAXWAIT	(~(Uint32)0)
-#define SDL_SetError printf
-#define SDL_free free
+#define HSDL_zero(x)	memset(&(x), 0, sizeof((x)))
+#define HSDL_malloc	malloc
+#define HSDL_MUTEX_TIMEDOUT	1
+#define HSDL_MUTEX_MAXWAIT	(~(Uint32)0)
+#define HSDL_SetError printf
+#define HSDL_free free
 
-typedef struct SDL_error
+typedef struct HSDL_error
 {    
     int error;
     char key[ERR_MAX_STRLEN];
@@ -45,7 +45,7 @@ typedef struct SDL_error
         double value_f;
         char buf[ERR_MAX_STRLEN];
     } args[ERR_MAX_ARGS];
-} SDL_error;
+} HSDL_error;
 
 
 #ifdef __CELLOS_LV2__
@@ -54,102 +54,102 @@ typedef struct SDL_error
 #include <semaphore.h>
 
 
-struct SDL_semaphore
+struct HSDL_semaphore
 {
     sem_t sem;
 };
-struct SDL_semaphore;
-typedef struct SDL_semaphore SDL_sem;
+struct HSDL_semaphore;
+typedef struct HSDL_semaphore HSDL_sem;
 
 /* Create a counting semaphore */
-SDL_sem *
-SDL_CreateSemaphore(Uint32 initial_value)
+HSDL_sem *
+HSDL_CreateSemaphore(Uint32 initial_value)
 {
-	SDL_sem *sem = (SDL_sem *) SDL_malloc(sizeof(SDL_sem));
+	HSDL_sem *sem = (HSDL_sem *) HSDL_malloc(sizeof(HSDL_sem));
 	if ( sem ) {
 		if ( sem_init(&sem->sem, 0, initial_value) < 0 ) {
-			SDL_SetError("sem_init() failed");
-			SDL_free(sem);
+			HSDL_SetError("sem_init() failed");
+			HSDL_free(sem);
 			sem = NULL;
 		}
 	} else {
-		//SDL_OutOfMemory();
+		//HSDL_OutOfMemory();
 	}
 	return sem;
 }
 
-void SDL_DestroySemaphore(SDL_sem *sem)
+void HSDL_DestroySemaphore(HSDL_sem *sem)
 {
 	if ( sem ) {
 		sem_destroy(&sem->sem);
-		SDL_free(sem);
+		HSDL_free(sem);
 	}
 }
 
-int SDL_SemTryWait(SDL_sem *sem)
+int HSDL_SemTryWait(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
-	retval = SDL_MUTEX_TIMEDOUT;
+	retval = HSDL_MUTEX_TIMEDOUT;
 	if ( sem_trywait(&sem->sem) == 0 ) {
 		retval = 0;
 	}
 	return retval;
 }
 
-int SDL_SemWait(SDL_sem *sem)
+int HSDL_SemWait(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	while ( ((retval = sem_wait(&sem->sem)) == -1) && (errno == EINTR) ) {}
 	if ( retval < 0 ) {
-		SDL_SetError("sem_wait() failed");
+		HSDL_SetError("sem_wait() failed");
 	}
 	return retval;
 }
 
-int SDL_SemWaitTimeout(SDL_sem *sem, Uint32 timeout)
+int HSDL_SemWaitTimeout(HSDL_sem *sem, Uint32 timeout)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	/* Try the easy cases first */
 	if ( timeout == 0 ) {
-		return SDL_SemTryWait(sem);
+		return HSDL_SemTryWait(sem);
 	}
-	if ( timeout == SDL_MUTEX_MAXWAIT ) {
-		return SDL_SemWait(sem);
+	if ( timeout == HSDL_MUTEX_MAXWAIT ) {
+		return HSDL_SemWait(sem);
 	}
 
 	/* Ack!  We have to busy wait... */
 	/* FIXME: Use sem_timedwait()? */
-	timeout += SDL_GetTicks();
+	timeout += HSDL_GetTicks();
 	do {
-		retval = SDL_SemTryWait(sem);
+		retval = HSDL_SemTryWait(sem);
 		if ( retval == 0 ) {
 			break;
 		}
-		SDL_Delay(1);
-	} while ( SDL_GetTicks() < timeout );
+		HSDL_Delay(1);
+	} while ( HSDL_GetTicks() < timeout );
 
 	return retval;
 }
 
 
-Uint32 SDL_SemValue(SDL_sem *sem)
+Uint32 HSDL_SemValue(HSDL_sem *sem)
 {
 	int ret = 0;
 	if ( sem ) {
@@ -161,51 +161,51 @@ Uint32 SDL_SemValue(SDL_sem *sem)
 	return (Uint32)ret;
 }
 
-int SDL_SemPost(SDL_sem *sem)
+int HSDL_SemPost(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	retval = sem_post(&sem->sem);
 	if ( retval < 0 ) {
-		SDL_SetError("sem_post() failed");
+		HSDL_SetError("sem_post() failed");
 	}
 	return retval;
 }
 
-typedef unsigned long SDL_threadID;
+typedef unsigned long HSDL_threadID;
 
-struct SDL_mutex
+struct HSDL_mutex
 {
     int recursive;
-    SDL_threadID owner;
-    SDL_sem *sem;
+    HSDL_threadID owner;
+    HSDL_sem *sem;
 };
 
-typedef struct SDL_mutex SDL_mutex;
-extern SDL_mutex *SDL_CreateMutex(void);
+typedef struct HSDL_mutex HSDL_mutex;
+extern HSDL_mutex *HSDL_CreateMutex(void);
 
 /* WARNING:  This may not work for systems with 64-bit pid_t */
-Uint32 SDL_ThreadID(void)
+Uint32 HSDL_ThreadID(void)
 {
 	return((Uint32)((size_t)pthread_self()));
 }
 
 /* Create a mutex */
-SDL_mutex *
-SDL_CreateMutex(void)
+HSDL_mutex *
+HSDL_CreateMutex(void)
 {
-    SDL_mutex *mutex;
+    HSDL_mutex *mutex;
 
     /* Allocate mutex memory */
-    mutex = (SDL_mutex *) SDL_malloc(sizeof(*mutex));
+    mutex = (HSDL_mutex *) HSDL_malloc(sizeof(*mutex));
     if (mutex) {
         /* Create the mutex semaphore, with initial value 1 */
-        mutex->sem = SDL_CreateSemaphore(1);
+        mutex->sem = HSDL_CreateSemaphore(1);
         mutex->recursive = 0;
         mutex->owner = 0;
         if (!mutex->sem) {
@@ -213,18 +213,18 @@ SDL_CreateMutex(void)
             mutex = NULL;
         }
     } else {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
     }
     return mutex;
 }
 
 /* Free the mutex */
 void
-SDL_DestroyMutex(SDL_mutex * mutex)
+HSDL_DestroyMutex(HSDL_mutex * mutex)
 {
     if (mutex) {
         if (mutex->sem) {
-            SDL_DestroySemaphore(mutex->sem);
+            HSDL_DestroySemaphore(mutex->sem);
         }
         free(mutex);
     }
@@ -233,19 +233,19 @@ SDL_DestroyMutex(SDL_mutex * mutex)
 
 /* Lock the semaphore */
 int
-SDL_mutexP(SDL_mutex * mutex)
+HSDL_mutexP(HSDL_mutex * mutex)
 {
-#if SDL_THREADS_DISABLED
+#if HSDL_THREADS_DISABLED
     return 0;
 #else
-    SDL_threadID this_thread;
+    HSDL_threadID this_thread;
 
     if (mutex == NULL) {
-        //SDL_SetError("Passed a NULL mutex");
+        //HSDL_SetError("Passed a NULL mutex");
         return -1;
     }
 
-    this_thread = SDL_ThreadID();
+    this_thread = HSDL_ThreadID();
     if (mutex->owner == this_thread) {
         ++mutex->recursive;
     } else {
@@ -253,30 +253,30 @@ SDL_mutexP(SDL_mutex * mutex)
            We set the locking thread id after we obtain the lock
            so unlocks from other threads will fail.
          */
-        SDL_SemWait(mutex->sem);
+        HSDL_SemWait(mutex->sem);
         mutex->owner = this_thread;
         mutex->recursive = 0;
     }
 
     return 0;
-#endif /* SDL_THREADS_DISABLED */
+#endif /* HSDL_THREADS_DISABLED */
 }
 
 /* Unlock the mutex */
 int
-SDL_mutexV(SDL_mutex * mutex)
+HSDL_mutexV(HSDL_mutex * mutex)
 {
-#if SDL_THREADS_DISABLED
+#if HSDL_THREADS_DISABLED
     return 0;
 #else
     if (mutex == NULL) {
-        //SDL_SetError("Passed a NULL mutex");
+        //HSDL_SetError("Passed a NULL mutex");
         return -1;
     }
 
     /* If we don't own the mutex, we can't unlock it */
-    if (SDL_ThreadID() != mutex->owner) {
-        //SDL_SetError("mutex not owned by this thread");
+    if (HSDL_ThreadID() != mutex->owner) {
+        //HSDL_SetError("mutex not owned by this thread");
         return -1;
     }
 
@@ -289,32 +289,32 @@ SDL_mutexV(SDL_mutex * mutex)
            then release the lock semaphore.
          */
         mutex->owner = 0;
-        SDL_SemPost(mutex->sem);
+        HSDL_SemPost(mutex->sem);
     }
     return 0;
-#endif /* SDL_THREADS_DISABLED */
+#endif /* HSDL_THREADS_DISABLED */
 }
 
-typedef struct SDL_Thread SDL_Thread;
-//typedef unsigned long SDL_threadID;
+typedef struct HSDL_Thread HSDL_Thread;
+//typedef unsigned long HSDL_threadID;
 
 typedef enum {
-    SDL_THREAD_PRIORITY_LOW,
-    SDL_THREAD_PRIORITY_NORMAL,
-    SDL_THREAD_PRIORITY_HIGH
-} SDL_ThreadPriority;
+    HSDL_THREAD_PRIORITY_LOW,
+    HSDL_THREAD_PRIORITY_NORMAL,
+    HSDL_THREAD_PRIORITY_HIGH
+} HSDL_ThreadPriority;
 
-typedef int (SDLCALL * SDL_ThreadFunction) (void *data);
+typedef int (SDLCALL * HSDL_ThreadFunction) (void *data);
 
 //typedef sys_ppu_thread_t SYS_ThreadHandle;
 typedef pthread_t SYS_ThreadHandle;
 /* This is the system-independent thread info structure */
-struct SDL_Thread
+struct HSDL_Thread
 {
-    SDL_threadID threadid;
+    HSDL_threadID threadid;
     SYS_ThreadHandle handle;
     int status;
-    SDL_error errbuf;
+    HSDL_error errbuf;
     void *data;
 };
 
@@ -323,11 +323,11 @@ struct SDL_Thread
 typedef struct {
         int (SDLCALL *func)(void *);
         void *data;
-        SDL_Thread *info;
-        SDL_sem *wait;
+        HSDL_Thread *info;
+        HSDL_sem *wait;
 } thread_args;
 
-void SDL_SYS_SetupThread(void)
+void HSDL_SYS_SetupThread(void)
 {
         int i;
 
@@ -340,7 +340,7 @@ void SDL_SYS_SetupThread(void)
 }
 
 void
-SDL_RunThread(void *data)
+HSDL_RunThread(void *data)
 {
     thread_args *args;
     int (SDLCALL * userfunc) (void *);
@@ -348,13 +348,13 @@ SDL_RunThread(void *data)
     int *statusloc;
 
     /* Perform any system-dependent setup
-       - this function cannot fail, and cannot use SDL_SetError()
+       - this function cannot fail, and cannot use HSDL_SetError()
      */
-    SDL_SYS_SetupThread();
+    HSDL_SYS_SetupThread();
 
     /* Get the thread id */
     args = (thread_args *) data;
-    args->info->threadid = SDL_ThreadID();
+    args->info->threadid = HSDL_ThreadID();
 
     /* Figure out what function to run */
     userfunc = args->func;
@@ -362,7 +362,7 @@ SDL_RunThread(void *data)
     statusloc = &args->info->status;
 
     /* Wake up the parent thread */
-    SDL_SemPost(args->wait);
+    HSDL_SemPost(args->wait);
 
     /* Run the function */
     *statusloc = userfunc(userdata);
@@ -370,32 +370,32 @@ SDL_RunThread(void *data)
 
 static void *RunThread(void *data)
 {
-        SDL_RunThread(data);
+        HSDL_RunThread(data);
         pthread_exit((void*)0);
         return((void *)0);              /* Prevent compiler warning */
 }
 
-int SDL_SYS_CreateThread(SDL_Thread *thread, void *args)
+int HSDL_SYS_CreateThread(HSDL_Thread *thread, void *args)
 {
         pthread_attr_t type;
 
         /* Set the thread attributes */
         if ( pthread_attr_init(&type) != 0 ) {
-                SDL_SetError("Couldn't initialize pthread attributes");
+                HSDL_SetError("Couldn't initialize pthread attributes");
                 return(-1);
         }
         pthread_attr_setdetachstate(&type, PTHREAD_CREATE_JOINABLE);
 
         /* Create the thread and go! */
         if ( pthread_create(&thread->handle, &type, RunThread, args) != 0 ) {
-                SDL_SetError("Not enough resources to create thread");
+                HSDL_SetError("Not enough resources to create thread");
                 return(-1);
         }
 
 #ifdef __RISCOS__
         if (riscos_using_threads == 0) {
                 riscos_using_threads = 1;
-                riscos_main_thread = SDL_ThreadID();
+                riscos_main_thread = HSDL_ThreadID();
         }
 #endif
 
@@ -405,12 +405,12 @@ int SDL_SYS_CreateThread(SDL_Thread *thread, void *args)
 
 
 
-void SDL_SYS_WaitThread(SDL_Thread *thread)
+void HSDL_SYS_WaitThread(HSDL_Thread *thread)
 {
         pthread_join(thread->handle, 0);
 }
 
-void SDL_SYS_KillThread(SDL_Thread *thread)
+void HSDL_SYS_KillThread(HSDL_Thread *thread)
 {
 
 }
@@ -420,18 +420,18 @@ void SDL_SYS_KillThread(SDL_Thread *thread)
    (except the main thread)
    The manipulation of an array here is safer than using a linked list.
 */
-static int SDL_maxthreads = 0;
-static int SDL_numthreads = 0;
-static SDL_Thread **SDL_Threads = NULL;
-static SDL_mutex *thread_lock = NULL;
+static int HSDL_maxthreads = 0;
+static int HSDL_numthreads = 0;
+static HSDL_Thread **HSDL_Threads = NULL;
+static HSDL_mutex *thread_lock = NULL;
 
 static int
-SDL_ThreadsInit(void)
+HSDL_ThreadsInit(void)
 {
     int retval;
 
     retval = 0;
-    thread_lock = SDL_CreateMutex();
+    thread_lock = HSDL_CreateMutex();
     if (thread_lock == NULL) {
         retval = -1;
     }
@@ -439,7 +439,7 @@ SDL_ThreadsInit(void)
 }
 /* Routines for manipulating the thread list */
 static void
-SDL_AddThread(SDL_Thread * thread)
+HSDL_AddThread(HSDL_Thread * thread)
 {
     /* WARNING:
        If the very first threads are created simultaneously, then
@@ -448,106 +448,106 @@ SDL_AddThread(SDL_Thread * thread)
        is only one thread running the first time this is called.
      */
     if (!thread_lock) {
-        if (SDL_ThreadsInit() < 0) {
+        if (HSDL_ThreadsInit() < 0) {
             return;
         }
     }
-    SDL_mutexP(thread_lock);
+    HSDL_mutexP(thread_lock);
 
     /* Expand the list of threads, if necessary */
 #ifdef DEBUG_THREADS
     printf("Adding thread (%d already - %d max)\n",
-           SDL_numthreads, SDL_maxthreads);
+           HSDL_numthreads, HSDL_maxthreads);
 #endif
-    if (SDL_numthreads == SDL_maxthreads) {
-        SDL_Thread **threads;
-        threads = (SDL_Thread **) realloc(SDL_Threads,
-                                              (SDL_maxthreads +
+    if (HSDL_numthreads == HSDL_maxthreads) {
+        HSDL_Thread **threads;
+        threads = (HSDL_Thread **) realloc(HSDL_Threads,
+                                              (HSDL_maxthreads +
                                                ARRAY_CHUNKSIZE) *
                                               (sizeof *threads));
         if (threads == NULL) {
-            //SDL_OutOfMemory();
+            //HSDL_OutOfMemory();
             goto done;
         }
-        SDL_maxthreads += ARRAY_CHUNKSIZE;
-        SDL_Threads = threads;
+        HSDL_maxthreads += ARRAY_CHUNKSIZE;
+        HSDL_Threads = threads;
     }
-    SDL_Threads[SDL_numthreads++] = thread;
+    HSDL_Threads[HSDL_numthreads++] = thread;
   done:
-    SDL_mutexV(thread_lock);
+    HSDL_mutexV(thread_lock);
 }
 
 static void
-SDL_DelThread(SDL_Thread * thread)
+HSDL_DelThread(HSDL_Thread * thread)
 {
     int i;
 
     if (!thread_lock) {
         return;
     }
-    SDL_mutexP(thread_lock);
-    for (i = 0; i < SDL_numthreads; ++i) {
-        if (thread == SDL_Threads[i]) {
+    HSDL_mutexP(thread_lock);
+    for (i = 0; i < HSDL_numthreads; ++i) {
+        if (thread == HSDL_Threads[i]) {
             break;
         }
     }
-    if (i < SDL_numthreads) {
-        if (--SDL_numthreads > 0) {
-            while (i < SDL_numthreads) {
-                SDL_Threads[i] = SDL_Threads[i + 1];
+    if (i < HSDL_numthreads) {
+        if (--HSDL_numthreads > 0) {
+            while (i < HSDL_numthreads) {
+                HSDL_Threads[i] = HSDL_Threads[i + 1];
                 ++i;
             }
         } else {
-            SDL_maxthreads = 0;
-            /*SDL_*/free(SDL_Threads);
-            SDL_Threads = NULL;
+            HSDL_maxthreads = 0;
+            /*HSDL_*/free(HSDL_Threads);
+            HSDL_Threads = NULL;
         }
 #ifdef DEBUG_THREADS
         printf("Deleting thread (%d left - %d max)\n",
-               SDL_numthreads, SDL_maxthreads);
+               HSDL_numthreads, HSDL_maxthreads);
 #endif
     }
-    SDL_mutexV(thread_lock);
+    HSDL_mutexV(thread_lock);
 
 }
 
 #define DECLSPEC
 
-#ifdef SDL_PASSED_BEGINTHREAD_ENDTHREAD
-#undef SDL_CreateThread
-DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(int (SDLCALL * fn) (void *), void *data,
-                 pfnSDL_CurrentBeginThread pfnBeginThread,
-                 pfnSDL_CurrentEndThread pfnEndThread)
+#ifdef HSDL_PASSED_BEGINTHREAD_ENDTHREAD
+#undef HSDL_CreateThread
+DECLSPEC HSDL_Thread *SDLCALL
+HSDL_CreateThread(int (SDLCALL * fn) (void *), void *data,
+                 pfnHSDL_CurrentBeginThread pfnBeginThread,
+                 pfnHSDL_CurrentEndThread pfnEndThread)
 #else
-DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
+DECLSPEC HSDL_Thread *SDLCALL
+HSDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
 #endif
 {
-    SDL_Thread *thread;
+    HSDL_Thread *thread;
     thread_args *args;
     int ret;
 
     /* Allocate memory for the thread info structure */
-    thread = (SDL_Thread *) malloc(sizeof(*thread));
+    thread = (HSDL_Thread *) malloc(sizeof(*thread));
     if (thread == NULL) {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
         return (NULL);
     }
     memset(thread, 0, (sizeof *thread));
     thread->status = -1;
 
     /* Set up the arguments for the thread */
-    args = (thread_args *) SDL_malloc(sizeof(*args));
+    args = (thread_args *) HSDL_malloc(sizeof(*args));
     if (args == NULL) {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
         free(thread);
         return (NULL);
     }
     args->func = fn;
     args->data = data;
     args->info = thread;
-    args->wait = SDL_CreateSemaphore(0);
+    args->wait = HSDL_CreateSemaphore(0);
     if (args->wait == NULL) {
         free(thread);
         free(args);
@@ -555,24 +555,24 @@ SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
     }
 
     /* Add the thread to the list of available threads */
-    SDL_AddThread(thread);
+    HSDL_AddThread(thread);
 
     /* Create the thread and go! */
-#ifdef SDL_PASSED_BEGINTHREAD_ENDTHREAD
-    ret = SDL_SYS_CreateThread(thread, args, pfnBeginThread, pfnEndThread);
+#ifdef HSDL_PASSED_BEGINTHREAD_ENDTHREAD
+    ret = HSDL_SYS_CreateThread(thread, args, pfnBeginThread, pfnEndThread);
 #else
-    ret = SDL_SYS_CreateThread(thread, args);
+    ret = HSDL_SYS_CreateThread(thread, args);
 #endif
     if (ret >= 0) {
         /* Wait for the thread function to use arguments */
-        SDL_SemWait(args->wait);
+        HSDL_SemWait(args->wait);
     } else {
         /* Oops, failed.  Gotta free everything */
-        SDL_DelThread(thread);
+        HSDL_DelThread(thread);
         free(thread);
         thread = NULL;
     }
-    SDL_DestroySemaphore(args->wait);
+    HSDL_DestroySemaphore(args->wait);
     free(args);
 
     /* Everything is running now */
@@ -652,103 +652,103 @@ static inline int pthread_cond_broadcast(pthread_cond_t *cond) {
 
 typedef u32 sem_t;
 
-struct SDL_semaphore
+struct HSDL_semaphore
 {
     sem_t sem;
 };
 
-struct SDL_semaphore;
-typedef struct SDL_semaphore SDL_sem;
+struct HSDL_semaphore;
+typedef struct HSDL_semaphore HSDL_sem;
 
 /* Create a counting semaphore */
-SDL_sem *
-SDL_CreateSemaphore(Uint32 initial_value)
+HSDL_sem *
+HSDL_CreateSemaphore(Uint32 initial_value)
 {
-	SDL_sem *sem = (SDL_sem *) SDL_malloc(sizeof(SDL_sem));
+	HSDL_sem *sem = (HSDL_sem *) HSDL_malloc(sizeof(HSDL_sem));
 	if ( sem ) {
 		if ( sem_init(&sem->sem, 0, initial_value) < 0 ) {
-			SDL_SetError("sem_init() failed");
-			SDL_free(sem);
+			HSDL_SetError("sem_init() failed");
+			HSDL_free(sem);
 			sem = NULL;
 		}
 	} else {
-		//SDL_OutOfMemory();
+		//HSDL_OutOfMemory();
 	}
 	return sem;
 }
 
-void SDL_DestroySemaphore(SDL_sem *sem)
+void HSDL_DestroySemaphore(HSDL_sem *sem)
 {
 	if ( sem ) {
 		sem_destroy(sem->sem);
-		SDL_free(sem);
+		HSDL_free(sem);
 	}
 }
 
-int SDL_SemTryWait(SDL_sem *sem)
+int HSDL_SemTryWait(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
-	retval = SDL_MUTEX_TIMEDOUT;
+	retval = HSDL_MUTEX_TIMEDOUT;
 	if ( sem_trywait(&sem->sem) == 0 ) {
 		retval = 0;
 	}
 	return retval;
 }
 
-int SDL_SemWait(SDL_sem *sem)
+int HSDL_SemWait(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	while ( ((retval = sem_wait(sem->sem)) == -1) && (errno == EINTR) ) {}
 	if ( retval < 0 ) {
-		SDL_SetError("sem_wait() failed");
+		HSDL_SetError("sem_wait() failed");
 	}
 	return retval;
 }
 
-int SDL_SemWaitTimeout(SDL_sem *sem, Uint32 timeout)
+int HSDL_SemWaitTimeout(HSDL_sem *sem, Uint32 timeout)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	/* Try the easy cases first */
 	if ( timeout == 0 ) {
-		return SDL_SemTryWait(sem);
+		return HSDL_SemTryWait(sem);
 	}
-	if ( timeout == SDL_MUTEX_MAXWAIT ) {
-		return SDL_SemWait(sem);
+	if ( timeout == HSDL_MUTEX_MAXWAIT ) {
+		return HSDL_SemWait(sem);
 	}
 
 	/* Ack!  We have to busy wait... */
 	/* FIXME: Use sem_timedwait()? */
-	timeout += SDL_GetTicks();
+	timeout += HSDL_GetTicks();
 	do {
-		retval = SDL_SemTryWait(sem);
+		retval = HSDL_SemTryWait(sem);
 		if ( retval == 0 ) {
 			break;
 		}
-		SDL_Delay(1);
-	} while ( SDL_GetTicks() < timeout );
+		HSDL_Delay(1);
+	} while ( HSDL_GetTicks() < timeout );
 
 	return retval;
 }
 
 
-Uint32 SDL_SemValue(SDL_sem *sem)
+Uint32 HSDL_SemValue(HSDL_sem *sem)
 {
 	int ret = 0;
 	if ( sem ) {
@@ -760,73 +760,73 @@ Uint32 SDL_SemValue(SDL_sem *sem)
 	return (Uint32)ret;
 }
 
-int SDL_SemPost(SDL_sem *sem)
+int HSDL_SemPost(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	retval = sem_post(sem->sem);
 	if ( retval < 0 ) {
-		SDL_SetError("sem_post() failed");
+		HSDL_SetError("sem_post() failed");
 	}
 	return retval;
 }
 
-typedef struct SDL_Thread SDL_Thread;
-typedef unsigned long SDL_threadID;
+typedef struct HSDL_Thread HSDL_Thread;
+typedef unsigned long HSDL_threadID;
 
 /* The SDL thread priority
  *
  * Note: On many systems you require special privileges to set high priority.
  */
 typedef enum {
-    SDL_THREAD_PRIORITY_LOW,
-    SDL_THREAD_PRIORITY_NORMAL,
-    SDL_THREAD_PRIORITY_HIGH
-} SDL_ThreadPriority;
+    HSDL_THREAD_PRIORITY_LOW,
+    HSDL_THREAD_PRIORITY_NORMAL,
+    HSDL_THREAD_PRIORITY_HIGH
+} HSDL_ThreadPriority;
 
-typedef int (SDLCALL * SDL_ThreadFunction) (void *data);
+typedef int (SDLCALL * HSDL_ThreadFunction) (void *data);
 //typedef sys_ppu_thread_t SYS_ThreadHandle;
 typedef pthread_t SYS_ThreadHandle;
 
 /* This is the system-independent thread info structure */
-struct SDL_Thread
+struct HSDL_Thread
 {
-    SDL_threadID threadid;
+    HSDL_threadID threadid;
     SYS_ThreadHandle handle;
     int status;
-    SDL_error errbuf;
+    HSDL_error errbuf;
     void *data;
 };
 
-struct SDL_mutex
+struct HSDL_mutex
 {
     int recursive;
-    SDL_threadID owner;
-    SDL_sem *sem;
+    HSDL_threadID owner;
+    HSDL_sem *sem;
 };
 
-typedef struct SDL_mutex SDL_mutex;
-extern SDL_mutex *SDL_CreateMutex(void);
+typedef struct HSDL_mutex HSDL_mutex;
+extern HSDL_mutex *HSDL_CreateMutex(void);
 
 
 
 
 /* Create a mutex */
-SDL_mutex *
-SDL_CreateMutex(void)
+HSDL_mutex *
+HSDL_CreateMutex(void)
 {
-    SDL_mutex *mutex;
+    HSDL_mutex *mutex;
 
     /* Allocate mutex memory */
-    mutex = (SDL_mutex *) SDL_malloc(sizeof(*mutex));
+    mutex = (HSDL_mutex *) HSDL_malloc(sizeof(*mutex));
     if (mutex) {
         /* Create the mutex semaphore, with initial value 1 */
-        mutex->sem = SDL_CreateSemaphore(1);
+        mutex->sem = HSDL_CreateSemaphore(1);
         mutex->recursive = 0;
         mutex->owner = 0;
         if (!mutex->sem) {
@@ -834,25 +834,25 @@ SDL_CreateMutex(void)
             mutex = NULL;
         }
     } else {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
     }
     return mutex;
 }
 
 /* Free the mutex */
 void
-SDL_DestroyMutex(SDL_mutex * mutex)
+HSDL_DestroyMutex(HSDL_mutex * mutex)
 {
     if (mutex) {
         if (mutex->sem) {
-            SDL_DestroySemaphore(mutex->sem);
+            HSDL_DestroySemaphore(mutex->sem);
         }
         free(mutex);
     }
 }
 
 /* WARNING:  This may not work for systems with 64-bit pid_t */
-Uint32 SDL_ThreadID(void)
+Uint32 HSDL_ThreadID(void)
 {
 	//return((Uint32)((size_t)pthread_self()));
 		return (Uint32) LWP_GetSelf();
@@ -861,19 +861,19 @@ Uint32 SDL_ThreadID(void)
 
 /* Lock the semaphore */
 int
-SDL_mutexP(SDL_mutex * mutex)
+HSDL_mutexP(HSDL_mutex * mutex)
 {
-#if SDL_THREADS_DISABLED
+#if HSDL_THREADS_DISABLED
     return 0;
 #else
-    SDL_threadID this_thread;
+    HSDL_threadID this_thread;
 
     if (mutex == NULL) {
-        //SDL_SetError("Passed a NULL mutex");
+        //HSDL_SetError("Passed a NULL mutex");
         return -1;
     }
 
-    this_thread = SDL_ThreadID();
+    this_thread = HSDL_ThreadID();
     if (mutex->owner == this_thread) {
         ++mutex->recursive;
     } else {
@@ -881,30 +881,30 @@ SDL_mutexP(SDL_mutex * mutex)
            We set the locking thread id after we obtain the lock
            so unlocks from other threads will fail.
          */
-        SDL_SemWait(mutex->sem);
+        HSDL_SemWait(mutex->sem);
         mutex->owner = this_thread;
         mutex->recursive = 0;
     }
 
     return 0;
-#endif /* SDL_THREADS_DISABLED */
+#endif /* HSDL_THREADS_DISABLED */
 }
 
 /* Unlock the mutex */
 int
-SDL_mutexV(SDL_mutex * mutex)
+HSDL_mutexV(HSDL_mutex * mutex)
 {
-#if SDL_THREADS_DISABLED
+#if HSDL_THREADS_DISABLED
     return 0;
 #else
     if (mutex == NULL) {
-        //SDL_SetError("Passed a NULL mutex");
+        //HSDL_SetError("Passed a NULL mutex");
         return -1;
     }
 
     /* If we don't own the mutex, we can't unlock it */
-    if (SDL_ThreadID() != mutex->owner) {
-        //SDL_SetError("mutex not owned by this thread");
+    if (HSDL_ThreadID() != mutex->owner) {
+        //HSDL_SetError("mutex not owned by this thread");
         return -1;
     }
 
@@ -917,10 +917,10 @@ SDL_mutexV(SDL_mutex * mutex)
            then release the lock semaphore.
          */
         mutex->owner = 0;
-        SDL_SemPost(mutex->sem);
+        HSDL_SemPost(mutex->sem);
     }
     return 0;
-#endif /* SDL_THREADS_DISABLED */
+#endif /* HSDL_THREADS_DISABLED */
 }
 
 #define ARRAY_CHUNKSIZE	32
@@ -928,18 +928,18 @@ SDL_mutexV(SDL_mutex * mutex)
    (except the main thread)
    The manipulation of an array here is safer than using a linked list.
 */
-static int SDL_maxthreads = 0;
-static int SDL_numthreads = 0;
-static SDL_Thread **SDL_Threads = NULL;
-static SDL_mutex *thread_lock = NULL;
+static int HSDL_maxthreads = 0;
+static int HSDL_numthreads = 0;
+static HSDL_Thread **HSDL_Threads = NULL;
+static HSDL_mutex *thread_lock = NULL;
 
 static int
-SDL_ThreadsInit(void)
+HSDL_ThreadsInit(void)
 {
     int retval;
 
     retval = 0;
-    thread_lock = SDL_CreateMutex();
+    thread_lock = HSDL_CreateMutex();
     if (thread_lock == NULL) {
         retval = -1;
     }
@@ -948,7 +948,7 @@ SDL_ThreadsInit(void)
 
 /* Routines for manipulating the thread list */
 static void
-SDL_AddThread(SDL_Thread * thread)
+HSDL_AddThread(HSDL_Thread * thread)
 {
     /* WARNING:
        If the very first threads are created simultaneously, then
@@ -957,92 +957,92 @@ SDL_AddThread(SDL_Thread * thread)
        is only one thread running the first time this is called.
      */
     if (!thread_lock) {
-        if (SDL_ThreadsInit() < 0) {
+        if (HSDL_ThreadsInit() < 0) {
             return;
         }
     }
-    SDL_mutexP(thread_lock);
+    HSDL_mutexP(thread_lock);
 
     /* Expand the list of threads, if necessary */
 #ifdef DEBUG_THREADS
     printf("Adding thread (%d already - %d max)\n",
-           SDL_numthreads, SDL_maxthreads);
+           HSDL_numthreads, HSDL_maxthreads);
 #endif
-    if (SDL_numthreads == SDL_maxthreads) {
-        SDL_Thread **threads;
-        threads = (SDL_Thread **) realloc(SDL_Threads,
-                                              (SDL_maxthreads +
+    if (HSDL_numthreads == HSDL_maxthreads) {
+        HSDL_Thread **threads;
+        threads = (HSDL_Thread **) realloc(HSDL_Threads,
+                                              (HSDL_maxthreads +
                                                ARRAY_CHUNKSIZE) *
                                               (sizeof *threads));
         if (threads == NULL) {
-            //SDL_OutOfMemory();
+            //HSDL_OutOfMemory();
             goto done;
         }
-        SDL_maxthreads += ARRAY_CHUNKSIZE;
-        SDL_Threads = threads;
+        HSDL_maxthreads += ARRAY_CHUNKSIZE;
+        HSDL_Threads = threads;
     }
-    SDL_Threads[SDL_numthreads++] = thread;
+    HSDL_Threads[HSDL_numthreads++] = thread;
   done:
-    SDL_mutexV(thread_lock);
+    HSDL_mutexV(thread_lock);
 }
 
 static void
-SDL_DelThread(SDL_Thread * thread)
+HSDL_DelThread(HSDL_Thread * thread)
 {
     int i;
 
     if (!thread_lock) {
         return;
     }
-    SDL_mutexP(thread_lock);
-    for (i = 0; i < SDL_numthreads; ++i) {
-        if (thread == SDL_Threads[i]) {
+    HSDL_mutexP(thread_lock);
+    for (i = 0; i < HSDL_numthreads; ++i) {
+        if (thread == HSDL_Threads[i]) {
             break;
         }
     }
-    if (i < SDL_numthreads) {
-        if (--SDL_numthreads > 0) {
-            while (i < SDL_numthreads) {
-                SDL_Threads[i] = SDL_Threads[i + 1];
+    if (i < HSDL_numthreads) {
+        if (--HSDL_numthreads > 0) {
+            while (i < HSDL_numthreads) {
+                HSDL_Threads[i] = HSDL_Threads[i + 1];
                 ++i;
             }
         } else {
-            SDL_maxthreads = 0;
-            /*SDL_*/free(SDL_Threads);
-            SDL_Threads = NULL;
+            HSDL_maxthreads = 0;
+            /*HSDL_*/free(HSDL_Threads);
+            HSDL_Threads = NULL;
         }
 #ifdef DEBUG_THREADS
         printf("Deleting thread (%d left - %d max)\n",
-               SDL_numthreads, SDL_maxthreads);
+               HSDL_numthreads, HSDL_maxthreads);
 #endif
     }
-    SDL_mutexV(thread_lock);
+    HSDL_mutexV(thread_lock);
 
 }
 
 /* The default (non-thread-safe) global error variable */
-static SDL_error SDL_global_error;
+static HSDL_error HSDL_global_error;
 
 /* Routine to get the thread-specific error variable */
-SDL_error *
-SDL_GetErrBuf(void)
+HSDL_error *
+HSDL_GetErrBuf(void)
 {
-    SDL_error *errbuf;
+    HSDL_error *errbuf;
 
-    errbuf = &SDL_global_error;
-    if (SDL_Threads) {
+    errbuf = &HSDL_global_error;
+    if (HSDL_Threads) {
         int i;
-        SDL_threadID this_thread;
+        HSDL_threadID this_thread;
 
-        this_thread = SDL_ThreadID();
-        SDL_mutexP(thread_lock);
-        for (i = 0; i < SDL_numthreads; ++i) {
-            if (this_thread == SDL_Threads[i]->threadid) {
-                errbuf = &SDL_Threads[i]->errbuf;
+        this_thread = HSDL_ThreadID();
+        HSDL_mutexP(thread_lock);
+        for (i = 0; i < HSDL_numthreads; ++i) {
+            if (this_thread == HSDL_Threads[i]->threadid) {
+                errbuf = &HSDL_Threads[i]->errbuf;
                 break;
             }
         }
-        SDL_mutexV(thread_lock);
+        HSDL_mutexV(thread_lock);
     }
     return (errbuf);
 }
@@ -1052,7 +1052,7 @@ static int sig_list[] = {
 };
 
 void
-SDL_MaskSignals(sigset_t * omask)
+HSDL_MaskSignals(sigset_t * omask)
 {
     sigset_t mask;
     int i;
@@ -1064,7 +1064,7 @@ SDL_MaskSignals(sigset_t * omask)
 }
 
 void
-SDL_UnmaskSignals(sigset_t * omask)
+HSDL_UnmaskSignals(sigset_t * omask)
 {
 
 }
@@ -1074,19 +1074,19 @@ typedef struct
 {
     int (SDLCALL * func) (void *);
     void *data;
-    SDL_Thread *info;
-    SDL_sem *wait;
+    HSDL_Thread *info;
+    HSDL_sem *wait;
 } thread_args;
 
 void
-SDL_SYS_SetupThread(void)
+HSDL_SYS_SetupThread(void)
 {
     /* Mask asynchronous signals for this thread */
-    SDL_MaskSignals(NULL);
+    HSDL_MaskSignals(NULL);
 }
 
 void
-SDL_RunThread(void *data)
+HSDL_RunThread(void *data)
 {
     thread_args *args;
     int (SDLCALL * userfunc) (void *);
@@ -1094,13 +1094,13 @@ SDL_RunThread(void *data)
     int *statusloc;
 
     /* Perform any system-dependent setup
-       - this function cannot fail, and cannot use SDL_SetError()
+       - this function cannot fail, and cannot use HSDL_SetError()
      */
-    SDL_SYS_SetupThread();
+    HSDL_SYS_SetupThread();
 
     /* Get the thread id */
     args = (thread_args *) data;
-    args->info->threadid = SDL_ThreadID();
+    args->info->threadid = HSDL_ThreadID();
 
     /* Figure out what function to run */
     userfunc = args->func;
@@ -1108,7 +1108,7 @@ SDL_RunThread(void *data)
     statusloc = &args->info->status;
 
     /* Wake up the parent thread */
-    SDL_SemPost(args->wait);
+    HSDL_SemPost(args->wait);
 
     /* Run the function */
     *statusloc = userfunc(userdata);
@@ -1117,11 +1117,11 @@ SDL_RunThread(void *data)
 static void *
 RunThread(void *arg)
 {
-    SDL_RunThread(arg);
+    HSDL_RunThread(arg);
 	return((void *)0);		/* Prevent compiler warning */
 }
 
-int SDL_SYS_CreateThread(SDL_Thread *thread, void *args)
+int HSDL_SYS_CreateThread(HSDL_Thread *thread, void *args)
 {
 	pthread_attr_t type;
 
@@ -1129,48 +1129,48 @@ int SDL_SYS_CreateThread(SDL_Thread *thread, void *args)
 
 	return(0);
 }
-void SDL_SYS_WaitThread(SDL_Thread *thread)
+void HSDL_SYS_WaitThread(HSDL_Thread *thread)
 {
 	pthread_join(thread->handle, 0);
 }
 
 #define DECLSPEC
 
-#ifdef SDL_PASSED_BEGINTHREAD_ENDTHREAD
-#undef SDL_CreateThread
-DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(int (SDLCALL * fn) (void *), void *data,
-                 pfnSDL_CurrentBeginThread pfnBeginThread,
-                 pfnSDL_CurrentEndThread pfnEndThread)
+#ifdef HSDL_PASSED_BEGINTHREAD_ENDTHREAD
+#undef HSDL_CreateThread
+DECLSPEC HSDL_Thread *SDLCALL
+HSDL_CreateThread(int (SDLCALL * fn) (void *), void *data,
+                 pfnHSDL_CurrentBeginThread pfnBeginThread,
+                 pfnHSDL_CurrentEndThread pfnEndThread)
 #else
-DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
+DECLSPEC HSDL_Thread *SDLCALL
+HSDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
 #endif
 {
-    SDL_Thread *thread;
+    HSDL_Thread *thread;
     thread_args *args;
     int ret;
 
     /* Allocate memory for the thread info structure */
-    thread = (SDL_Thread *) malloc(sizeof(*thread));
+    thread = (HSDL_Thread *) malloc(sizeof(*thread));
     if (thread == NULL) {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
         return (NULL);
     }
     memset(thread, 0, (sizeof *thread));
     thread->status = -1;
 
     /* Set up the arguments for the thread */
-    args = (thread_args *) SDL_malloc(sizeof(*args));
+    args = (thread_args *) HSDL_malloc(sizeof(*args));
     if (args == NULL) {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
         free(thread);
         return (NULL);
     }
     args->func = fn;
     args->data = data;
     args->info = thread;
-    args->wait = SDL_CreateSemaphore(0);
+    args->wait = HSDL_CreateSemaphore(0);
     if (args->wait == NULL) {
         free(thread);
         free(args);
@@ -1178,58 +1178,58 @@ SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
     }
 
     /* Add the thread to the list of available threads */
-    SDL_AddThread(thread);
+    HSDL_AddThread(thread);
 
     /* Create the thread and go! */
-#ifdef SDL_PASSED_BEGINTHREAD_ENDTHREAD
-    ret = SDL_SYS_CreateThread(thread, args, pfnBeginThread, pfnEndThread);
+#ifdef HSDL_PASSED_BEGINTHREAD_ENDTHREAD
+    ret = HSDL_SYS_CreateThread(thread, args, pfnBeginThread, pfnEndThread);
 #else
-    ret = SDL_SYS_CreateThread(thread, args);
+    ret = HSDL_SYS_CreateThread(thread, args);
 #endif
     if (ret >= 0) {
         /* Wait for the thread function to use arguments */
-        SDL_SemWait(args->wait);
+        HSDL_SemWait(args->wait);
     } else {
         /* Oops, failed.  Gotta free everything */
-        SDL_DelThread(thread);
+        HSDL_DelThread(thread);
         free(thread);
         thread = NULL;
     }
-    SDL_DestroySemaphore(args->wait);
+    HSDL_DestroySemaphore(args->wait);
     free(args);
 
     /* Everything is running now */
     return (thread);
 }
 
-SDL_threadID
-SDL_GetThreadID(SDL_Thread * thread)
+HSDL_threadID
+HSDL_GetThreadID(HSDL_Thread * thread)
 {
-    SDL_threadID id;
+    HSDL_threadID id;
 
     if (thread) {
         id = thread->threadid;
     } else {
-        id = SDL_ThreadID();
+        id = HSDL_ThreadID();
     }
     return id;
 }
 
 int
-SDL_SetThreadPriority(SDL_ThreadPriority priority)
+HSDL_SetThreadPriority(HSDL_ThreadPriority priority)
 {
     return 0;
 }
 
 void
-SDL_WaitThread(SDL_Thread * thread, int *status)
+HSDL_WaitThread(HSDL_Thread * thread, int *status)
 {
     if (thread) {
-        SDL_SYS_WaitThread(thread);
+        HSDL_SYS_WaitThread(thread);
         if (status) {
             *status = thread->status;
         }
-        SDL_DelThread(thread);
+        HSDL_DelThread(thread);
         free(thread);
     }
 }
@@ -1239,7 +1239,7 @@ SDL_WaitThread(SDL_Thread * thread, int *status)
 #include <unistd.h>
 #include <windows.h>
 
-struct SDL_semaphore {
+struct HSDL_semaphore {
 #if defined(_WIN32_WCE) && (_WIN32_WCE < 300)
 	SYNCHHANDLE id;
 #else
@@ -1248,16 +1248,16 @@ struct SDL_semaphore {
 	volatile LONG count;
 };
 
-struct SDL_semaphore;
-typedef struct SDL_semaphore SDL_sem;
+struct HSDL_semaphore;
+typedef struct HSDL_semaphore HSDL_sem;
 
 /* Create a semaphore */
-SDL_sem *SDL_CreateSemaphore(Uint32 initial_value)
+HSDL_sem *HSDL_CreateSemaphore(Uint32 initial_value)
 {
-	SDL_sem *sem;
+	HSDL_sem *sem;
 
 	/* Allocate sem memory */
-	sem = (SDL_sem *)SDL_malloc(sizeof(*sem));
+	sem = (HSDL_sem *)HSDL_malloc(sizeof(*sem));
 	if ( sem ) {
 		/* Create the semaphore, with max value 32K */
 #if defined(_WIN32_WCE) && (_WIN32_WCE < 300)
@@ -1267,19 +1267,19 @@ SDL_sem *SDL_CreateSemaphore(Uint32 initial_value)
 #endif
 		sem->count = (LONG) initial_value;
 		if ( ! sem->id ) {
-			SDL_SetError("Couldn't create semaphore");
-			SDL_free(sem);
+			HSDL_SetError("Couldn't create semaphore");
+			HSDL_free(sem);
 			sem = NULL;
 		}
 	} else {
-		//SDL_OutOfMemory();
+		//HSDL_OutOfMemory();
 	}
 	return(sem);
 }
 
 
 /* Free the semaphore */
-void SDL_DestroySemaphore(SDL_sem *sem)
+void HSDL_DestroySemaphore(HSDL_sem *sem)
 {
 	if ( sem ) {
 		if ( sem->id ) {
@@ -1290,21 +1290,21 @@ void SDL_DestroySemaphore(SDL_sem *sem)
 #endif
 			sem->id = 0;
 		}
-		SDL_free(sem);
+		HSDL_free(sem);
 	}
 }
 
-int SDL_SemWaitTimeout(SDL_sem *sem, Uint32 timeout)
+int HSDL_SemWaitTimeout(HSDL_sem *sem, Uint32 timeout)
 {
 	int retval;
 	DWORD dwMilliseconds;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL sem");
+		HSDL_SetError("Passed a NULL sem");
 		return -1;
 	}
 
-	if ( timeout == SDL_MUTEX_MAXWAIT ) {
+	if ( timeout == HSDL_MUTEX_MAXWAIT ) {
 		dwMilliseconds = INFINITE;
 	} else {
 		dwMilliseconds = (DWORD)timeout;
@@ -1319,40 +1319,40 @@ int SDL_SemWaitTimeout(SDL_sem *sem, Uint32 timeout)
 		retval = 0;
 		break;
 	    case WAIT_TIMEOUT:
-		retval = SDL_MUTEX_TIMEDOUT;
+		retval = HSDL_MUTEX_TIMEDOUT;
 		break;
 	    default:
-		SDL_SetError("WaitForSingleObject() failed");
+		HSDL_SetError("WaitForSingleObject() failed");
 		retval = -1;
 		break;
 	}
 	return retval;
 }
 
-int SDL_SemTryWait(SDL_sem *sem)
+int HSDL_SemTryWait(HSDL_sem *sem)
 {
-	return SDL_SemWaitTimeout(sem, 0);
+	return HSDL_SemWaitTimeout(sem, 0);
 }
 
-int SDL_SemWait(SDL_sem *sem)
+int HSDL_SemWait(HSDL_sem *sem)
 {
-	return SDL_SemWaitTimeout(sem, SDL_MUTEX_MAXWAIT);
+	return HSDL_SemWaitTimeout(sem, HSDL_MUTEX_MAXWAIT);
 }
 
 /* Returns the current count of the semaphore */
-Uint32 SDL_SemValue(SDL_sem *sem)
+Uint32 HSDL_SemValue(HSDL_sem *sem)
 {
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL sem");
+		HSDL_SetError("Passed a NULL sem");
 		return 0;
 	}
 	return (Uint32) sem->count;
 }
 
-int SDL_SemPost(SDL_sem *sem)
+int HSDL_SemPost(HSDL_sem *sem)
 {
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL sem");
+		HSDL_SetError("Passed a NULL sem");
 		return -1;
 	}
 	/* Increase the counter in the first place, because
@@ -1367,100 +1367,100 @@ int SDL_SemPost(SDL_sem *sem)
 	if ( ReleaseSemaphore(sem->id, 1, NULL) == FALSE ) {
 #endif
 		InterlockedDecrement(&sem->count);	/* restore */
-		SDL_SetError("ReleaseSemaphore() failed");
+		HSDL_SetError("ReleaseSemaphore() failed");
 		return -1;
 	}
 	return 0;
 }
-typedef struct SDL_Thread SDL_Thread;
-typedef unsigned long SDL_threadID;
+typedef struct HSDL_Thread HSDL_Thread;
+typedef unsigned long HSDL_threadID;
 
 /* The SDL thread priority
  *
  * Note: On many systems you require special privileges to set high priority.
  */
 typedef enum {
-    SDL_THREAD_PRIORITY_LOW,
-    SDL_THREAD_PRIORITY_NORMAL,
-    SDL_THREAD_PRIORITY_HIGH
-} SDL_ThreadPriority;
+    HSDL_THREAD_PRIORITY_LOW,
+    HSDL_THREAD_PRIORITY_NORMAL,
+    HSDL_THREAD_PRIORITY_HIGH
+} HSDL_ThreadPriority;
 
-typedef int (SDLCALL * SDL_ThreadFunction) (void *data);
+typedef int (SDLCALL * HSDL_ThreadFunction) (void *data);
 typedef HANDLE SYS_ThreadHandle;
 
 /* This is the system-independent thread info structure */
-struct SDL_Thread
+struct HSDL_Thread
 {
-    SDL_threadID threadid;
+    HSDL_threadID threadid;
     SYS_ThreadHandle handle;
     int status;
-    SDL_error errbuf;
+    HSDL_error errbuf;
     void *data;
 };
 
-struct SDL_mutex {
+struct HSDL_mutex {
 	HANDLE id;
 };
 
-typedef struct SDL_mutex SDL_mutex;
-extern SDL_mutex *SDL_CreateMutex(void);
+typedef struct HSDL_mutex HSDL_mutex;
+extern HSDL_mutex *HSDL_CreateMutex(void);
 
 /* Create a mutex */
-SDL_mutex *SDL_CreateMutex(void)
+HSDL_mutex *HSDL_CreateMutex(void)
 {
-	SDL_mutex *mutex;
+	HSDL_mutex *mutex;
 
 	/* Allocate mutex memory */
-	mutex = (SDL_mutex *)SDL_malloc(sizeof(*mutex));
+	mutex = (HSDL_mutex *)HSDL_malloc(sizeof(*mutex));
 	if ( mutex ) {
 		/* Create the mutex, with initial value signaled */
 		mutex->id = CreateMutex(NULL, FALSE, NULL);
 		if ( ! mutex->id ) {
-			SDL_SetError("Couldn't create mutex");
-			SDL_free(mutex);
+			HSDL_SetError("Couldn't create mutex");
+			HSDL_free(mutex);
 			mutex = NULL;
 		}
 	} else {
-		//SDL_OutOfMemory();
+		//HSDL_OutOfMemory();
 	}
 	return(mutex);
 }
 
 /* Free the mutex */
-void SDL_DestroyMutex(SDL_mutex *mutex)
+void HSDL_DestroyMutex(HSDL_mutex *mutex)
 {
 	if ( mutex ) {
 		if ( mutex->id ) {
 			CloseHandle(mutex->id);
 			mutex->id = 0;
 		}
-		SDL_free(mutex);
+		HSDL_free(mutex);
 	}
 }
 
 /* Lock the mutex */
-int SDL_mutexP(SDL_mutex *mutex)
+int HSDL_mutexP(HSDL_mutex *mutex)
 {
 	if ( mutex == NULL ) {
-		SDL_SetError("Passed a NULL mutex");
+		HSDL_SetError("Passed a NULL mutex");
 		return -1;
 	}
 	if ( WaitForSingleObject(mutex->id, INFINITE) == WAIT_FAILED ) {
-		SDL_SetError("Couldn't wait on mutex");
+		HSDL_SetError("Couldn't wait on mutex");
 		return -1;
 	}
 	return(0);
 }
 
 /* Unlock the mutex */
-int SDL_mutexV(SDL_mutex *mutex)
+int HSDL_mutexV(HSDL_mutex *mutex)
 {
 	if ( mutex == NULL ) {
-		SDL_SetError("Passed a NULL mutex");
+		HSDL_SetError("Passed a NULL mutex");
 		return -1;
 	}
 	if ( ReleaseMutex(mutex->id) == FALSE ) {
-		SDL_SetError("Couldn't release mutex");
+		HSDL_SetError("Couldn't release mutex");
 		return -1;
 	}
 	return(0);
@@ -1471,18 +1471,18 @@ int SDL_mutexV(SDL_mutex *mutex)
    (except the main thread)
    The manipulation of an array here is safer than using a linked list.
 */
-static int SDL_maxthreads = 0;
-static int SDL_numthreads = 0;
-static SDL_Thread **SDL_Threads = NULL;
-static SDL_mutex *thread_lock = NULL;
+static int HSDL_maxthreads = 0;
+static int HSDL_numthreads = 0;
+static HSDL_Thread **HSDL_Threads = NULL;
+static HSDL_mutex *thread_lock = NULL;
 
 static int
-SDL_ThreadsInit(void)
+HSDL_ThreadsInit(void)
 {
     int retval;
 
     retval = 0;
-    thread_lock = SDL_CreateMutex();
+    thread_lock = HSDL_CreateMutex();
     if (thread_lock == NULL) {
         retval = -1;
     }
@@ -1491,7 +1491,7 @@ SDL_ThreadsInit(void)
 
 /* Routines for manipulating the thread list */
 static void
-SDL_AddThread(SDL_Thread * thread)
+HSDL_AddThread(HSDL_Thread * thread)
 {
     /* WARNING:
        If the very first threads are created simultaneously, then
@@ -1500,96 +1500,96 @@ SDL_AddThread(SDL_Thread * thread)
        is only one thread running the first time this is called.
      */
     if (!thread_lock) {
-        if (SDL_ThreadsInit() < 0) {
+        if (HSDL_ThreadsInit() < 0) {
             return;
         }
     }
-    SDL_mutexP(thread_lock);
+    HSDL_mutexP(thread_lock);
 
     /* Expand the list of threads, if necessary */
 #ifdef DEBUG_THREADS
     printf("Adding thread (%d already - %d max)\n",
-           SDL_numthreads, SDL_maxthreads);
+           HSDL_numthreads, HSDL_maxthreads);
 #endif
-    if (SDL_numthreads == SDL_maxthreads) {
-        SDL_Thread **threads;
-        threads = (SDL_Thread **) realloc(SDL_Threads,
-                                              (SDL_maxthreads +
+    if (HSDL_numthreads == HSDL_maxthreads) {
+        HSDL_Thread **threads;
+        threads = (HSDL_Thread **) realloc(HSDL_Threads,
+                                              (HSDL_maxthreads +
                                                ARRAY_CHUNKSIZE) *
                                               (sizeof *threads));
         if (threads == NULL) {
-            //SDL_OutOfMemory();
+            //HSDL_OutOfMemory();
             goto done;
         }
-        SDL_maxthreads += ARRAY_CHUNKSIZE;
-        SDL_Threads = threads;
+        HSDL_maxthreads += ARRAY_CHUNKSIZE;
+        HSDL_Threads = threads;
     }
-    SDL_Threads[SDL_numthreads++] = thread;
+    HSDL_Threads[HSDL_numthreads++] = thread;
   done:
-    SDL_mutexV(thread_lock);
+    HSDL_mutexV(thread_lock);
 }
 
 static void
-SDL_DelThread(SDL_Thread * thread)
+HSDL_DelThread(HSDL_Thread * thread)
 {
     int i;
 
     if (!thread_lock) {
         return;
     }
-    SDL_mutexP(thread_lock);
-    for (i = 0; i < SDL_numthreads; ++i) {
-        if (thread == SDL_Threads[i]) {
+    HSDL_mutexP(thread_lock);
+    for (i = 0; i < HSDL_numthreads; ++i) {
+        if (thread == HSDL_Threads[i]) {
             break;
         }
     }
-    if (i < SDL_numthreads) {
-        if (--SDL_numthreads > 0) {
-            while (i < SDL_numthreads) {
-                SDL_Threads[i] = SDL_Threads[i + 1];
+    if (i < HSDL_numthreads) {
+        if (--HSDL_numthreads > 0) {
+            while (i < HSDL_numthreads) {
+                HSDL_Threads[i] = HSDL_Threads[i + 1];
                 ++i;
             }
         } else {
-            SDL_maxthreads = 0;
-            free(SDL_Threads);
-            SDL_Threads = NULL;
+            HSDL_maxthreads = 0;
+            free(HSDL_Threads);
+            HSDL_Threads = NULL;
         }
 #ifdef DEBUG_THREADS
         printf("Deleting thread (%d left - %d max)\n",
-               SDL_numthreads, SDL_maxthreads);
+               HSDL_numthreads, HSDL_maxthreads);
 #endif
     }
-    SDL_mutexV(thread_lock);
+    HSDL_mutexV(thread_lock);
 
 }
-Uint32 SDL_ThreadID(void)
+Uint32 HSDL_ThreadID(void)
 {
 	return((Uint32)GetCurrentThreadId());
 }
 
 /* The default (non-thread-safe) global error variable */
-static SDL_error SDL_global_error;
+static HSDL_error HSDL_global_error;
 
 /* Routine to get the thread-specific error variable */
-SDL_error *
-SDL_GetErrBuf(void)
+HSDL_error *
+HSDL_GetErrBuf(void)
 {
-    SDL_error *errbuf;
+    HSDL_error *errbuf;
 
-    errbuf = &SDL_global_error;
-    if (SDL_Threads) {
+    errbuf = &HSDL_global_error;
+    if (HSDL_Threads) {
         int i;
-        SDL_threadID this_thread;
+        HSDL_threadID this_thread;
 
-        this_thread = SDL_ThreadID();
-        SDL_mutexP(thread_lock);
-        for (i = 0; i < SDL_numthreads; ++i) {
-            if (this_thread == SDL_Threads[i]->threadid) {
-                errbuf = &SDL_Threads[i]->errbuf;
+        this_thread = HSDL_ThreadID();
+        HSDL_mutexP(thread_lock);
+        for (i = 0; i < HSDL_numthreads; ++i) {
+            if (this_thread == HSDL_Threads[i]->threadid) {
+                errbuf = &HSDL_Threads[i]->errbuf;
                 break;
             }
         }
-        SDL_mutexV(thread_lock);
+        HSDL_mutexV(thread_lock);
     }
     return (errbuf);
 }
@@ -1600,18 +1600,18 @@ typedef struct
 {
     int (SDLCALL * func) (void *);
     void *data;
-    SDL_Thread *info;
-    SDL_sem *wait;
+    HSDL_Thread *info;
+    HSDL_sem *wait;
 } thread_args;
 
 
-void SDL_SYS_SetupThread(void)
+void HSDL_SYS_SetupThread(void)
 {
 	return;
 }
 
 void
-SDL_RunThread(void *data)
+HSDL_RunThread(void *data)
 {
     thread_args *args;
     int (SDLCALL * userfunc) (void *);
@@ -1619,13 +1619,13 @@ SDL_RunThread(void *data)
     int *statusloc;
 
     /* Perform any system-dependent setup
-       - this function cannot fail, and cannot use SDL_SetError()
+       - this function cannot fail, and cannot use HSDL_SetError()
      */
-    SDL_SYS_SetupThread();
+    HSDL_SYS_SetupThread();
 
     /* Get the thread id */
     args = (thread_args *) data;
-    args->info->threadid = SDL_ThreadID();
+    args->info->threadid = HSDL_ThreadID();
 
     /* Figure out what function to run */
     userfunc = args->func;
@@ -1633,21 +1633,21 @@ SDL_RunThread(void *data)
     statusloc = &args->info->status;
 
     /* Wake up the parent thread */
-    SDL_SemPost(args->wait);
+    HSDL_SemPost(args->wait);
 
     /* Run the function */
     *statusloc = userfunc(userdata);
 }
-typedef unsigned long (__cdecl *pfnSDL_CurrentBeginThread) (void *, unsigned,
+typedef unsigned long (__cdecl *pfnHSDL_CurrentBeginThread) (void *, unsigned,
         unsigned (__stdcall *func)(void *), void *arg, 
         unsigned, unsigned *threadID);
-typedef void (__cdecl *pfnSDL_CurrentEndThread)(unsigned code);
+typedef void (__cdecl *pfnHSDL_CurrentEndThread)(unsigned code);
 
 
 typedef struct ThreadStartParms
 {
   void *args;
-  pfnSDL_CurrentEndThread pfnCurrentEndThread;
+  pfnHSDL_CurrentEndThread pfnCurrentEndThread;
 } tThreadStartParms, *pThreadStartParms;
 
 
@@ -1655,16 +1655,16 @@ typedef struct ThreadStartParms
 static DWORD RunThread(void *data)
 {
   pThreadStartParms pThreadParms = (pThreadStartParms)data;
-  pfnSDL_CurrentEndThread pfnCurrentEndThread = NULL;
+  pfnHSDL_CurrentEndThread pfnCurrentEndThread = NULL;
 
   // Call the thread function!
-  SDL_RunThread(pThreadParms->args);
+  HSDL_RunThread(pThreadParms->args);
 
   // Get the current endthread we have to use!
   if (pThreadParms)
   {
     pfnCurrentEndThread = pThreadParms->pfnCurrentEndThread;
-    SDL_free(pThreadParms);
+    HSDL_free(pThreadParms);
   }
   // Call endthread!
   if (pfnCurrentEndThread)
@@ -1682,18 +1682,18 @@ static unsigned __stdcall RunThreadViaBeginThreadEx(void *data)
   return (unsigned) RunThread(data);
 }
 
-int SDL_SYS_CreateThread(SDL_Thread *thread, void *args)
+int HSDL_SYS_CreateThread(HSDL_Thread *thread, void *args)
 {
 #ifdef _WIN32_WCE
-	pfnSDL_CurrentBeginThread pfnBeginThread = NULL;
-	pfnSDL_CurrentEndThread pfnEndThread = NULL;
+	pfnHSDL_CurrentBeginThread pfnBeginThread = NULL;
+	pfnHSDL_CurrentEndThread pfnEndThread = NULL;
 #else
-	pfnSDL_CurrentBeginThread pfnBeginThread = _beginthreadex;
-	pfnSDL_CurrentEndThread pfnEndThread = _endthreadex;
+	pfnHSDL_CurrentBeginThread pfnBeginThread = _beginthreadex;
+	pfnHSDL_CurrentEndThread pfnEndThread = _endthreadex;
 #endif
-	pThreadStartParms pThreadParms = (pThreadStartParms)SDL_malloc(sizeof(tThreadStartParms));
+	pThreadStartParms pThreadParms = (pThreadStartParms)HSDL_malloc(sizeof(tThreadStartParms));
 	if (!pThreadParms) {
-		//SDL_OutOfMemory();
+		//HSDL_OutOfMemory();
 		return(-1);
 	}
 
@@ -1712,14 +1712,14 @@ int SDL_SYS_CreateThread(SDL_Thread *thread, void *args)
 		thread->handle = CreateThread(NULL, 0, RunThreadViaCreateThread, pThreadParms, 0, &threadid);
 	}
 	if (thread->handle == NULL) {
-		SDL_SetError("Not enough resources to create thread");
+		HSDL_SetError("Not enough resources to create thread");
 		return(-1);
 	}
 	return(0);
 }
 
 
-void SDL_SYS_WaitThread(SDL_Thread *thread)
+void HSDL_SYS_WaitThread(HSDL_Thread *thread)
 {
 	WaitForSingleObject(thread->handle, INFINITE);
 	CloseHandle(thread->handle);
@@ -1727,41 +1727,41 @@ void SDL_SYS_WaitThread(SDL_Thread *thread)
 
 #define DECLSPEC
 
-#ifdef SDL_PASSED_BEGINTHREAD_ENDTHREAD
-#undef SDL_CreateThread
-DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(int (SDLCALL * fn) (void *), void *data,
-                 pfnSDL_CurrentBeginThread pfnBeginThread,
-                 pfnSDL_CurrentEndThread pfnEndThread)
+#ifdef HSDL_PASSED_BEGINTHREAD_ENDTHREAD
+#undef HSDL_CreateThread
+DECLSPEC HSDL_Thread *SDLCALL
+HSDL_CreateThread(int (SDLCALL * fn) (void *), void *data,
+                 pfnHSDL_CurrentBeginThread pfnBeginThread,
+                 pfnHSDL_CurrentEndThread pfnEndThread)
 #else
-DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
+DECLSPEC HSDL_Thread *SDLCALL
+HSDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
 #endif
 {
-    SDL_Thread *thread;
+    HSDL_Thread *thread;
     thread_args *args;
     int ret;
 
     /* Allocate memory for the thread info structure */
-    thread = (SDL_Thread *) /*SDL_*/malloc(sizeof(*thread));
+    thread = (HSDL_Thread *) /*HSDL_*/malloc(sizeof(*thread));
     if (thread == NULL) {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
         return (NULL);
     }
     memset(thread, 0, (sizeof *thread));
     thread->status = -1;
 
     /* Set up the arguments for the thread */
-    args = (thread_args *) SDL_malloc(sizeof(*args));
+    args = (thread_args *) HSDL_malloc(sizeof(*args));
     if (args == NULL) {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
         free(thread);
         return (NULL);
     }
     args->func = fn;
     args->data = data;
     args->info = thread;
-    args->wait = SDL_CreateSemaphore(0);
+    args->wait = HSDL_CreateSemaphore(0);
     if (args->wait == NULL) {
         free(thread);
         free(args);
@@ -1769,58 +1769,58 @@ SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
     }
 
     /* Add the thread to the list of available threads */
-    SDL_AddThread(thread);
+    HSDL_AddThread(thread);
 
     /* Create the thread and go! */
-#ifdef SDL_PASSED_BEGINTHREAD_ENDTHREAD
-    ret = SDL_SYS_CreateThread(thread, args, pfnBeginThread, pfnEndThread);
+#ifdef HSDL_PASSED_BEGINTHREAD_ENDTHREAD
+    ret = HSDL_SYS_CreateThread(thread, args, pfnBeginThread, pfnEndThread);
 #else
-    ret = SDL_SYS_CreateThread(thread, args);
+    ret = HSDL_SYS_CreateThread(thread, args);
 #endif
     if (ret >= 0) {
         /* Wait for the thread function to use arguments */
-        SDL_SemWait(args->wait);
+        HSDL_SemWait(args->wait);
     } else {
         /* Oops, failed.  Gotta free everything */
-        SDL_DelThread(thread);
+        HSDL_DelThread(thread);
         free(thread);
         thread = NULL;
     }
-    SDL_DestroySemaphore(args->wait);
+    HSDL_DestroySemaphore(args->wait);
     free(args);
 
     /* Everything is running now */
     return (thread);
 }
 
-SDL_threadID
-SDL_GetThreadID(SDL_Thread * thread)
+HSDL_threadID
+HSDL_GetThreadID(HSDL_Thread * thread)
 {
-    SDL_threadID id;
+    HSDL_threadID id;
 
     if (thread) {
         id = thread->threadid;
     } else {
-        id = SDL_ThreadID();
+        id = HSDL_ThreadID();
     }
     return id;
 }
 
 int
-SDL_SetThreadPriority(SDL_ThreadPriority priority)
+HSDL_SetThreadPriority(HSDL_ThreadPriority priority)
 {
     return 0;
 }
 
 void
-SDL_WaitThread(SDL_Thread * thread, int *status)
+HSDL_WaitThread(HSDL_Thread * thread, int *status)
 {
     if (thread) {
-        SDL_SYS_WaitThread(thread);
+        HSDL_SYS_WaitThread(thread);
         if (status) {
             *status = thread->status;
         }
-        SDL_DelThread(thread);
+        HSDL_DelThread(thread);
         free(thread);
     }
 }
@@ -1834,103 +1834,103 @@ SDL_WaitThread(SDL_Thread * thread, int *status)
 #include <pthread.h>
 #include <semaphore.h>
 
-struct SDL_semaphore
+struct HSDL_semaphore
 {
     sem_t sem;
 };
 
-struct SDL_semaphore;
-typedef struct SDL_semaphore SDL_sem;
+struct HSDL_semaphore;
+typedef struct HSDL_semaphore HSDL_sem;
 
 /* Create a counting semaphore */
-SDL_sem *
-SDL_CreateSemaphore(Uint32 initial_value)
+HSDL_sem *
+HSDL_CreateSemaphore(Uint32 initial_value)
 {
-	SDL_sem *sem = (SDL_sem *) SDL_malloc(sizeof(SDL_sem));
+	HSDL_sem *sem = (HSDL_sem *) HSDL_malloc(sizeof(HSDL_sem));
 	if ( sem ) {
 		if ( sem_init(&sem->sem, 0, initial_value) < 0 ) {
-			SDL_SetError("sem_init() failed");
-			SDL_free(sem);
+			HSDL_SetError("sem_init() failed");
+			HSDL_free(sem);
 			sem = NULL;
 		}
 	} else {
-		//SDL_OutOfMemory();
+		//HSDL_OutOfMemory();
 	}
 	return sem;
 }
 
-void SDL_DestroySemaphore(SDL_sem *sem)
+void HSDL_DestroySemaphore(HSDL_sem *sem)
 {
 	if ( sem ) {
 		sem_destroy(&sem->sem);
-		SDL_free(sem);
+		HSDL_free(sem);
 	}
 }
 
-int SDL_SemTryWait(SDL_sem *sem)
+int HSDL_SemTryWait(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
-	retval = SDL_MUTEX_TIMEDOUT;
+	retval = HSDL_MUTEX_TIMEDOUT;
 	if ( sem_trywait(&sem->sem) == 0 ) {
 		retval = 0;
 	}
 	return retval;
 }
 
-int SDL_SemWait(SDL_sem *sem)
+int HSDL_SemWait(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	while ( ((retval = sem_wait(&sem->sem)) == -1) && (errno == EINTR) ) {}
 	if ( retval < 0 ) {
-		SDL_SetError("sem_wait() failed");
+		HSDL_SetError("sem_wait() failed");
 	}
 	return retval;
 }
 
-int SDL_SemWaitTimeout(SDL_sem *sem, Uint32 timeout)
+int HSDL_SemWaitTimeout(HSDL_sem *sem, Uint32 timeout)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	/* Try the easy cases first */
 	if ( timeout == 0 ) {
-		return SDL_SemTryWait(sem);
+		return HSDL_SemTryWait(sem);
 	}
-	if ( timeout == SDL_MUTEX_MAXWAIT ) {
-		return SDL_SemWait(sem);
+	if ( timeout == HSDL_MUTEX_MAXWAIT ) {
+		return HSDL_SemWait(sem);
 	}
 
 	/* Ack!  We have to busy wait... */
 	/* FIXME: Use sem_timedwait()? */
-	timeout += SDL_GetTicks();
+	timeout += HSDL_GetTicks();
 	do {
-		retval = SDL_SemTryWait(sem);
+		retval = HSDL_SemTryWait(sem);
 		if ( retval == 0 ) {
 			break;
 		}
-		SDL_Delay(1);
-	} while ( SDL_GetTicks() < timeout );
+		HSDL_Delay(1);
+	} while ( HSDL_GetTicks() < timeout );
 
 	return retval;
 }
 
 
-Uint32 SDL_SemValue(SDL_sem *sem)
+Uint32 HSDL_SemValue(HSDL_sem *sem)
 {
 	int ret = 0;
 	if ( sem ) {
@@ -1942,97 +1942,97 @@ Uint32 SDL_SemValue(SDL_sem *sem)
 	return (Uint32)ret;
 }
 
-int SDL_SemPost(SDL_sem *sem)
+int HSDL_SemPost(HSDL_sem *sem)
 {
 	int retval;
 
 	if ( ! sem ) {
-		SDL_SetError("Passed a NULL semaphore");
+		HSDL_SetError("Passed a NULL semaphore");
 		return -1;
 	}
 
 	retval = sem_post(&sem->sem);
 	if ( retval < 0 ) {
-		SDL_SetError("sem_post() failed");
+		HSDL_SetError("sem_post() failed");
 	}
 	return retval;
 }
 
-typedef struct SDL_Thread SDL_Thread;
-typedef unsigned long SDL_threadID;
+typedef struct HSDL_Thread HSDL_Thread;
+typedef unsigned long HSDL_threadID;
 
 /* The SDL thread priority
  *
  * Note: On many systems you require special privileges to set high priority.
  */
 typedef enum {
-    SDL_THREAD_PRIORITY_LOW,
-    SDL_THREAD_PRIORITY_NORMAL,
-    SDL_THREAD_PRIORITY_HIGH
-} SDL_ThreadPriority;
+    HSDL_THREAD_PRIORITY_LOW,
+    HSDL_THREAD_PRIORITY_NORMAL,
+    HSDL_THREAD_PRIORITY_HIGH
+} HSDL_ThreadPriority;
 
-typedef int (SDLCALL * SDL_ThreadFunction) (void *data);
+typedef int (SDLCALL * HSDL_ThreadFunction) (void *data);
 //typedef sys_ppu_thread_t SYS_ThreadHandle;
 typedef pthread_t SYS_ThreadHandle;
 
 /* This is the system-independent thread info structure */
-struct SDL_Thread
+struct HSDL_Thread
 {
-    SDL_threadID threadid;
+    HSDL_threadID threadid;
     SYS_ThreadHandle handle;
     int status;
-    SDL_error errbuf;
+    HSDL_error errbuf;
     void *data;
 };
 
-struct SDL_mutex
+struct HSDL_mutex
 {
     int recursive;
-    SDL_threadID owner;
-    SDL_sem *sem;
+    HSDL_threadID owner;
+    HSDL_sem *sem;
 };
 
-typedef struct SDL_mutex SDL_mutex;
-extern SDL_mutex *SDL_CreateMutex(void);
+typedef struct HSDL_mutex HSDL_mutex;
+extern HSDL_mutex *HSDL_CreateMutex(void);
 
 
 /* Create a mutex */
-SDL_mutex *
-SDL_CreateMutex(void)
+HSDL_mutex *
+HSDL_CreateMutex(void)
 {
-    SDL_mutex *mutex;
+    HSDL_mutex *mutex;
 
     /* Allocate mutex memory */
-    mutex = (SDL_mutex *) SDL_malloc(sizeof(*mutex));
+    mutex = (HSDL_mutex *) HSDL_malloc(sizeof(*mutex));
     if (mutex) {
         /* Create the mutex semaphore, with initial value 1 */
-        mutex->sem = SDL_CreateSemaphore(1);
+        mutex->sem = HSDL_CreateSemaphore(1);
         mutex->recursive = 0;
         mutex->owner = 0;
         if (!mutex->sem) {
-            /*SDL_*/free(mutex);
+            /*HSDL_*/free(mutex);
             mutex = NULL;
         }
     } else {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
     }
     return mutex;
 }
 
 /* Free the mutex */
 void
-SDL_DestroyMutex(SDL_mutex * mutex)
+HSDL_DestroyMutex(HSDL_mutex * mutex)
 {
     if (mutex) {
         if (mutex->sem) {
-            SDL_DestroySemaphore(mutex->sem);
+            HSDL_DestroySemaphore(mutex->sem);
         }
         free(mutex);
     }
 }
 
 /* WARNING:  This may not work for systems with 64-bit pid_t */
-Uint32 SDL_ThreadID(void)
+Uint32 HSDL_ThreadID(void)
 {
 	return((Uint32)((size_t)pthread_self()));
 }
@@ -2040,19 +2040,19 @@ Uint32 SDL_ThreadID(void)
 
 /* Lock the semaphore */
 int
-SDL_mutexP(SDL_mutex * mutex)
+HSDL_mutexP(HSDL_mutex * mutex)
 {
-#if SDL_THREADS_DISABLED
+#if HSDL_THREADS_DISABLED
     return 0;
 #else
-    SDL_threadID this_thread;
+    HSDL_threadID this_thread;
 
     if (mutex == NULL) {
-        //SDL_SetError("Passed a NULL mutex");
+        //HSDL_SetError("Passed a NULL mutex");
         return -1;
     }
 
-    this_thread = SDL_ThreadID();
+    this_thread = HSDL_ThreadID();
     if (mutex->owner == this_thread) {
         ++mutex->recursive;
     } else {
@@ -2060,30 +2060,30 @@ SDL_mutexP(SDL_mutex * mutex)
            We set the locking thread id after we obtain the lock
            so unlocks from other threads will fail.
          */
-        SDL_SemWait(mutex->sem);
+        HSDL_SemWait(mutex->sem);
         mutex->owner = this_thread;
         mutex->recursive = 0;
     }
 
     return 0;
-#endif /* SDL_THREADS_DISABLED */
+#endif /* HSDL_THREADS_DISABLED */
 }
 
 /* Unlock the mutex */
 int
-SDL_mutexV(SDL_mutex * mutex)
+HSDL_mutexV(HSDL_mutex * mutex)
 {
-#if SDL_THREADS_DISABLED
+#if HSDL_THREADS_DISABLED
     return 0;
 #else
     if (mutex == NULL) {
-        //SDL_SetError("Passed a NULL mutex");
+        //HSDL_SetError("Passed a NULL mutex");
         return -1;
     }
 
     /* If we don't own the mutex, we can't unlock it */
-    if (SDL_ThreadID() != mutex->owner) {
-        //SDL_SetError("mutex not owned by this thread");
+    if (HSDL_ThreadID() != mutex->owner) {
+        //HSDL_SetError("mutex not owned by this thread");
         return -1;
     }
 
@@ -2096,10 +2096,10 @@ SDL_mutexV(SDL_mutex * mutex)
            then release the lock semaphore.
          */
         mutex->owner = 0;
-        SDL_SemPost(mutex->sem);
+        HSDL_SemPost(mutex->sem);
     }
     return 0;
-#endif /* SDL_THREADS_DISABLED */
+#endif /* HSDL_THREADS_DISABLED */
 }
 
 #define ARRAY_CHUNKSIZE	32
@@ -2107,18 +2107,18 @@ SDL_mutexV(SDL_mutex * mutex)
    (except the main thread)
    The manipulation of an array here is safer than using a linked list.
 */
-static int SDL_maxthreads = 0;
-static int SDL_numthreads = 0;
-static SDL_Thread **SDL_Threads = NULL;
-static SDL_mutex *thread_lock = NULL;
+static int HSDL_maxthreads = 0;
+static int HSDL_numthreads = 0;
+static HSDL_Thread **HSDL_Threads = NULL;
+static HSDL_mutex *thread_lock = NULL;
 
 static int
-SDL_ThreadsInit(void)
+HSDL_ThreadsInit(void)
 {
     int retval;
 
     retval = 0;
-    thread_lock = SDL_CreateMutex();
+    thread_lock = HSDL_CreateMutex();
     if (thread_lock == NULL) {
         retval = -1;
     }
@@ -2127,7 +2127,7 @@ SDL_ThreadsInit(void)
 
 /* Routines for manipulating the thread list */
 static void
-SDL_AddThread(SDL_Thread * thread)
+HSDL_AddThread(HSDL_Thread * thread)
 {
     /* WARNING:
        If the very first threads are created simultaneously, then
@@ -2136,92 +2136,92 @@ SDL_AddThread(SDL_Thread * thread)
        is only one thread running the first time this is called.
      */
     if (!thread_lock) {
-        if (SDL_ThreadsInit() < 0) {
+        if (HSDL_ThreadsInit() < 0) {
             return;
         }
     }
-    SDL_mutexP(thread_lock);
+    HSDL_mutexP(thread_lock);
 
     /* Expand the list of threads, if necessary */
 #ifdef DEBUG_THREADS
     printf("Adding thread (%d already - %d max)\n",
-           SDL_numthreads, SDL_maxthreads);
+           HSDL_numthreads, HSDL_maxthreads);
 #endif
-    if (SDL_numthreads == SDL_maxthreads) {
-        SDL_Thread **threads;
-        threads = (SDL_Thread **) realloc(SDL_Threads,
-                                              (SDL_maxthreads +
+    if (HSDL_numthreads == HSDL_maxthreads) {
+        HSDL_Thread **threads;
+        threads = (HSDL_Thread **) realloc(HSDL_Threads,
+                                              (HSDL_maxthreads +
                                                ARRAY_CHUNKSIZE) *
                                               (sizeof *threads));
         if (threads == NULL) {
-            //SDL_OutOfMemory();
+            //HSDL_OutOfMemory();
             goto done;
         }
-        SDL_maxthreads += ARRAY_CHUNKSIZE;
-        SDL_Threads = threads;
+        HSDL_maxthreads += ARRAY_CHUNKSIZE;
+        HSDL_Threads = threads;
     }
-    SDL_Threads[SDL_numthreads++] = thread;
+    HSDL_Threads[HSDL_numthreads++] = thread;
   done:
-    SDL_mutexV(thread_lock);
+    HSDL_mutexV(thread_lock);
 }
 
 static void
-SDL_DelThread(SDL_Thread * thread)
+HSDL_DelThread(HSDL_Thread * thread)
 {
     int i;
 
     if (!thread_lock) {
         return;
     }
-    SDL_mutexP(thread_lock);
-    for (i = 0; i < SDL_numthreads; ++i) {
-        if (thread == SDL_Threads[i]) {
+    HSDL_mutexP(thread_lock);
+    for (i = 0; i < HSDL_numthreads; ++i) {
+        if (thread == HSDL_Threads[i]) {
             break;
         }
     }
-    if (i < SDL_numthreads) {
-        if (--SDL_numthreads > 0) {
-            while (i < SDL_numthreads) {
-                SDL_Threads[i] = SDL_Threads[i + 1];
+    if (i < HSDL_numthreads) {
+        if (--HSDL_numthreads > 0) {
+            while (i < HSDL_numthreads) {
+                HSDL_Threads[i] = HSDL_Threads[i + 1];
                 ++i;
             }
         } else {
-            SDL_maxthreads = 0;
-            /*SDL_*/free(SDL_Threads);
-            SDL_Threads = NULL;
+            HSDL_maxthreads = 0;
+            /*HSDL_*/free(HSDL_Threads);
+            HSDL_Threads = NULL;
         }
 #ifdef DEBUG_THREADS
         printf("Deleting thread (%d left - %d max)\n",
-               SDL_numthreads, SDL_maxthreads);
+               HSDL_numthreads, HSDL_maxthreads);
 #endif
     }
-    SDL_mutexV(thread_lock);
+    HSDL_mutexV(thread_lock);
 
 }
 
 /* The default (non-thread-safe) global error variable */
-static SDL_error SDL_global_error;
+static HSDL_error HSDL_global_error;
 
 /* Routine to get the thread-specific error variable */
-SDL_error *
-SDL_GetErrBuf(void)
+HSDL_error *
+HSDL_GetErrBuf(void)
 {
-    SDL_error *errbuf;
+    HSDL_error *errbuf;
 
-    errbuf = &SDL_global_error;
-    if (SDL_Threads) {
+    errbuf = &HSDL_global_error;
+    if (HSDL_Threads) {
         int i;
-        SDL_threadID this_thread;
+        HSDL_threadID this_thread;
 
-        this_thread = SDL_ThreadID();
-        SDL_mutexP(thread_lock);
-        for (i = 0; i < SDL_numthreads; ++i) {
-            if (this_thread == SDL_Threads[i]->threadid) {
-                errbuf = &SDL_Threads[i]->errbuf;
+        this_thread = HSDL_ThreadID();
+        HSDL_mutexP(thread_lock);
+        for (i = 0; i < HSDL_numthreads; ++i) {
+            if (this_thread == HSDL_Threads[i]->threadid) {
+                errbuf = &HSDL_Threads[i]->errbuf;
                 break;
             }
         }
-        SDL_mutexV(thread_lock);
+        HSDL_mutexV(thread_lock);
     }
     return (errbuf);
 }
@@ -2231,7 +2231,7 @@ static int sig_list[] = {
 };
 
 void
-SDL_MaskSignals(sigset_t * omask)
+HSDL_MaskSignals(sigset_t * omask)
 {
     sigset_t mask;
     int i;
@@ -2244,7 +2244,7 @@ SDL_MaskSignals(sigset_t * omask)
 }
 
 void
-SDL_UnmaskSignals(sigset_t * omask)
+HSDL_UnmaskSignals(sigset_t * omask)
 {
 
 }
@@ -2254,19 +2254,19 @@ typedef struct
 {
     int (SDLCALL * func) (void *);
     void *data;
-    SDL_Thread *info;
-    SDL_sem *wait;
+    HSDL_Thread *info;
+    HSDL_sem *wait;
 } thread_args;
 
 void
-SDL_SYS_SetupThread(void)
+HSDL_SYS_SetupThread(void)
 {
     /* Mask asynchronous signals for this thread */
-    SDL_MaskSignals(NULL);
+    HSDL_MaskSignals(NULL);
 }
 
 void
-SDL_RunThread(void *data)
+HSDL_RunThread(void *data)
 {
     thread_args *args;
     int (SDLCALL * userfunc) (void *);
@@ -2274,13 +2274,13 @@ SDL_RunThread(void *data)
     int *statusloc;
 
     /* Perform any system-dependent setup
-       - this function cannot fail, and cannot use SDL_SetError()
+       - this function cannot fail, and cannot use HSDL_SetError()
      */
-    SDL_SYS_SetupThread();
+    HSDL_SYS_SetupThread();
 
     /* Get the thread id */
     args = (thread_args *) data;
-    args->info->threadid = SDL_ThreadID();
+    args->info->threadid = HSDL_ThreadID();
 
     /* Figure out what function to run */
     userfunc = args->func;
@@ -2288,7 +2288,7 @@ SDL_RunThread(void *data)
     statusloc = &args->info->status;
 
     /* Wake up the parent thread */
-    SDL_SemPost(args->wait);
+    HSDL_SemPost(args->wait);
 
     /* Run the function */
     *statusloc = userfunc(userdata);
@@ -2297,69 +2297,69 @@ SDL_RunThread(void *data)
 static void *
 RunThread(void *arg)
 {
-    SDL_RunThread(arg);
+    HSDL_RunThread(arg);
     pthread_exit((void*)0);
 }
 
-int SDL_SYS_CreateThread(SDL_Thread *thread, void *args)
+int HSDL_SYS_CreateThread(HSDL_Thread *thread, void *args)
 {
 	pthread_attr_t type;
 
 	/* Set the thread attributes */
 	if ( pthread_attr_init(&type) != 0 ) {
-		SDL_SetError("Couldn't initialize pthread attributes");
+		HSDL_SetError("Couldn't initialize pthread attributes");
 		return(-1);
 	}
 	pthread_attr_setdetachstate(&type, PTHREAD_CREATE_JOINABLE);
 
 	/* Create the thread and go! */
 	if ( pthread_create(&thread->handle, &type, RunThread, args) != 0 ) {
-		SDL_SetError("Not enough resources to create thread");
+		HSDL_SetError("Not enough resources to create thread");
 		return(-1);
 	}
 
 #ifdef __RISCOS__
 	if (riscos_using_threads == 0) {
 		riscos_using_threads = 1;
-		riscos_main_thread = SDL_ThreadID();
+		riscos_main_thread = HSDL_ThreadID();
 	}
 #endif
 
 	return(0);
 }
-void SDL_SYS_WaitThread(SDL_Thread *thread)
+void HSDL_SYS_WaitThread(HSDL_Thread *thread)
 {
 	pthread_join(thread->handle, 0);
 }
 
 #define DECLSPEC
 
-#ifdef SDL_PASSED_BEGINTHREAD_ENDTHREAD
-#undef SDL_CreateThread
-DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(int (SDLCALL * fn) (void *), void *data,
-                 pfnSDL_CurrentBeginThread pfnBeginThread,
-                 pfnSDL_CurrentEndThread pfnEndThread)
+#ifdef HSDL_PASSED_BEGINTHREAD_ENDTHREAD
+#undef HSDL_CreateThread
+DECLSPEC HSDL_Thread *SDLCALL
+HSDL_CreateThread(int (SDLCALL * fn) (void *), void *data,
+                 pfnHSDL_CurrentBeginThread pfnBeginThread,
+                 pfnHSDL_CurrentEndThread pfnEndThread)
 #else
-DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
+DECLSPEC HSDL_Thread *SDLCALL
+HSDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
 #endif
 {
-    SDL_Thread *thread;
+    HSDL_Thread *thread;
     thread_args *args;
     int ret;
 
     /* Allocate memory for the thread info structure */
-    thread = (SDL_Thread *) /*SDL_*/malloc(sizeof(*thread));
+    thread = (HSDL_Thread *) /*HSDL_*/malloc(sizeof(*thread));
     if (thread == NULL) {
-        //SDL_OutOfMemory();
+        //HSDL_OutOfMemory();
         return (NULL);
     }
     memset(thread, 0, (sizeof *thread));
     thread->status = -1;
 
     /* Set up the arguments for the thread */
-    args = (thread_args *) SDL_malloc(sizeof(*args));
+    args = (thread_args *) HSDL_malloc(sizeof(*args));
     if (args == NULL) {       
         free(thread);
         return (NULL);
@@ -2367,7 +2367,7 @@ SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
     args->func = fn;
     args->data = data;
     args->info = thread;
-    args->wait = SDL_CreateSemaphore(0);
+    args->wait = HSDL_CreateSemaphore(0);
     if (args->wait == NULL) {
         free(thread);
         free(args);
@@ -2375,58 +2375,58 @@ SDL_CreateThread(int (SDLCALL * fn) (void *), void *data)
     }
 
     /* Add the thread to the list of available threads */
-    SDL_AddThread(thread);
+    HSDL_AddThread(thread);
 
     /* Create the thread and go! */
-#ifdef SDL_PASSED_BEGINTHREAD_ENDTHREAD
-    ret = SDL_SYS_CreateThread(thread, args, pfnBeginThread, pfnEndThread);
+#ifdef HSDL_PASSED_BEGINTHREAD_ENDTHREAD
+    ret = HSDL_SYS_CreateThread(thread, args, pfnBeginThread, pfnEndThread);
 #else
-    ret = SDL_SYS_CreateThread(thread, args);
+    ret = HSDL_SYS_CreateThread(thread, args);
 #endif
     if (ret >= 0) {
         /* Wait for the thread function to use arguments */
-        SDL_SemWait(args->wait);
+        HSDL_SemWait(args->wait);
     } else {
         /* Oops, failed.  Gotta free everything */
-        SDL_DelThread(thread);
+        HSDL_DelThread(thread);
         free(thread);
         thread = NULL;
     }
-    SDL_DestroySemaphore(args->wait);
+    HSDL_DestroySemaphore(args->wait);
     free(args);
 
     /* Everything is running now */
     return (thread);
 }
 
-SDL_threadID
-SDL_GetThreadID(SDL_Thread * thread)
+HSDL_threadID
+HSDL_GetThreadID(HSDL_Thread * thread)
 {
-    SDL_threadID id;
+    HSDL_threadID id;
 
     if (thread) {
         id = thread->threadid;
     } else {
-        id = SDL_ThreadID();
+        id = HSDL_ThreadID();
     }
     return id;
 }
 
 int
-SDL_SetThreadPriority(SDL_ThreadPriority priority)
+HSDL_SetThreadPriority(HSDL_ThreadPriority priority)
 {
     return 0;
 }
 
 void
-SDL_WaitThread(SDL_Thread * thread, int *status)
+HSDL_WaitThread(HSDL_Thread * thread, int *status)
 {
     if (thread) {
-        SDL_SYS_WaitThread(thread);
+        HSDL_SYS_WaitThread(thread);
         if (status) {
             *status = thread->status;
         }
-        SDL_DelThread(thread);
+        HSDL_DelThread(thread);
         free(thread);
     }
 }

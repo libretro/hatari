@@ -70,7 +70,7 @@ static SGOBJ devicedlg[] =
  	{ SGTEXT, 0, 0, 3,20, 46,1, dlgMidiOutName },
 
  	{ SGBUTTON, SG_DEFAULT, 0, 16,22, 20,1, "Back to main menu" },
-	{ -1, 0, 0, 0,0, 0,0, NULL }
+	{ SGSTOP, 0, 0, 0,0, 0,0, NULL }
 };
 
 
@@ -109,7 +109,7 @@ void Dialog_DeviceDlg(void)
 	/* The devices dialog main loop */
 	do
 	{
-		but = SDLGui_DoDialog(devicedlg, NULL);
+		but = SDLGui_DoDialog(devicedlg, NULL, false);
 
 		switch(but)
 		{

@@ -33,6 +33,7 @@ const char DebugCpu_fileid[] = "Hatari debugcpu.c : " __DATE__ " " __TIME__;
 #include "68kDisass.h"
 #include "console.h"
 #include "options.h"
+#include "vars.h"
 
 
 #define MEMDUMP_COLS   16      /* memdump, number of bytes per row */
@@ -66,7 +67,6 @@ static int DebugCpu_LoadBin(int nArgc, char *psArgs[])
 		fprintf(stderr, "Invalid address!\n");
 		return DEBUGGER_CMDDONE;
 	}
-	address &= 0x00FFFFFF;
 
 	if ((fp = fopen(psArgs[1], "rb")) == NULL)
 	{
@@ -74,6 +74,12 @@ static int DebugCpu_LoadBin(int nArgc, char *psArgs[])
 		return DEBUGGER_CMDDONE;
 	}
 
+	/* TODO: more efficient would be to:
+	 * - check file size
+	 * - verify that it fits into valid memory area
+	 * - flush emulated CPU data cache
+	 * - read file contents directly into memory
+	 */
 	c = fgetc(fp);
 	while (!feof(fp))
 	{
@@ -108,7 +114,6 @@ static int DebugCpu_SaveBin(int nArgc, char *psArgs[])
 		fprintf(stderr, "  Invalid address!\n");
 		return DEBUGGER_CMDDONE;
 	}
-	address &= 0x00FFFFFF;
 
 	if (!Eval_Number(psArgs[3], &bytes))
 	{
@@ -139,11 +144,11 @@ static int DebugCpu_SaveBin(int nArgc, char *psArgs[])
  * Check whether given address matches any CPU symbol and whether
  * there's profiling information available for it.  If yes, show it.
  */
-static void DebugCpu_ShowAddressInfo(Uint32 addr)
+static void DebugCpu_ShowAddressInfo(Uint32 addr, FILE *fp)
 {
 	const char *symbol = Symbols_GetByCpuAddress(addr);
 	if (symbol)
-		fprintf(debugOutput, "%s:\n", symbol);
+		fprintf(fp, "%s:\n", symbol);
 }
 
 /**
@@ -167,7 +172,6 @@ int DebugCpu_DisAsm(int nArgc, char *psArgs[])
 			break;
 		case 1:
 			/* range */
-			disasm_upper &= 0x00FFFFFF;
 			break;
 		}
 	}
@@ -177,7 +181,6 @@ int DebugCpu_DisAsm(int nArgc, char *psArgs[])
 		if(!disasm_addr)
 			disasm_addr = M68000_GetPC();
 	}
-	disasm_addr &= 0x00FFFFFF;
 
 	/* limit is topmost address or instruction count */
 	if (disasm_upper)
@@ -186,14 +189,14 @@ int DebugCpu_DisAsm(int nArgc, char *psArgs[])
 	}
 	else
 	{
-		disasm_upper = 0x00FFFFFF;
+		disasm_upper = 0xFFFFFFFF;
 		max_insts = ConfigureParams.Debugger.nDisasmLines;
 	}
 
 	/* output a range */
 	for (insts = 0; insts < max_insts && disasm_addr < disasm_upper; insts++)
 	{
-		DebugCpu_ShowAddressInfo(disasm_addr);
+		DebugCpu_ShowAddressInfo(disasm_addr, debugOutput);
 		Disasm(debugOutput, (uaecptr)disasm_addr, &nextpc, 1);
 		disasm_addr = nextpc;
 	}
@@ -215,7 +218,7 @@ static char *DebugCpu_MatchRegister(const char *text, int state)
 		"d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
 		"pc", "sr"
 	};
-	return DebugUI_MatchHelper(regs, ARRAYSIZE(regs), text, state);
+	return DebugUI_MatchHelper(regs, ARRAY_SIZE(regs), text, state);
 }
 
 
@@ -272,7 +275,11 @@ int DebugCpu_Register(int nArgc, char *psArgs[])
 	{
 		uaecptr nextpc;
 		/* use the UAE function instead */
+#ifdef WINUAE_FOR_HATARI
+		m68k_dumpstate_file(debugOutput, &nextpc);
+#else
 		m68k_dumpstate(debugOutput, &nextpc);
+#endif
 		fflush(debugOutput);
 		return DEBUGGER_CMDDONE;
 	}
@@ -381,17 +388,15 @@ int DebugCpu_MemDump(int nArgc, char *psArgs[])
 			break;
 		}
 	} /* continue */
-	memdump_addr &= 0x00FFFFFF;
 
 	if (!memdump_upper)
 	{
 		memdump_upper = memdump_addr + MEMDUMP_COLS * ConfigureParams.Debugger.nMemdumpLines;
 	}
-	memdump_upper &= 0x00FFFFFF;
 
 	while (memdump_addr < memdump_upper)
 	{
-		fprintf(debugOutput, "%6.6X: ", memdump_addr); /* print address */
+		fprintf(debugOutput, "%8.8X: ", memdump_addr);	/* print address */
 		for (i = 0; i < MEMDUMP_COLS; i++)               /* print hex data */
 			fprintf(debugOutput, "%2.2x ", STMemory_ReadByte(memdump_addr++));
 		fprintf(debugOutput, "  ");                     /* print ASCII data */
@@ -431,7 +436,6 @@ static int DebugCpu_MemWrite(int nArgc, char *psArgs[])
 		return DEBUGGER_CMDDONE;
 	}
 
-	write_addr &= 0x00FFFFFF;
 	numBytes = 0;
 
 	/* get bytes data */
@@ -497,7 +501,7 @@ static char *DebugCpu_MatchNext(const char *text, int state)
 	static const char* ntypes[] = {
 		"branch", "exception", "exreturn", "return", "subcall", "subreturn"
 	};
-	return DebugUI_MatchHelper(ntypes, ARRAYSIZE(ntypes), text, state);
+	return DebugUI_MatchHelper(ntypes, ARRAY_SIZE(ntypes), text, state);
 }
 
 /**
@@ -534,15 +538,25 @@ static int DebugCpu_Next(int nArgc, char *psArgv[])
 		Uint32 optype, nextpc;
 
 		optype = DebugCpu_OpcodeType();
-		/* can this instruction be stepped normally? */
-		if (optype != CALL_SUBROUTINE && optype != CALL_EXCEPTION)
+		/* should this instruction be stepped normally, or is it
+		 * - subroutine call
+		 * - exception
+		 * - loop branch backwards
+		 */
+		if (optype == CALL_SUBROUTINE ||
+		    optype == CALL_EXCEPTION ||
+		    (optype == CALL_BRANCH &&
+		     (STMemory_ReadWord(M68000_GetPC()) & 0xf0f8) == 0x50c8 &&
+		     (Sint16)STMemory_ReadWord(M68000_GetPC()+SIZE_WORD) < 0))
+		{
+			nextpc = Disasm_GetNextPC(M68000_GetPC());
+			sprintf(command, "pc=$%x :once :quiet\n", nextpc);
+		}
+		else
 		{
 			nCpuSteps = 1;
 			return DEBUGGER_END;
 		}
-
-		nextpc = Disasm_GetNextPC(M68000_GetPC());
-		sprintf(command, "pc=$%x :once :quiet\n", nextpc);
 	}
 	/* use breakpoint, not steps */
 	if (BreakCond_Command(command, false))
@@ -586,7 +600,7 @@ Uint32 DebugCpu_OpcodeType(void)
 	/* TODO: fbcc, fdbcc */
 	if ((opcode & 0xf000) == 0x6000 ||	/* BRA / BCC */
 	    (opcode & 0xffc0) == 0x4ec0 ||	/* JMP */
-	    (opcode & 0xf080) == 0x50c8)	/* DBCC */
+	    (opcode & 0xf0f8) == 0x50c8)	/* DBCC */
 		return CALL_BRANCH;
 
 	return CALL_UNKNOWN;
@@ -614,7 +628,7 @@ void DebugCpu_Check(void)
 	}
 	if (LOG_TRACE_LEVEL((TRACE_CPU_DISASM|TRACE_CPU_SYMBOLS)))
 	{
-		DebugCpu_ShowAddressInfo(M68000_GetPC());
+		DebugCpu_ShowAddressInfo(M68000_GetPC(), TraceFile);
 	}
 	if (nCpuActiveCBs)
 	{
@@ -652,7 +666,7 @@ void DebugCpu_Check(void)
 void DebugCpu_SetDebugging(void)
 {
 	bCpuProfiling = Profile_CpuStart();
-	nCpuActiveCBs = BreakCond_BreakPointCount(false);
+	nCpuActiveCBs = BreakCond_CpuBreakPointCount();
 
 	if (nCpuActiveCBs || nCpuSteps || bCpuProfiling || History_TrackCpu()
 	    || LOG_TRACE_LEVEL((TRACE_CPU_DISASM|TRACE_CPU_SYMBOLS))
@@ -675,7 +689,7 @@ static const dbgcommand_t cpucommands[] =
 	  "set CPU PC address breakpoints",
 	  BreakAddr_Description,
 	  true	},
-	{ DebugCpu_BreakCond, BreakCond_MatchCpuVariable,
+	{ DebugCpu_BreakCond, Vars_MatchCpuVariable,
 	  "breakpoint", "b",
 	  "set/remove/list conditional CPU breakpoints",
 	  BreakCond_Description,
@@ -771,7 +785,7 @@ int DebugCpu_Init(const dbgcommand_t **table)
 	disasm_addr = 0;
 	
 	*table = cpucommands;
-	return ARRAYSIZE(cpucommands);
+	return ARRAY_SIZE(cpucommands);
 }
 
 /**

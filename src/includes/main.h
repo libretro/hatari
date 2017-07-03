@@ -16,8 +16,17 @@
 #include <math.h>
 #include <time.h>
 
+#ifdef __LIBRETRO__ 	/* RETRO HACK */
+#include <stdint.h>
+extern size_t HSDL_strlcpy(char *dest, const char *source, size_t size);
+#endif /* RETRO HACK */
+
 #include <SDL_types.h>
 #include <stdbool.h>
+
+#if defined(_MSC_VER)
+#include "vs-fix.h"
+#endif
 
 #if __GNUC__ >= 3
 # define likely(x)      __builtin_expect (!!(x), 1)
@@ -25,6 +34,13 @@
 #else
 # define likely(x)      (x)
 # define unlikely(x)    (x)
+#endif
+
+/* avoid warnings with variables used only in asserts */
+#ifdef NDEBUG
+# define ASSERT_VARIABLE(x) (void)(x)
+#else
+# define ASSERT_VARIABLE(x) assert(x)
 #endif
 
 #ifdef WIN32
@@ -35,8 +51,8 @@
 
 #define CALL_VAR(func)  { ((void(*)(void))func)(); }
 
-#ifndef ARRAYSIZE
-#define ARRAYSIZE(x) (int)(sizeof(x)/sizeof(x[0]))
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (int)(sizeof(x)/sizeof(x[0]))
 #endif
 
 /* 68000 operand sizes */
@@ -55,7 +71,7 @@ extern void Main_RequestQuit(int exitval);
 extern void Main_SetRunVBLs(Uint32 vbls);
 extern bool Main_SetVBLSlowdown(int factor);
 extern void Main_WaitOnVbl(void);
-extern void Main_WarpMouse(int x, int y);
+extern void Main_WarpMouse(int x, int y, bool restore);
 extern void Main_EventHandler(void);
 extern void Main_SetTitle(const char *title);
 

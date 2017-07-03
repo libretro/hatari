@@ -63,6 +63,8 @@ static const char* History_ReasonStr(debug_reason_t reason)
 		return "CPU steps";
 	case REASON_DSP_STEPS:
 		return "DSP steps";
+	case REASON_PROGRAM:
+		return "Program break";
 	case REASON_USER:
 		return "User break";
 	default:
@@ -215,9 +217,9 @@ static Uint32 History_Output(Uint32 count, FILE *fp)
 }
 
 /* History_Output() helper for "info" & "lock" commands */
-void History_Show(Uint32 count)
+void History_Show(FILE *fp, Uint32 count)
 {
-	History_Output(count, stderr);
+	History_Output(count, fp);
 }
 
 /*
@@ -246,7 +248,7 @@ static void History_Save(const char *name)
 char *History_Match(const char *text, int state)
 {
 	static const char* cmds[] = { "cpu", "dsp", "off", "save" };
-	return DebugUI_MatchHelper(cmds, ARRAYSIZE(cmds), text, state);
+	return DebugUI_MatchHelper(cmds, ARRAY_SIZE(cmds), text, state);
 }
 
 /**
@@ -297,6 +299,6 @@ int History_Parse(int nArgc, char *psArgs[])
 		return DebugUI_PrintCmdHelp(psArgs[0]);
 	}
 
-	History_Show(count);
+	History_Show(stderr, count);
 	return DEBUGGER_CMDDONE;
 }

@@ -45,6 +45,8 @@ static const char * const psCartNameExts[] =
 	NULL
 };
 
+static int PatchIllegal = false;
+
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -98,8 +100,6 @@ static void Cart_LoadImage(void)
  */
 void Cart_ResetImage(void)
 {
-	int PatchIllegal = false;
-
 	/* "Clear" cartridge ROM space */
 	memset(&RomMem[0xfa0000], 0xff, 0x20000);
 
@@ -111,15 +111,17 @@ void Cart_ResetImage(void)
 			Log_Printf(LOG_WARN, "Cartridge can't be used together with extended VDI resolution!\n");
 		if (ConfigureParams.HardDisk.bUseHardDiskDirectories)
 			Log_Printf(LOG_WARN, "Cartridge can't be used together with GEMDOS hard disk emulation!\n");
-		if (LogTraceFlags & (TRACE_OS_GEMDOS | TRACE_OS_VDI | TRACE_OS_AES))
+		if (LogTraceFlags & (TRACE_OS_GEMDOS | TRACE_OS_BASE | TRACE_OS_VDI | TRACE_OS_AES))
 			Log_Printf(LOG_WARN, "Cartridge can't be used together with GEMDOS/VDI/AES tracing!\n");
 	}
 
 	/* Use internal cartridge trampoline code when user wants extended VDI
 	 * resolution, GEMDOS HD emulation or to trace GEMDOS, VDI or AES.
+	 * (OS_BASE does subset of GEMDOS tracing)
 	 * But don't use it on TOS 0.00, it does not work there. */
+	PatchIllegal = false;				/* By default, don't patch opcodes */
 	if ((bUseVDIRes || ConfigureParams.HardDisk.bUseHardDiskDirectories ||
-	    LogTraceFlags & (TRACE_OS_GEMDOS | TRACE_OS_VDI | TRACE_OS_AES))
+	    LogTraceFlags & (TRACE_OS_GEMDOS | TRACE_OS_BASE | TRACE_OS_VDI | TRACE_OS_AES))
 	    && TosVersion >= 0x100)
 	{
 		/* Copy built-in cartridge data into the cartridge memory of the ST */
@@ -131,7 +133,18 @@ void Cart_ResetImage(void)
 		/* Load external image file: */
 		Cart_LoadImage();
 	}
+}
 
+
+/*-----------------------------------------------------------------------*/
+/**
+ * Patch the cpu tables to intercept some opcodes used for Gemdos HD
+ * emulation or for NatFeats.
+ * We need to split this from Cart_ResetImage(), as the patches should
+ * be applied after building the cpu opcodes tables.
+ */
+void Cart_Patch(void)
+{
 	if (PatchIllegal == true)
 	{
 		//fprintf ( stderr ," Cart_ResetImage patch\n" );

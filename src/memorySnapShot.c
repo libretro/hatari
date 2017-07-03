@@ -41,6 +41,7 @@ const char MemorySnapShot_fileid[] = "Hatari memorySnapShot.c : " __DATE__ " " _
 #include "m68000.h"
 #include "memorySnapShot.h"
 #include "mfp.h"
+#include "midi.h"
 #include "psg.h"
 #include "reset.h"
 #include "sound.h"
@@ -48,14 +49,16 @@ const char MemorySnapShot_fileid[] = "Hatari memorySnapShot.c : " __DATE__ " " _
 #include "stMemory.h"
 #include "tos.h"
 #include "screen.h"
+#include "screenConvert.h"
 #include "video.h"
 #include "falcon/dsp.h"
 #include "falcon/crossbar.h"
 #include "falcon/videl.h"
 #include "statusbar.h"
+#include "cart.h"
 
 
-#define VERSION_STRING      "1.8.1"   /* Version number of compatible memory snapshots - Always 6 bytes (inc' NULL) */
+#define VERSION_STRING      "2.0.1"   /* Version number of compatible memory snapshots - Always 6 bytes (inc' NULL) */
 #define SNAPSHOT_MAGIC      0xDeadBeef
 
 #if HAVE_LIBZ
@@ -155,7 +158,7 @@ static int MemorySnapShot_fseek(MSS_File fhndl, int pos)
  * Open/Create snapshot file, and set flag so 'MemorySnapShot_Store' knows
  * how to handle data.
  */
-static bool MemorySnapShot_OpenFile(const char *pszFileName, bool bSave)
+static bool MemorySnapShot_OpenFile(const char *pszFileName, bool bSave, bool bConfirm)
 {
 	char VersionString[] = VERSION_STRING;
 #if ENABLE_WINUAE_CPU
@@ -173,15 +176,17 @@ static bool MemorySnapShot_OpenFile(const char *pszFileName, bool bSave)
 	 */
 	if (bSave)
 	{
-		if (!File_QueryOverwrite(pszFileName))
+		if (bConfirm && !File_QueryOverwrite(pszFileName))
+		{
+			/* info for debugger invocation */
+			Log_Printf(LOG_INFO, "Save canceled.");
 			return false;
-
+		}
 		/* Save */
 		CaptureFile = MemorySnapShot_fopen(pszFileName, "wb");
 		if (!CaptureFile)
 		{
-			fprintf(stderr, "Failed to open save file '%s': %s\n",
-			        pszFileName, strerror(errno));
+			Log_Printf(LOG_WARN, "Save file open error: %s",strerror(errno));
 			bCaptureError = true;
 			return false;
 		}
@@ -198,8 +203,7 @@ static bool MemorySnapShot_OpenFile(const char *pszFileName, bool bSave)
 		CaptureFile = MemorySnapShot_fopen(pszFileName, "rb");
 		if (!CaptureFile)
 		{
-			fprintf(stderr, "Failed to open file '%s': %s\n",
-			        pszFileName, strerror(errno));
+			Log_Printf(LOG_WARN, "File open error: %s", strerror(errno));
 			bCaptureError = true;
 			return false;
 		}
@@ -298,7 +302,7 @@ void MemorySnapShot_Capture(const char *pszFileName, bool bConfirm)
 	Uint32 magic = SNAPSHOT_MAGIC;
 
 	/* Set to 'saving' */
-	if (MemorySnapShot_OpenFile(pszFileName, true))
+	if (MemorySnapShot_OpenFile(pszFileName, true, bConfirm))
 	{
 		/* Capture each files details */
 		Configuration_MemorySnapShot_Capture(true);
@@ -312,6 +316,7 @@ void MemorySnapShot_Capture(const char *pszFileName, bool bConfirm)
 		GemDOS_MemorySnapShot_Capture(true);
 		ACIA_MemorySnapShot_Capture(true);
 		IKBD_MemorySnapShot_Capture(true);
+		MIDI_MemorySnapShot_Capture(true);
 		CycInt_MemorySnapShot_Capture(true);
 		M68000_MemorySnapShot_Capture(true);
 		MFP_MemorySnapShot_Capture(true);
@@ -325,6 +330,8 @@ void MemorySnapShot_Capture(const char *pszFileName, bool bConfirm)
 		DSP_MemorySnapShot_Capture(true);
 		DebugUI_MemorySnapShot_Capture(pszFileName, true);
 		IoMem_MemorySnapShot_Capture(true);
+		ScreenConv_MemorySnapShot_Capture(true);
+
 		/* end marker */
 		MemorySnapShot_Store(&magic, sizeof(magic));
 		/* And close */
@@ -337,9 +344,11 @@ void MemorySnapShot_Capture(const char *pszFileName, bool bConfirm)
 
 	/* Did error */
 	if (bCaptureError)
-		Log_AlertDlg(LOG_ERROR, "Unable to save memory state to file.");
+		Log_AlertDlg(LOG_ERROR, "Unable to save memory state to file: %s", pszFileName);
 	else if (bConfirm)
-		Log_AlertDlg(LOG_INFO, "Memory state file saved.");
+		Log_AlertDlg(LOG_INFO, "Memory state file saved: %s", pszFileName);
+	else
+		Log_Printf(LOG_INFO, "Memory state file saved: %s", pszFileName);
 }
 
 
@@ -352,7 +361,7 @@ void MemorySnapShot_Restore(const char *pszFileName, bool bConfirm)
 	Uint32 magic;
 
 	/* Set to 'restore' */
-	if (MemorySnapShot_OpenFile(pszFileName, false))
+	if (MemorySnapShot_OpenFile(pszFileName, false, bConfirm))
 	{
 		Configuration_MemorySnapShot_Capture(false);
 		TOS_MemorySnapShot_Capture(false);
@@ -371,6 +380,7 @@ void MemorySnapShot_Restore(const char *pszFileName, bool bConfirm)
 		GemDOS_MemorySnapShot_Capture(false);
 		ACIA_MemorySnapShot_Capture(false);
 		IKBD_MemorySnapShot_Capture(false);			/* After ACIA */
+		MIDI_MemorySnapShot_Capture(false);
 		CycInt_MemorySnapShot_Capture(false);
 		M68000_MemorySnapShot_Capture(false);
 		MFP_MemorySnapShot_Capture(false);
@@ -384,6 +394,7 @@ void MemorySnapShot_Restore(const char *pszFileName, bool bConfirm)
 		DSP_MemorySnapShot_Capture(false);
 		DebugUI_MemorySnapShot_Capture(pszFileName, false);
 		IoMem_MemorySnapShot_Capture(false);
+		ScreenConv_MemorySnapShot_Capture(false);
 
 		/* version string check catches release-to-release
 		 * state changes, bCaptureError catches too short
@@ -395,6 +406,10 @@ void MemorySnapShot_Restore(const char *pszFileName, bool bConfirm)
 
 		/* And close */
 		MemorySnapShot_CloseFile();
+
+		/* Apply patches for gemdos HD if needed */
+		/* (we need to do it after cpu tables for all opcodes were rebuilt) */
+		Cart_Patch();
 
 		/* changes may affect also info shown in statusbar */
 		Statusbar_UpdateInfo();
@@ -408,9 +423,11 @@ void MemorySnapShot_Restore(const char *pszFileName, bool bConfirm)
 
 	/* Did error? */
 	if (bCaptureError)
-		Log_AlertDlg(LOG_ERROR, "Unable to restore memory state from file.");
+		Log_AlertDlg(LOG_ERROR, "Unable to restore memory state from file: %s", pszFileName);
 	else if (bConfirm)
-		Log_AlertDlg(LOG_INFO, "Memory state file restored.");
+		Log_AlertDlg(LOG_INFO, "Memory state file restored: %s", pszFileName);
+	else
+		Log_Printf(LOG_INFO, "Memory state file restored: %s", pszFileName);
 }
 
 
@@ -421,20 +438,41 @@ void MemorySnapShot_Restore(const char *pszFileName, bool bConfirm)
  */
 #include <savestate.h>
 
+void save_u64(uae_u64 data)
+{
+	MemorySnapShot_Store(&data, 8);
+}
+
 void save_u32(uae_u32 data)
 {
 	MemorySnapShot_Store(&data, 4);
+//printf ("s32 %x\n", data);
 }
 
 void save_u16(uae_u16 data)
 {
 	MemorySnapShot_Store(&data, 2);
+//printf ("s16 %x\n", data);
+}
+
+void save_u8(uae_u8 data)
+{
+	MemorySnapShot_Store(&data, 1);
+//printf ("s8 %x\n", data);
+}
+
+uae_u64 restore_u64(void)
+{
+	uae_u64 data;
+	MemorySnapShot_Store(&data, 8);
+	return data;
 }
 
 uae_u32 restore_u32(void)
 {
 	uae_u32 data;
 	MemorySnapShot_Store(&data, 4);
+//printf ("r32 %x\n", data);
 	return data;
 }
 
@@ -442,5 +480,15 @@ uae_u16 restore_u16(void)
 {
 	uae_u16 data;
 	MemorySnapShot_Store(&data, 2);
+//printf ("r16 %x\n", data);
 	return data;
 }
+
+uae_u8 restore_u8(void)
+{
+	uae_u8 data;
+	MemorySnapShot_Store(&data, 1);
+//printf ("r8 %x\n", data);
+	return data;
+}
+

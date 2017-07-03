@@ -7,10 +7,10 @@
   Here we process a key press and the remapping of the scancodes.
 */
 const char Keymap_fileid[] = "Hatari keymap.c : " __DATE__ " " __TIME__;
-#ifdef __LIBRETRO__
+#ifdef __LIBRETRO__	/* RETRO HACK */
 #include <stdint.h>
 #include "SDL.h"
-#endif
+#endif	/* RETRO HACK */
 #include <ctype.h>
 #include "main.h"
 #include "keymap.h"
@@ -61,7 +61,7 @@ void Keymap_Init(void)
 /**
  * Map SDL symbolic key to ST scan code
  */
-static const char Keymap_SymbolicToStScanCode(SDL_keysym* pKeySym)
+static char Keymap_SymbolicToStScanCode(SDL_keysym* pKeySym)
 {
 	char code;
 
@@ -101,14 +101,14 @@ static const char Keymap_SymbolicToStScanCode(SDL_keysym* pKeySym)
 	 case SDLK_SEMICOLON: code = 0x27; break;
 	 case SDLK_LESS: code = 0x60; break;
 	 case SDLK_EQUALS: code = 0x0D; break;
-	 //case SDLK_GREATER : code = -1; break;
-	 //case SDLK_QUESTION: code = -1; break;
-	 //case SDLK_AT: code = -1; break;
+	 case SDLK_GREATER : code = 0x34; break;
+	 case SDLK_QUESTION: code = 0x35; break;
+	 case SDLK_AT: code = 0x28; break;
 	 case SDLK_LEFTBRACKET: code = 0x63; break;
 	 case SDLK_BACKSLASH: code = 0x2B; break;     /* Might be 0x60 for UK keyboards */
 	 case SDLK_RIGHTBRACKET: code = 0x64; break;
 	 case SDLK_CARET: code = 0x2B; break;
-	 //case SDLK_UNDERSCORE: code = -1; break;
+	 case SDLK_UNDERSCORE: code = 0x0C; break;
 	 case SDLK_BACKQUOTE: code = 0x52; break;
 	 case SDLK_a: code = 0x1E; break;
 	 case SDLK_b: code = 0x30; break;
@@ -293,10 +293,10 @@ static char Keymap_PcToStScanCode(SDL_keysym* pKeySym)
 	 case SDL_SCANCODE_PAUSE: return 0x61;
 	 case SDL_SCANCODE_INSERT: return 0x52;
 	 case SDL_SCANCODE_HOME: return 0x47;
-	 case SDL_SCANCODE_PAGEUP: return 0x62;
+	 case SDL_SCANCODE_PAGEUP: return 0x63;
 	 case SDL_SCANCODE_DELETE: return 0x53;
 	 case SDL_SCANCODE_END: return 0x2b;
-	 case SDL_SCANCODE_PAGEDOWN: return 0x61;
+	 case SDL_SCANCODE_PAGEDOWN: return 0x64;
 	 case SDL_SCANCODE_RIGHT: return 0x4d;
 	 case SDL_SCANCODE_LEFT: return 0x4b;
 	 case SDL_SCANCODE_DOWN: return 0x50;
@@ -468,8 +468,10 @@ static char Keymap_PcToStScanCode(SDL_keysym* keysym)
 	 case SDLK_KP_ENTER:    return 0x72;  /* NumPad Enter */
 
 	 /* Special Keys */
-	 case SDLK_PAGEUP:   return 0x62;  /* F11 => Help */
-	 case SDLK_PAGEDOWN: return 0x61;  /* F12 => Undo */
+	 case SDLK_PRINT:    return 0x62;  /* Help */
+	 case SDLK_SCROLLOCK: return 0x61; /* Undo */
+	 case SDLK_PAGEUP:   return 0x63;  /* Keypad ( */
+	 case SDLK_PAGEDOWN: return 0x64;  /* Keypad ) */
 	 case SDLK_HOME:     return 0x47;  /* Home */
 	 case SDLK_END:      return 0x60;  /* End => "<>" on German Atari kbd */
 	 case SDLK_UP:       return 0x48;  /* Arrow Up */
@@ -624,7 +626,7 @@ void Keymap_LoadRemapFile(char *pszFileName)
 	in = fopen(pszFileName, "r");
 	if (!in)
 	{
-		Log_Printf(LOG_DEBUG, "Keymap_LoadRemapFile: failed to "
+		Log_Printf(LOG_ERROR, "Keymap_LoadRemapFile: failed to "
 			   " open keymap file '%s'\n", pszFileName);
 		return;
 	}
@@ -638,18 +640,47 @@ void Keymap_LoadRemapFile(char *pszFileName)
 		Str_Trim(szString);
 		if (strlen(szString)>0)
 		{
+			char *p;
 			/* Is a comment? */
-			if ( (szString[0]==';') || (szString[0]=='#') )
+			if (szString[0] == ';' || szString[0] == '#')
 				continue;
-			/* Read values */
-			sscanf(szString, "%d,%d", &PCKeyCode, &STScanCode);
+			/* Cut out the values */
+			p = strtok(szString, ",");
+			if (!p)
+				continue;
+			Str_Trim(szString);
+			PCKeyCode = atoi(szString);    /* Direct key code? */
+			if (PCKeyCode < 10)
+			{
+				/* If it's not a valid number >= 10, then
+				 * assume we've got a symbolic key name
+				 */
+				int offset = 0;
+				/* quoted character (e.g. comment line char)? */
+				if (*szString == '\\' && strlen(szString) == 2)
+					offset = 1;
+				PCKeyCode = Keymap_GetKeyFromName(szString+offset);
+			}
+			p = strtok(NULL, "\n");
+			if (!p)
+				continue;
+			STScanCode = atoi(p);
 			/* Store into remap table, check both value within range */
-			if (STScanCode >= 0 && STScanCode <= KBD_MAX_SCANCODE
+			if (STScanCode > 0 && STScanCode <= KBD_MAX_SCANCODE
 			    && PCKeyCode >= 8)
 			{
+				LOG_TRACE(TRACE_KEYMAP,
+				          "keymap from file: sym=%i --> scan=%i\n",
+				          PCKeyCode, STScanCode);
 				LoadedKeymap[idx][0] = PCKeyCode;
 				LoadedKeymap[idx][1] = STScanCode;
 				idx += 1;
+			}
+			else
+			{
+				Log_Printf(LOG_WARN, "Could not parse keymap file:"
+				           " '%s' (%d >= 8), '%s' (0 > %d <= %d)\n",
+					   szString, PCKeyCode, p, STScanCode, KBD_MAX_SCANCODE);
 			}
 		}
 	}
@@ -734,8 +765,8 @@ void Keymap_KeyDown(SDL_keysym *sdlkey)
 	int symkey = sdlkey->sym;
 	int modkey = sdlkey->mod;
 
-	LOG_TRACE(TRACE_KEYMAP, "key down: sym=%i scan=%i mod=0x%x\n", symkey,
-	          sdlkey->scancode, modkey);
+	LOG_TRACE(TRACE_KEYMAP, "key down: sym=%i scan=%i mod=0x%x name='%s'\n",
+	          symkey, sdlkey->scancode, modkey, Keymap_GetKeyName(symkey));
 
 	if (ShortCut_CheckKeys(modkey, symkey, 1))
 		return;
@@ -777,8 +808,8 @@ void Keymap_KeyUp(SDL_keysym *sdlkey)
 	int symkey = sdlkey->sym;
 	int modkey = sdlkey->mod;
 
-	LOG_TRACE(TRACE_KEYMAP, "key up: sym=%i scan=%i mod=$%x\n", symkey,
-	          sdlkey->scancode, modkey);
+	LOG_TRACE(TRACE_KEYMAP, "key up: sym=%i scan=%i mod=0x%x name='%s'\n",
+	          symkey, sdlkey->scancode, modkey, Keymap_GetKeyName(symkey));
 
 	/* Ignore short-cut keys here */
 	if (ShortCut_CheckKeys(modkey, symkey, 0))
@@ -839,3 +870,289 @@ void Keymap_SimulateCharacter(char asckey, bool press)
 		}
 	}
 }
+
+
+#if WITH_SDL2
+
+int Keymap_GetKeyFromName(const char *name)
+{
+	return SDL_GetKeyFromName(name);
+}
+
+const char *Keymap_GetKeyName(int keycode)
+{
+	if (!keycode)
+		return "";
+
+	return SDL_GetKeyName(keycode);
+}
+
+#else	/* WITH_SDL2 */
+
+static struct {
+	int code;
+	const char *name;
+} const sdl_keytab[] = {
+	{ SDLK_BACKSPACE, "Backspace" },
+	{ SDLK_TAB, "Tab" },
+	{ SDLK_CLEAR, "Clear" },
+	{ SDLK_RETURN, "Return" },
+	{ SDLK_PAUSE, "Pause" },
+	{ SDLK_ESCAPE, "Escape" },
+	{ SDLK_SPACE, "Space" },
+	{ SDLK_EXCLAIM, "!" },
+	{ SDLK_QUOTEDBL, "\"" },
+	{ SDLK_HASH, "#" },
+	{ SDLK_DOLLAR, "$" },
+	{ SDLK_AMPERSAND, "&" },
+	{ SDLK_QUOTE, "'" },
+	{ SDLK_LEFTPAREN, "(" },
+	{ SDLK_RIGHTPAREN, ")" },
+	{ SDLK_ASTERISK, "*" },
+	{ SDLK_PLUS, "+" },
+	{ SDLK_COMMA, "," },
+	{ SDLK_MINUS, "-" },
+	{ SDLK_PERIOD, "." },
+	{ SDLK_SLASH, "/" },
+	{ SDLK_0, "0" },
+	{ SDLK_1, "1" },
+	{ SDLK_2, "2" },
+	{ SDLK_3, "3" },
+	{ SDLK_4, "4" },
+	{ SDLK_5, "5" },
+	{ SDLK_6, "6" },
+	{ SDLK_7, "7" },
+	{ SDLK_8, "8" },
+	{ SDLK_9, "9" },
+	{ SDLK_COLON, ":" },
+	{ SDLK_SEMICOLON, ";" },
+	{ SDLK_LESS, "<" },
+	{ SDLK_EQUALS, "=" },
+	{ SDLK_GREATER, ">" },
+	{ SDLK_QUESTION, "?" },
+	{ SDLK_AT, "@" },
+	{ SDLK_LEFTBRACKET, "[" },
+	{ SDLK_BACKSLASH, "\\" },
+	{ SDLK_RIGHTBRACKET, "]" },
+	{ SDLK_CARET, "^" },
+	{ SDLK_UNDERSCORE, "_" },
+	{ SDLK_BACKQUOTE, "`" },
+	{ SDLK_a, "A" },
+	{ SDLK_b, "B" },
+	{ SDLK_c, "C" },
+	{ SDLK_d, "D" },
+	{ SDLK_e, "E" },
+	{ SDLK_f, "F" },
+	{ SDLK_g, "G" },
+	{ SDLK_h, "H" },
+	{ SDLK_i, "I" },
+	{ SDLK_j, "J" },
+	{ SDLK_k, "K" },
+	{ SDLK_l, "L" },
+	{ SDLK_m, "M" },
+	{ SDLK_n, "N" },
+	{ SDLK_o, "O" },
+	{ SDLK_p, "P" },
+	{ SDLK_q, "Q" },
+	{ SDLK_r, "R" },
+	{ SDLK_s, "S" },
+	{ SDLK_t, "T" },
+	{ SDLK_u, "U" },
+	{ SDLK_v, "V" },
+	{ SDLK_w, "W" },
+	{ SDLK_x, "X" },
+	{ SDLK_y, "Y" },
+	{ SDLK_z, "Z" },
+	{ SDLK_DELETE, "Delete" },
+	{ SDLK_KP0, "Keypad 0" },
+	{ SDLK_KP1, "Keypad 1" },
+	{ SDLK_KP2, "Keypad 2" },
+	{ SDLK_KP3, "Keypad 3" },
+	{ SDLK_KP4, "Keypad 4" },
+	{ SDLK_KP5, "Keypad 5" },
+	{ SDLK_KP6, "Keypad 6" },
+	{ SDLK_KP7, "Keypad 7" },
+	{ SDLK_KP8, "Keypad 8" },
+	{ SDLK_KP9, "Keypad 9" },
+	{ SDLK_KP_PERIOD, "Keypad ." },
+	{ SDLK_KP_DIVIDE, "Keypad /" },
+	{ SDLK_KP_MULTIPLY, "Keypad *" },
+	{ SDLK_KP_MINUS, "Keypad -" },
+	{ SDLK_KP_PLUS, "Keypad +" },
+	{ SDLK_KP_ENTER, "Keypad Enter" },
+	{ SDLK_KP_EQUALS, "Keypad =" },
+	{ SDLK_UP, "Up" },
+	{ SDLK_DOWN, "Down" },
+	{ SDLK_RIGHT, "Right" },
+	{ SDLK_LEFT, "Left" },
+	{ SDLK_INSERT, "Insert" },
+	{ SDLK_HOME, "Home" },
+	{ SDLK_END, "End" },
+	{ SDLK_PAGEUP, "PageUp" },
+	{ SDLK_PAGEDOWN, "PageDown" },
+	{ SDLK_F1, "F1" },
+	{ SDLK_F2, "F2" },
+	{ SDLK_F3, "F3" },
+	{ SDLK_F4, "F4" },
+	{ SDLK_F5, "F5" },
+	{ SDLK_F6, "F6" },
+	{ SDLK_F7, "F7" },
+	{ SDLK_F8, "F8" },
+	{ SDLK_F9, "F9" },
+	{ SDLK_F10, "F10" },
+	{ SDLK_F11, "F11" },
+	{ SDLK_F12, "F12" },
+	{ SDLK_F13, "F13" },
+	{ SDLK_F14, "F14" },
+	{ SDLK_F15, "F15" },
+	{ SDLK_NUMLOCK, "Numlock" },
+	{ SDLK_CAPSLOCK, "CapsLock" },
+	{ SDLK_SCROLLOCK, "ScrollLock" },
+	{ SDLK_RSHIFT, "Right Shift" },
+	{ SDLK_LSHIFT, "Left Shift" },
+	{ SDLK_RCTRL, "Right Ctrl" },
+	{ SDLK_LCTRL, "Left Ctrl" },
+	{ SDLK_RALT, "Right Alt" },
+	{ SDLK_LALT, "Left Alt" },
+	{ SDLK_RMETA, "Right GUI" },
+	{ SDLK_LMETA, "Left GUI" },
+	{ SDLK_MODE, "ModeSwitch" },
+	{ SDLK_HELP, "Help" },
+	{ SDLK_PRINT, "PrintScreen" },
+	{ SDLK_SYSREQ, "SysReq" },
+	{ SDLK_BREAK, "Cancel" },
+	{ SDLK_MENU, "Menu" },
+	{ SDLK_POWER, "Power" },
+	{ SDLK_UNDO, "Undo" },
+
+	{ SDLK_WORLD_1, "¡" },	/* 161 */
+	{ SDLK_WORLD_2, "¢" },	/* 162 */
+	{ SDLK_WORLD_3, "£" },	/* 163 */
+	{ SDLK_WORLD_4, "¤" },	/* 164 */
+	{ SDLK_WORLD_5, "¥" },	/* 165 */
+	{ SDLK_WORLD_6, "¦" },	/* 166 */
+	{ SDLK_WORLD_7, "§" },	/* 167 */
+	{ SDLK_WORLD_8, "¨" },	/* 168 */
+	{ SDLK_WORLD_9, "©" },	/* 169 */
+	{ SDLK_WORLD_10, "ª" },	/* 170 */
+	{ SDLK_WORLD_11, "«" },	/* 171 */
+	{ SDLK_WORLD_12, "¬" },	/* 172 */
+	{ SDLK_WORLD_14, "®" },	/* 174 */
+	{ SDLK_WORLD_15, "¯" },	/* 175 */
+	{ SDLK_WORLD_16, "°" },	/* 176 */
+	{ SDLK_WORLD_17, "±" },	/* 177 */
+	{ SDLK_WORLD_18, "²" },	/* 178 */
+	{ SDLK_WORLD_19, "³" },	/* 179 */
+	{ SDLK_WORLD_20, "´" },	/* 180 */
+	{ SDLK_WORLD_21, "µ" },	/* 181 */
+	{ SDLK_WORLD_22, "¶" },	/* 182 */
+	{ SDLK_WORLD_23, "·" },	/* 183 */
+	{ SDLK_WORLD_24, "¸" },	/* 184 */
+	{ SDLK_WORLD_25, "¹" },	/* 185 */
+	{ SDLK_WORLD_26, "º" },	/* 186 */
+	{ SDLK_WORLD_27, "»" },	/* 187 */
+	{ SDLK_WORLD_28, "¼" },	/* 188 */
+	{ SDLK_WORLD_29, "½" },	/* 189 */
+	{ SDLK_WORLD_30, "¾" },	/* 190 */
+	{ SDLK_WORLD_31, "¿" },	/* 191 */
+	{ SDLK_WORLD_32, "À" },	/* 192 */
+	{ SDLK_WORLD_33, "Á" },	/* 193 */
+	{ SDLK_WORLD_34, "Â" },	/* 194 */
+	{ SDLK_WORLD_35, "Ã" },	/* 195 */
+	{ SDLK_WORLD_36, "Ä" },	/* 196 */
+	{ SDLK_WORLD_37, "Å" },	/* 197 */
+	{ SDLK_WORLD_38, "Æ" },	/* 198 */
+	{ SDLK_WORLD_39, "Ç" },	/* 199 */
+	{ SDLK_WORLD_40, "È" },	/* 200 */
+	{ SDLK_WORLD_41, "É" },	/* 201 */
+	{ SDLK_WORLD_42, "Ê" },	/* 202 */
+	{ SDLK_WORLD_43, "Ë" },	/* 203 */
+	{ SDLK_WORLD_44, "Ì" },	/* 204 */
+	{ SDLK_WORLD_45, "Í" },	/* 205 */
+	{ SDLK_WORLD_46, "Î" },	/* 206 */
+	{ SDLK_WORLD_47, "Ï" },	/* 207 */
+	{ SDLK_WORLD_48, "Ð" },	/* 208 */
+	{ SDLK_WORLD_49, "Ñ" },	/* 209 */
+	{ SDLK_WORLD_50, "Ò" },	/* 210 */
+	{ SDLK_WORLD_51, "Ó" },	/* 211 */
+	{ SDLK_WORLD_52, "Ô" },	/* 212 */
+	{ SDLK_WORLD_53, "Õ" },	/* 213 */
+	{ SDLK_WORLD_54, "Ö" },	/* 214 */
+	{ SDLK_WORLD_55, "×" },	/* 215 */
+	{ SDLK_WORLD_56, "Ø" },	/* 216 */
+	{ SDLK_WORLD_57, "Ù" },	/* 217 */
+	{ SDLK_WORLD_58, "Ú" },	/* 218 */
+	{ SDLK_WORLD_59, "Û" },	/* 219 */
+	{ SDLK_WORLD_60, "Ü" },	/* 220 */
+	{ SDLK_WORLD_61, "Ý" },	/* 221 */
+	{ SDLK_WORLD_62, "Þ" },	/* 222 */
+	{ SDLK_WORLD_63, "ß" },	/* 223 */
+	{ SDLK_WORLD_64, "à" },	/* 224 */
+	{ SDLK_WORLD_65, "á" },	/* 225 */
+	{ SDLK_WORLD_66, "â" },	/* 226 */
+	{ SDLK_WORLD_67, "ã" },	/* 227 */
+	{ SDLK_WORLD_68, "ä" },	/* 228 */
+	{ SDLK_WORLD_69, "å" },	/* 229 */
+	{ SDLK_WORLD_70, "æ" },	/* 230 */
+	{ SDLK_WORLD_71, "ç" },	/* 231 */
+	{ SDLK_WORLD_72, "è" },	/* 232 */
+	{ SDLK_WORLD_73, "é" },	/* 233 */
+	{ SDLK_WORLD_74, "ê" },	/* 234 */
+	{ SDLK_WORLD_75, "ë" },	/* 235 */
+	{ SDLK_WORLD_76, "ì" },	/* 236 */
+	{ SDLK_WORLD_77, "í" },	/* 237 */
+	{ SDLK_WORLD_78, "î" },	/* 238 */
+	{ SDLK_WORLD_79, "ï" },	/* 239 */
+	{ SDLK_WORLD_80, "ð" },	/* 240 */
+	{ SDLK_WORLD_81, "ñ" },	/* 241 */
+	{ SDLK_WORLD_82, "ò" },	/* 242 */
+	{ SDLK_WORLD_83, "ó" },	/* 243 */
+	{ SDLK_WORLD_84, "ô" },	/* 244 */
+	{ SDLK_WORLD_85, "õ" },	/* 245 */
+	{ SDLK_WORLD_86, "ö" },	/* 246 */
+	{ SDLK_WORLD_87, "÷" },	/* 247 */
+	{ SDLK_WORLD_88, "ø" },	/* 248 */
+	{ SDLK_WORLD_89, "ù" },	/* 249 */
+	{ SDLK_WORLD_90, "ú" },	/* 250 */
+	{ SDLK_WORLD_91, "û" },	/* 251 */
+	{ SDLK_WORLD_92, "ü" },	/* 252 */
+	{ SDLK_WORLD_93, "ý" },	/* 253 */
+	{ SDLK_WORLD_94, "þ" },	/* 254 */
+	{ SDLK_WORLD_95, "ÿ" },	/* 255 */
+
+	{ -1, NULL }
+};
+
+int Keymap_GetKeyFromName(const char *name)
+{
+	int i;
+
+	if (!name[0])
+		return 0;
+
+	for (i = 0; sdl_keytab[i].name != NULL; i++)
+	{
+		if (strcasecmp(name, sdl_keytab[i].name) == 0)
+			return sdl_keytab[i].code;
+	}
+
+	return 0;
+}
+
+const char *Keymap_GetKeyName(int keycode)
+{
+	int i;
+
+	if (!keycode)
+		return "";
+
+	for (i = 0; sdl_keytab[i].name != NULL; i++)
+	{
+		if (keycode == sdl_keytab[i].code)
+			return sdl_keytab[i].name;
+	}
+
+	return "";
+}
+
+#endif
