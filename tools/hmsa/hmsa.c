@@ -245,7 +245,7 @@ int main(int argc, char *argv[])
 	} else {
 		/* Just read disk image directly into buffer */
 		disksize = 0;
-		diskbuf = File_Read(srcfile, &disksize, NULL);
+		diskbuf = HFile_Read(srcfile, &disksize, NULL);
 		if (!diskbuf || disksize < 512*8) {
 			fprintf(stderr, "ERROR: could not read ST disk %s!\n", srcfile);
 			retval = -1;

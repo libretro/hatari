@@ -23,7 +23,11 @@ const char Paths_fileid[] = "Hatari paths.c : " __DATE__ " " __TIME__;
 #if defined(__MACOSX__)
 	#define HATARI_HOME_DIR "Library/Application Support/Hatari"
 #else
+#ifdef WIIU
+	#define HATARI_HOME_DIR "hatari"
+#else
 	#define HATARI_HOME_DIR ".hatari"
+#endif
 #endif
 
 static char sWorkingDir[FILENAME_MAX];    /* Working directory */
@@ -191,7 +195,19 @@ static char *Paths_InitExecDir(const char *argv0)
 static void Paths_InitHomeDirs(void)
 {
 	char *psHome;
+#ifdef WIIU
+	strcpy(sUserHomeDir, "sd:/retroarch/cores/system");
+	strcpy(sHatariHomeDir, "sd:/retroarch/cores/system/hatari");
+	if (!File_DirExists(sHatariHomeDir))
+	{
+		if (mkdir(sHatariHomeDir, 0755) != 0)
+		{
+			strcpy(sHatariHomeDir, sUserHomeDir);
+		}
+	}
 
+	return;
+#endif
 	psHome = getenv("HOME");
 	if (psHome)
 		strncpy(sUserHomeDir, psHome, FILENAME_MAX);
@@ -251,14 +267,19 @@ static void Paths_InitHomeDirs(void)
 void Paths_Init(const char *argv0)
 {
 	char *psExecDir;  /* Path string where the hatari executable can be found */
-
+#ifdef WIIU
+	strcpy(sWorkingDir, "sd:/retroarch/cores");
+	strcpy(sDataDir, "sd:/retroarch/cores/system");
+	Paths_InitHomeDirs();
+	return;
+#else
 	/* Init working directory string */
 	if (getcwd(sWorkingDir, FILENAME_MAX) == NULL)
 	{
 		/* This should never happen... just in case... */
 		strcpy(sWorkingDir, ".");
 	}
-
+#endif
 	/* Init the user's home directory string */
 	Paths_InitHomeDirs();
 

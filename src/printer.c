@@ -73,7 +73,7 @@ void Printer_UnInit(void)
 	Dprintf((stderr, "Printer_UnInit()\n"));
 
 	/* Close any open files */
-	pPrinterHandle = File_Close(pPrinterHandle);
+	pPrinterHandle = HFile_Close(pPrinterHandle);
 	bUnflushed = false;
 	nIdleCount = 0;
 }

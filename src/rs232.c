@@ -21,11 +21,13 @@ const char RS232_fileid[] = "Hatari rs232.c : " __DATE__ " " __TIME__;
 # include <termios.h>
 # include <unistd.h>
 #endif
-
+#ifdef WIIU
+//no rs323 for now
+#else
 #include <SDL.h>
 #include <SDL_thread.h>
 #include <errno.h>
-
+#endif
 #include "main.h"
 #include "configuration.h"
 #include "ioMem.h"
@@ -270,11 +272,11 @@ static void RS232_CloseCOMPort(void)
 	Dprintf(("Closed RS232 files.\n"));
 }
 
-
+#ifndef WIIU
 /* thread stuff */
 static SDL_sem* pSemFreeBuf;       /* Semaphore to sync free space in InputBuffer_RS232 */
 static SDL_Thread *RS232Thread = NULL; /* Thread handle for reading incoming data */
-
+#endif
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -283,7 +285,7 @@ static SDL_Thread *RS232Thread = NULL; /* Thread handle for reading incoming dat
 static void RS232_AddBytesToInputBuffer(unsigned char *pBytes, int nBytes)
 {
 	int i;
-
+#ifndef WIIU
 	/* Copy bytes into input buffer */
 	for (i=0; i<nBytes; i++)
 	{
@@ -291,6 +293,7 @@ static void RS232_AddBytesToInputBuffer(unsigned char *pBytes, int nBytes)
 		InputBuffer_RS232[InputBuffer_Tail] = *pBytes++;
 		InputBuffer_Tail = (InputBuffer_Tail+1) % MAX_RS232INPUT_BUFFER;
 	}
+#endif
 }
 
 
@@ -302,7 +305,7 @@ static int RS232_ThreadFunc(void *pData)
 {
 	int iInChar;
 	unsigned char cInChar;
-
+#ifndef WIIU
 	/* Check for any RS-232 incoming data */
 	while (!bQuitThread)
 	{
@@ -335,7 +338,7 @@ static int RS232_ThreadFunc(void *pData)
 			SDL_Delay(200);
 		}
 	}
-
+#endif
 	return true;
 }
 
@@ -348,6 +351,7 @@ static int RS232_ThreadFunc(void *pData)
  */
 void RS232_Init(void)
 {
+#ifndef WIIU
 	if (ConfigureParams.RS232.bEnableRS232)
 	{
 		if (!RS232_OpenCOMPort())
@@ -382,6 +386,10 @@ void RS232_Init(void)
 			Dprintf(("RS232 thread has been created.\n"));
 		}
 	}
+#else
+	ConfigureParams.RS232.bEnableRS232 = false;
+	return;
+#endif
 }
 
 
@@ -391,6 +399,7 @@ void RS232_Init(void)
  */
 void RS232_UnInit(void)
 {
+#ifndef WIIU
 	/* Close, kill thread and free resource */
 	if (RS232Thread)
 	{
@@ -414,6 +423,7 @@ void RS232_UnInit(void)
 		SDL_DestroySemaphore(pSemFreeBuf);
 		pSemFreeBuf = NULL;
 	}
+#endif
 }
 
 
@@ -625,6 +635,7 @@ void RS232_SetFlowControl(Sint16 ctrl)
  */
 bool RS232_TransferBytesTo(Uint8 *pBytes, int nBytes)
 {
+#ifndef WIIU
 	/* Make sure there's a RS-232 connection if it's enabled */
 	if (ConfigureParams.RS232.bEnableRS232)
 		RS232_OpenCOMPort();
@@ -641,7 +652,7 @@ bool RS232_TransferBytesTo(Uint8 *pBytes, int nBytes)
 			return true;   /* OK */
 		}
 	}
-
+#endif
 	return false;  /* Failed */
 }
 
@@ -653,7 +664,7 @@ bool RS232_TransferBytesTo(Uint8 *pBytes, int nBytes)
 bool RS232_ReadBytes(Uint8 *pBytes, int nBytes)
 {
 	int i;
-
+#ifndef WIIU
 	/* Connected? */
 	if (hComIn && InputBuffer_Head != InputBuffer_Tail)
 	{
@@ -666,7 +677,7 @@ bool RS232_ReadBytes(Uint8 *pBytes, int nBytes)
 		}
 		return true;
 	}
-
+#endif
 	return false;
 }
 
@@ -677,6 +688,7 @@ bool RS232_ReadBytes(Uint8 *pBytes, int nBytes)
  */
 bool RS232_GetStatus(void)
 {
+#ifndef WIIU
 	/* Connected? */
 	if (hComIn)
 	{
@@ -684,7 +696,7 @@ bool RS232_GetStatus(void)
 		if (InputBuffer_Head != InputBuffer_Tail)
 			return true;
 	}
-
+#endif
 	/* No, none */
 	return false;
 }

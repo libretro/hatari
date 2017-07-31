@@ -50,7 +50,7 @@
 //#define HAVE_UNIX_DOMAIN_SOCKETS 1
 
 #ifdef __LIBRETRO__
-#if defined(AND) || defined(__CELLOS_LV2__)
+#if defined(AND) || defined(__CELLOS_LV2__) || defined(WIIU)
 #undef HAVE_POSIX_MEMALIGN
 #else
 #define HAVE_POSIX_MEMALIGN 1
@@ -74,13 +74,17 @@
 
 /* Define to 1 if you have the 'alphasort' function. */
 #ifndef WIN32PORT
+#if !defined(WIIU)
 #define HAVE_ALPHASORT 1
 #endif
+#endif
 /* Define to 1 if you have the 'scandir' function. */
+#if !defined(WIIU)
 #define HAVE_SCANDIR 1
+#endif
 
 #ifdef __LIBRETRO__
-#if defined(AND) || defined(__CELLOS_LV2__) || defined(WIN32PORT)
+#if defined(AND) || defined(__CELLOS_LV2__) || defined(WIN32PORT) || defined(WIIU)
 #undef HAVE_STATVFS
 #else
 #define HAVE_STATVFS 1
@@ -97,8 +101,9 @@
 
 /* Define to 1 if you have the 'ftello' function. */
 //#define HAVE_FTELLO 1
-
-
+#ifdef WIIU
+#define utime(file,time) 0
+#endif
 /* Relative path from bindir to datadir */
 #define BIN2DATADIR "."
 

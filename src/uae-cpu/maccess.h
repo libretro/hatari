@@ -30,7 +30,6 @@
 
 #include <SDL_endian.h>
 
-
 static inline uae_u32 do_get_mem_long(void *a)
 {
 	return SDL_SwapBE32(*(uae_u32 *)a);

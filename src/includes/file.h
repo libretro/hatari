@@ -20,7 +20,7 @@ extern bool File_DoesFileExtensionMatch(const char *pszFileName, const char *psz
 extern bool File_ChangeFileExtension(const char *Filename_old, const char *Extension_old , char *Filename_new , const char *Extension_new);
 extern const char *File_RemoveFileNameDrive(const char *pszFileName);
 extern bool File_DoesFileNameEndWithSlash(char *pszFileName);
-extern Uint8 *File_Read(const char *pszFileName, long *pFileSize, const char * const ppszExts[]);
+extern Uint8 *HFile_Read(const char *pszFileName, long *pFileSize, const char * const ppszExts[]);
 extern bool File_Save(const char *pszFileName, const Uint8 *pAddress, size_t Size, bool bQueryOverwrite);
 extern off_t File_Length(const char *pszFileName);
 extern bool File_Exists(const char *pszFileName);
@@ -31,7 +31,7 @@ extern void File_SplitPath(const char *pSrcFileName, char *pDir, char *pName, ch
 extern char* File_MakePath(const char *pDir, const char *pName, const char *pExt);
 extern void File_ShrinkName(char *pDestFileName, const char *pSrcFileName, int maxlen);
 extern FILE *File_Open(const char *path, const char *mode);
-extern FILE *File_Close(FILE *fp);
+extern FILE *HFile_Close(FILE *fp);
 extern bool File_Lock(FILE *fp);
 extern void File_UnLock(FILE *fp);
 extern bool File_InputAvailable(FILE *fp);

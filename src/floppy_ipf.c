@@ -189,7 +189,7 @@ Uint8 *IPF_ReadDisk(int Drive, const char *pszFileName, long *pImageSize, int *p
 	*pImageSize = 0;
 
 	/* Just load directly a buffer, and set ImageSize accordingly */
-	pIPFFile = File_Read(pszFileName, pImageSize, NULL);
+	pIPFFile = HFile_Read(pszFileName, pImageSize, NULL);
 	if (!pIPFFile)
 	{
 		*pImageSize = 0;

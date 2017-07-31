@@ -86,8 +86,8 @@ void Midi_Init(void)
  */
 void Midi_UnInit(void)
 {
-	pMidiFhIn = File_Close(pMidiFhIn);
-	pMidiFhOut = File_Close(pMidiFhOut);
+	pMidiFhIn = HFile_Close(pMidiFhIn);
+	pMidiFhOut = HFile_Close(pMidiFhOut);
 
 	CycInt_RemovePendingInterrupt(INTERRUPT_MIDI);
 }

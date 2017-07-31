@@ -101,7 +101,7 @@ static void DebugUI_SetLogDefault(void)
 	{
 		if (debugOutput)
 		{
-			File_Close(debugOutput);
+			HFile_Close(debugOutput);
 			fprintf(stderr, "Debug log closed.\n");
 		}
 		debugOutput = stderr;
@@ -114,7 +114,7 @@ static void DebugUI_SetLogDefault(void)
  */
 static int DebugUI_SetLogFile(int nArgc, char *psArgs[])
 {
-	File_Close(debugOutput);
+	HFile_Close(debugOutput);
 	debugOutput = NULL;
 
 	if (nArgc > 1)

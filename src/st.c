@@ -62,7 +62,7 @@ Uint8 *ST_ReadDisk(int Drive, const char *pszFileName, long *pImageSize, int *pI
 	*pImageSize = 0;
 
 	/* Just load directly a buffer, and set ImageSize accordingly */
-	pStFile = File_Read(pszFileName, pImageSize, NULL);
+	pStFile = HFile_Read(pszFileName, pImageSize, NULL);
 	if (!pStFile)
 	{
 		*pImageSize = 0;

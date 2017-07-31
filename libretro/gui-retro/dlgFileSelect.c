@@ -532,10 +532,11 @@ char* SDLGui_FileSelect(const char *title,const char *path_and_name, char **zip_
 			perror("SDLGui_FileSelect: non-existing path and CWD failed");
 			goto clean_exit;
 		}
-	}
 
+	}
 	File_MakeAbsoluteName(path);
 	File_MakeValidPathName(path);
+
 	File_ShrinkName(dlgpath, path, DLGPATH_SIZE);
 	File_ShrinkName(dlgfname, fname, DLGFNAME_SIZE);
 

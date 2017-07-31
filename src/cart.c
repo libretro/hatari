@@ -57,7 +57,7 @@ static void Cart_LoadImage(void)
 	char *pCartFileName = ConfigureParams.Rom.szCartridgeImageFileName;
 
 	/* Try to load the image file: */
-	pCartData = File_Read(pCartFileName, &nCartSize, psCartNameExts);
+	pCartData = HFile_Read(pCartFileName, &nCartSize, psCartNameExts);
 	if (!pCartData)
 	{
 		Log_Printf(LOG_ERROR, "Failed to load '%s'.\n", pCartFileName);

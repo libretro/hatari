@@ -922,7 +922,7 @@ static void VDI_ModifyDesktopInf(char *pszFileName)
 	int i;
 
 	/* Load our '.inf' file */
-	pInfData = File_Read(pszFileName, &InfSize, NULL);
+	pInfData = HFile_Read(pszFileName, &InfSize, NULL);
 	if (pInfData)
 	{
 		/* Scan file for '#E' */

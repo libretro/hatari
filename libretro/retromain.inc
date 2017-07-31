@@ -30,6 +30,8 @@ extern void retro_shutdown_hatari(void);
 #elif defined(__CELLOS_LV2__)
 #define CONFDIR "/dev_hdd0/HOMEBREW/ST"
 //#warning "conf dir for ps3"
+#elif defined(WIIU)
+#define CONFDIR "sd:/retroarch/cores/system"
 #elif defined(GEKKO)
 #define CONFDIR "sd:/HOMEBREW/ST"
 #else

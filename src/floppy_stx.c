@@ -337,7 +337,7 @@ Uint8 *STX_ReadDisk(int Drive, const char *pszFileName, long *pImageSize, int *p
 	*pImageSize = 0;
 
 	/* Just load directly a buffer, and set ImageSize accordingly */
-	pSTXFile = File_Read(pszFileName, pImageSize, NULL);
+	pSTXFile = HFile_Read(pszFileName, pImageSize, NULL);
 	if (!pSTXFile)
 	{
 		*pImageSize = 0;
@@ -550,7 +550,7 @@ static bool	STX_LoadSaveFile ( int Drive , const char *FilenameSave )
 	STX_TRACK_STRUCT	*pStxTrack;
 
 
-	SaveFileBuffer = File_Read ( FilenameSave, &SaveFileSize, NULL );
+	SaveFileBuffer = HFile_Read ( FilenameSave, &SaveFileSize, NULL );
 	if (!SaveFileBuffer)
 	{
 		fprintf ( stderr , "STX_LoadSaveFile drive=%d file=%s error\n" , Drive , FilenameSave );

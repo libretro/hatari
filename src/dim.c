@@ -66,7 +66,7 @@ Uint8 *DIM_ReadDisk(int Drive, const char *pszFileName, long *pImageSize, int *p
 	Uint8 *pDiskBuffer = NULL;
 
 	/* Load file into buffer */
-	pDimFile = File_Read(pszFileName, pImageSize, NULL);
+	pDimFile = HFile_Read(pszFileName, pImageSize, NULL);
 	if (pDimFile)
 	{
 		/* Check header for valid image: */

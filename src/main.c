@@ -314,6 +314,9 @@ void Main_WaitOnVbl(void)
 #ifdef __LIBRETRO__
 if(pauseg==1)pause_select();
 co_switch(mainThread);
+#ifdef WIIU
+return;
+#endif
 #endif
 
 	nVBLCount++;

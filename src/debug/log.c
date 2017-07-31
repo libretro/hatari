@@ -198,8 +198,8 @@ int Log_SetAlertLevel(int level)
  */
 void Log_UnInit(void)
 {
-	hLogFile = File_Close(hLogFile);
-	TraceFile = File_Close(TraceFile);
+	hLogFile = HFile_Close(hLogFile);
+	TraceFile = HFile_Close(TraceFile);
 }
 
 

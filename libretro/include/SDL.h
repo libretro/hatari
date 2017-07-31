@@ -20,8 +20,8 @@ extern int Reset_Warm(void);
 
 #define RGB565(r, g, b)  (((r) << (5+6)) | ((g) << 6) | (b))
 #define SDL_MapRGB(a, r, g, b) RGB565( (r)>>3, (g)>>3, (b)>>3)
-
 extern long GetTicks(void);
+
 extern void retro_fillrect(SDL_Surface * surf,SDL_Rect *rect,unsigned int col);
 extern SDL_Surface *prepare_texture(int w,int h,int b);
 extern int SDL_SaveBMP(SDL_Surface *surface,const char *file);
@@ -48,7 +48,11 @@ Uint8 type;
 #define SDL_InitSubSystem(...) 1
 #define SDL_Init(...) 1
 //TIME
+#ifdef WIIU
+#define SDL_Delay(a) //we are awake
+#else
 #define SDL_Delay(a) usleep((a)*1000)
+#endif
 //SURFACE
 #define SDL_SetColors(a, b, c, d)
 #define SDL_MUSTLOCK(a) 0

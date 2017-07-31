@@ -37,7 +37,7 @@ extern int Reset_Cold(void);
 #endif
 
 long frame=0;
-unsigned long  Ktime=0 , LastFPSTime=0;
+long  Ktime=0 , LastFPSTime=0;
 
 //VIDEO
 extern SDL_Surface *sdlscrn; 
@@ -124,11 +124,27 @@ long GetTicks(void)
 
 } 
 
+#ifdef WIIU
+#include <features_cpu.h>
+retro_time_t current_tus=0,last_tus=0;
+#endif
 int slowdown=0;
 
 //NO SURE FIND BETTER WAY TO COME BACK IN MAIN THREAD IN HATARI GUI
 void gui_poll_events(void)
 {
+#ifdef WIIU
+  current_tus=cpu_features_get_time_usec();
+  current_tus/=1000;
+
+   if(current_tus - last_tus >= 1000/50)
+   { 
+      slowdown=0;
+      frame++; 
+      last_tus = current_tus;		
+      co_switch(mainThread);
+   }
+#else
    Ktime = GetTicks();
 
    if(Ktime - LastFPSTime >= 1000/50)
@@ -138,6 +154,7 @@ void gui_poll_events(void)
       LastFPSTime = Ktime;		
       co_switch(mainThread);
    }
+#endif
 }
 
 //save bkg for screenshot
