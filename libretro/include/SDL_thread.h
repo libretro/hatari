@@ -1827,7 +1827,11 @@ SDL_WaitThread(SDL_Thread * thread, int *status)
 
 #else //pthread
 
+#if defined(__HAIKU__)
+#include <posix/errno.h>
+#else
 #include <sys/errno.h> 
+#endif
 #include <unistd.h>
 #include <signal.h>
 
