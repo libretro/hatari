@@ -18,6 +18,7 @@
 */
 const char Midi_fileid[] = "Hatari midi.c : " __DATE__ " " __TIME__;
 
+#include <libretro.h>
 #include <SDL_types.h>
 
 #include "main.h"
@@ -28,6 +29,7 @@ const char Midi_fileid[] = "Hatari midi.c : " __DATE__ " " __TIME__;
 #include "midi.h"
 #include "file.h"
 #include "acia.h"
+#include "clocks_timings.h"
 
 
 #define ACIA_SR_INTERRUPT_REQUEST  0x80
@@ -35,8 +37,9 @@ const char Midi_fileid[] = "Hatari midi.c : " __DATE__ " " __TIME__;
 #define ACIA_SR_RX_FULL            0x01
 
 
-static FILE *pMidiFhIn  = NULL;        /* File handle used for Midi input */
-static FILE *pMidiFhOut = NULL;        /* File handle used for Midi output */
+struct retro_midi_interface *MidiRetroInterface;
+static Uint64 MidiWriteClockCounter;
+
 static Uint8 MidiControlRegister;
 static Uint8 MidiStatusRegister;
 static Uint8 nRxDataByte;
@@ -47,37 +50,7 @@ static Uint8 nRxDataByte;
  */
 void Midi_Init(void)
 {
-	if (!ConfigureParams.Midi.bEnableMidi)
-		return;
-
-	if (ConfigureParams.Midi.sMidiOutFileName[0])
-	{
-		/* Open MIDI output file */
-		pMidiFhOut = File_Open(ConfigureParams.Midi.sMidiOutFileName, "wb");
-		if (!pMidiFhOut)
-		{
-			Log_AlertDlg(LOG_ERROR, "MIDI output file open failed. MIDI support disabled.");
-			ConfigureParams.Midi.bEnableMidi = false;
-			return;
-		}
-		setvbuf(pMidiFhOut, NULL, _IONBF, 0);    /* No output buffering! */
-		LOG_TRACE(TRACE_MIDI, "MIDI: Opened file '%s' for output\n",
-			 ConfigureParams.Midi.sMidiOutFileName);
-	}
-	if (ConfigureParams.Midi.sMidiInFileName[0])
-	{
-		/* Try to open MIDI input file */
-		pMidiFhIn = File_Open(ConfigureParams.Midi.sMidiInFileName, "rb");
-		if (!pMidiFhIn)
-		{
-			Log_AlertDlg(LOG_ERROR, "MIDI input file open failed. MIDI support disabled.");
-			ConfigureParams.Midi.bEnableMidi = false;
-			return;
-		}
-		setvbuf(pMidiFhIn, NULL, _IONBF, 0);    /* No input buffering! */
-		LOG_TRACE(TRACE_MIDI, "MIDI: Opened file '%s' for input\n",
-			 ConfigureParams.Midi.sMidiInFileName);
-	}
+	MidiWriteClockCounter = 0;
 }
 
 
@@ -86,9 +59,6 @@ void Midi_Init(void)
  */
 void Midi_UnInit(void)
 {
-	pMidiFhIn = HFile_Close(pMidiFhIn);
-	pMidiFhOut = HFile_Close(pMidiFhOut);
-
 	CycInt_RemovePendingInterrupt(INTERRUPT_MIDI);
 }
 
@@ -101,8 +71,9 @@ void Midi_Reset(void)
 	MidiControlRegister = 0;
 	MidiStatusRegister = ACIA_SR_TX_EMPTY;
 	nRxDataByte = 1;
+	MidiWriteClockCounter = 0;
 
-	if (ConfigureParams.Midi.bEnableMidi)
+	if (MidiRetroInterface)
 		CycInt_AddRelativeInterrupt(2050, INT_CPU_CYCLE, INTERRUPT_MIDI);
 	else
 		CycInt_RemovePendingInterrupt (INTERRUPT_MIDI);
@@ -180,23 +151,27 @@ void Midi_Data_WriteByte(void)
 
 	MidiStatusRegister &= ~ACIA_SR_INTERRUPT_REQUEST;
 
-	if (!ConfigureParams.Midi.bEnableMidi)
+	if (!MidiRetroInterface)
 		return;
 
-	if (pMidiFhOut)
+	if (MidiRetroInterface->output_enabled())
 	{
-		int ret;
+		Uint64 deltaTime;
+		bool ret;
 
-		/* Write the character to the output file: */
-		ret = fputc(nTxDataByte, pMidiFhOut);
+		if (MidiWriteClockCounter == 0)
+			MidiWriteClockCounter = CyclesGlobalClockCounter;
 
-		/* If there was an error then stop the midi emulation */
-		if (ret == EOF)
-		{
-			LOG_TRACE(TRACE_MIDI, "MIDI: write error -> stop MIDI\n");
-			Midi_UnInit();
-			return;
-		}
+		deltaTime = (Uint64)((double)(CyclesGlobalClockCounter - MidiWriteClockCounter) /
+                      ((double)MachineClocks.CPU_Freq / 1000000.0) + 0.5);
+		if (deltaTime > 0xFFFFFFFF)
+			deltaTime = 0;
+
+		ret = MidiRetroInterface->write(nTxDataByte, (uint32_t)deltaTime);
+		if (!ret)
+			LOG_TRACE(TRACE_MIDI, "MIDI: write error (doesn't stop MIDI)\n");
+
+		MidiWriteClockCounter = CyclesGlobalClockCounter;
 	}
 
 	MidiStatusRegister &= ~ACIA_SR_TX_EMPTY;
@@ -208,7 +183,7 @@ void Midi_Data_WriteByte(void)
  */
 void Midi_InterruptHandler_Update(void)
 {
-	int nInChar;
+	Uint8 nInChar;
 
 	/* Remove this interrupt from list and re-order */
 	CycInt_AcknowledgeInterrupt();
@@ -232,10 +207,12 @@ void Midi_InterruptHandler_Update(void)
 	}
 
 	/* Read the bytes in, if we have any */
-	if (pMidiFhIn && File_InputAvailable(pMidiFhIn))
+	if (MidiRetroInterface && MidiRetroInterface->input_enabled())
 	{
-		nInChar = fgetc(pMidiFhIn);
-		if (nInChar != EOF)
+		bool ret;
+
+		ret = MidiRetroInterface->read(&nInChar);
+		if (ret)
 		{
 			LOG_TRACE(TRACE_MIDI, "MIDI: Read character -> $%x\n", nInChar);
 			/* Copy into our internal queue */
@@ -254,11 +231,13 @@ void Midi_InterruptHandler_Update(void)
 			MFP_GPIP &= ~0x10;
 		}
 		else
-		{
 			LOG_TRACE(TRACE_MIDI, "MIDI: read error (doesn't stop MIDI)\n");
-			clearerr(pMidiFhIn);
-		}
 	}
 
 	CycInt_AddRelativeInterrupt(2050, INT_CPU_CYCLE, INTERRUPT_MIDI);
+}
+
+void Midi_SetRetroInterface(struct retro_midi_interface *interface)
+{
+	MidiRetroInterface = interface;
 }
