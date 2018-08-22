@@ -191,10 +191,13 @@ int  GuiGetMouseState( int * x,int * y)
 
 void texture_uninit(void)
 {
-   if(sdlscrn->format)	
-      free(sdlscrn->format);	
-   if(sdlscrn)	
-      free(sdlscrn);	
+   if(sdlscrn)
+   {
+      if(sdlscrn->format)
+         free(sdlscrn->format);
+
+      free(sdlscrn);
+   }
 }
 
 SDL_Surface *prepare_texture(int w,int h,int b)
