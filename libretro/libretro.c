@@ -228,8 +228,6 @@ void retro_init(void)
 
 void retro_deinit(void)
 {	 
-   Emu_uninit(); 
-
    if(emuThread)
    {	 
       co_delete(emuThread);
@@ -342,6 +340,8 @@ bool retro_load_game(const struct retro_game_info *info)
 void retro_unload_game(void)
 {
    pauseg=0;
+
+   Emu_uninit();
 }
 
 unsigned retro_get_region(void)
