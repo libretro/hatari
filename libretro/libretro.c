@@ -18,6 +18,7 @@ extern int STATUTON,SHOWKEY,SHIFTON,pauseg,SND ,snd_sampler;
 extern short signed int SNDBUF[1024*2];
 extern char RPATH[512];
 extern char RETRO_DIR[512];
+extern struct retro_midi_interface *MidiRetroInterface;
 
 #include "cmdline.c"
 
@@ -222,6 +223,13 @@ void retro_init(void)
 	};
 	environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, &inputDescriptors);
 
+   static struct retro_midi_interface midi_interface;
+
+   if(environ_cb(RETRO_ENVIRONMENT_GET_MIDI_INTERFACE, &midi_interface))
+      MidiRetroInterface = &midi_interface;
+   else
+      MidiRetroInterface = NULL;
+
    Emu_init();
    texture_init();
 }
@@ -320,6 +328,9 @@ void retro_run(void)
    video_cb(bmp, width, height, retrow<< 1);
 
    co_switch(emuThread);
+
+   if (MidiRetroInterface && MidiRetroInterface->output_enabled())
+      MidiRetroInterface->flush();
 }
 
 bool retro_load_game(const struct retro_game_info *info)
