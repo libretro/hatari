@@ -30,11 +30,11 @@
 #define M3U_SPECIAL_COMMAND "#COMMAND:"
 
 #ifdef _WIN32
-#define PATH_JOIN_SEPARATOR   		"\\"
+#define PATH_SEPARATOR   		"\\"
 // Windows also support the unix path separator
-#define PATH_JOIN_SEPARATOR_ALT   	"/"
+#define PATH_SEPARATOR_ALT   	"/"
 #else
-#define PATH_JOIN_SEPARATOR   		"/"
+#define PATH_SEPARATOR   		"/"
 #endif
 
 // Note: This function returns a pointer to a substring_left of the original string.
@@ -108,12 +108,12 @@ char* dirname_int(char* filename)
 	char* right;
 	int len = strlen(filename);
 	
-	if ((right = strrchr(filename, PATH_JOIN_SEPARATOR[0])) != NULL)
+	if ((right = strrchr(filename, PATH_SEPARATOR[0])) != NULL)
 		return strleft(filename, len - strlen(right));
 	
 #ifdef _WIN32
 	// Alternative search for windows beceause it also support the UNIX seperator
-	if ((right = strrchr(filename, PATH_JOIN_SEPARATOR_ALT[0])) != NULL)
+	if ((right = strrchr(filename, PATH_SEPARATOR_ALT[0])) != NULL)
 		return strleft(filename, len - strlen(right));
 #endif
 	
@@ -122,24 +122,27 @@ char* dirname_int(char* filename)
 }
 
 // Verify if file exists
-int file_exist(char *filename)
+bool file_exists(const char *filename)
 {
-  struct stat buffer;   
-  return (stat(filename, &buffer) == 0);
+	struct stat buf;
+	if (stat(filename, &buf) == 0 &&
+	    (buf.st_mode & (S_IRUSR|S_IWUSR)) && !(buf.st_mode & S_IFDIR))
+	{
+		/* file points to user readable regular file */
+		return true;
+	}
+	return false;
 }
 
-char* path_join(char* basedir, char* filename)
+void path_join(char* out, const char* basedir, const char* filename)
 {
-	int len = strlen(basedir) + strlen(PATH_JOIN_SEPARATOR) + strlen(filename);
-	char* result = calloc(len + 1, sizeof(char));
-	sprintf(result, "%s%s%s", basedir, PATH_JOIN_SEPARATOR, filename);
-	return result;
+	snprintf(out, PATH_MAX_LEN, "%s%s%s", basedir, PATH_SEPARATOR, filename);
 }	
 
-char* m3u_search_file(char* basedir, char* dskName)
+char* m3u_search_file(const char* basedir, const char* dskName)
 {
 	// Verify if this item is an absolute pathname (or the file is in working dir)
-	if (file_exist(dskName))
+	if (file_exists(dskName))
 	{
 		// Copy and return
 		int len = strlen(dskName);
@@ -151,9 +154,12 @@ char* m3u_search_file(char* basedir, char* dskName)
 	// If basedir was provided
 	if(basedir != NULL)
 	{
+		// Join basedir and dskName
+		char* dskPath = calloc(PATH_MAX_LEN, sizeof(char));
+		path_join(dskPath, basedir, dskName);
+
 		// Verify if this item is a relative filename (append it to the m3u path)
-		char* dskPath = path_join(basedir, dskName);
-		if (file_exist(dskPath))
+		if (file_exists(dskPath))
 		{
 			// Return
 			return dskPath;

@@ -24,6 +24,7 @@ extern int STATUTON,SHOWKEY,SHIFTON,pauseg,SND ,snd_sampler;
 extern short signed int SNDBUF[1024*2];
 extern char RPATH[512];
 extern char RETRO_DIR[512];
+extern char RETRO_TOS[512];
 extern struct retro_midi_interface *MidiRetroInterface;
 
 #include "cmdline.c"
@@ -457,7 +458,16 @@ void retro_run(void)
 
 bool retro_load_game(const struct retro_game_info *info)
 {
-   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);
+   // Init
+   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);   
+   path_join(RETRO_TOS, RETRO_DIR, "tos.img");
+   
+   // Verify if tos.img is present
+   if(!file_exists(RETRO_TOS))
+   {
+	   log_cb(RETRO_LOG_ERROR, "TOS image '%s' not found. Content cannot be loaded\n", RETRO_TOS);
+	   return false;
+   }
 
    const char *full_path;
 

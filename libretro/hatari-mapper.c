@@ -5,15 +5,11 @@
 #include "joy.h"
 
 //CORE VAR
-#ifdef _WIN32
-char slash = '\\';
-#else
-char slash = '/';
-#endif
 extern const char *retro_save_directory;
 extern const char *retro_system_directory;
 extern const char *retro_content_directory;
 char RETRO_DIR[512];
+char RETRO_TOS[512];
 
 //HATARI PROTOTYPES
 #include "configuration.h"
@@ -252,27 +248,6 @@ SDL_Surface *prepare_texture(int w,int h,int b)
    //printf("fin prepare tex:%dx%dx%d\n",bitmp->w,bitmp->h,bitmp->format->BytesPerPixel);
    return bitmp;
 }      
-
-int LoadTosFromRetroSystemDir(void)
-{
-   char tmp_dir[256];
-
-   printf("Trying to TOS load from retro_system_directory\n");
-
-   sprintf(tmp_dir, "%s%c%s", RETRO_DIR, slash,"tos.img");
-
-   printf("%s ",tmp_dir );
-   if(File_Exists(tmp_dir)==true)
-   {
-      printf("exist\n");
-      sprintf(ConfigureParams.Rom.szTosImageFileName,"%s",tmp_dir);
-      if (Reset_Cold())
-         return -1;
-      return 0;
-   }
-   printf("not exist\n");
-   return -1;
-}
 
 void texture_init(void)
 {

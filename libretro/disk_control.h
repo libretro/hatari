@@ -21,8 +21,12 @@
 
 #include <stdbool.h>
 
-#define DC_MAX_SIZE 20
+//*****************************************************************************
+// File helpers functions
+#define PATH_MAX_LEN 512
 
+void path_join(char* out, const char* basedir, const char* filename);
+bool file_exists(const char *filename);
 
 //*****************************************************************************
 // String helpers functions
@@ -31,6 +35,8 @@ bool strendswith(const char* str, const char* end);
 
 //*****************************************************************************
 // Disk control structure and functions
+#define DC_MAX_SIZE 20
+
 struct dc_storage{
 	char* command;
 	char* files[DC_MAX_SIZE];
