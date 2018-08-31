@@ -4,6 +4,12 @@
 
 #include "STkeymap.h"
 
+#include "disk_control.h"
+static dc_storage* dc;
+
+// LOG
+retro_log_printf_t log_cb;
+
 cothread_t mainThread;
 cothread_t emuThread;
 
@@ -18,6 +24,7 @@ extern int STATUTON,SHOWKEY,SHIFTON,pauseg,SND ,snd_sampler;
 extern short signed int SNDBUF[1024*2];
 extern char RPATH[512];
 extern char RETRO_DIR[512];
+extern char RETRO_TOS[512];
 extern struct retro_midi_interface *MidiRetroInterface;
 
 #include "cmdline.c"
@@ -156,11 +163,118 @@ void retro_reset(void){
 
 }
 
+//*****************************************************************************
+//*****************************************************************************
+// Disk control
+extern bool Floppy_EjectDiskFromDrive(int Drive);
+extern const char* Floppy_SetDiskFileName(int Drive, const char *pszFileName, const char *pszZipPath);
+extern bool Floppy_InsertDiskIntoDrive(int Drive);
+
+static bool disk_set_eject_state(bool ejected)
+{
+	if (dc)
+	{
+		dc->eject_state = ejected;
+		
+		if(dc->eject_state)
+			return Floppy_EjectDiskFromDrive(0);
+		else
+			return Floppy_InsertDiskIntoDrive(0);			
+	}
+	
+	return true;
+}
+
+static bool disk_get_eject_state(void)
+{
+	if (dc)
+		return dc->eject_state;
+	
+	return true;
+}
+
+static unsigned disk_get_image_index(void)
+{
+	if (dc)
+		return dc->index;
+	
+	return 0;
+}
+
+static bool disk_set_image_index(unsigned index)
+{
+	// Insert disk
+	if (dc)
+	{
+		// Same disk...
+		// This can mess things in the emu
+		if(index == dc->index)
+			return true;
+		
+		if ((index < dc->count) && (dc->files[index]))
+		{
+			dc->index = index;
+			Floppy_SetDiskFileName(0, dc->files[index], NULL);
+			log_cb(RETRO_LOG_INFO, "Image set (%d): %s\n", index+1, dc->files[index]);
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+static unsigned disk_get_num_images(void)
+{
+	if (dc)
+		return dc->count;
+
+	return 0;
+}
+
+static bool disk_replace_image_index(unsigned index, const struct retro_game_info *info)
+{
+	// Not implemented
+	// No many infos on this in the libretro doc...
+	return false;
+}
+
+static bool disk_add_image_index(void)
+{
+	// Not implemented
+	// No many infos on this in the libretro doc...
+	return false;
+}
+
+static struct retro_disk_control_callback disk_interface = {
+   disk_set_eject_state,
+   disk_get_eject_state,
+   disk_get_image_index,
+   disk_set_image_index,
+   disk_get_num_images,
+   disk_replace_image_index,
+   disk_add_image_index,
+};
+
+//*****************************************************************************
+//*****************************************************************************
+// Init
+static void fallback_log(enum retro_log_level level, const char *fmt, ...)
+{
+}
+
 void retro_init(void)
 {    	
-   const char *system_dir = NULL;
+	struct retro_log_callback log;	
+	const char *system_dir = NULL;
+	dc = dc_create();
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) && system_dir)
+	// Init log
+	if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
+		log_cb = log.log;
+	else
+		log_cb = fallback_log;
+
+	if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) && system_dir)
    {
       // if defined, use the system directory			
       retro_system_directory=system_dir;		
@@ -230,8 +344,11 @@ void retro_init(void)
    else
       MidiRetroInterface = NULL;
 
-   Emu_init();
-   texture_init();
+ 	// Disk control interface
+	environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &disk_interface);
+
+	Emu_init();
+	texture_init();
 }
 
 void retro_deinit(void)
@@ -244,6 +361,10 @@ void retro_deinit(void)
       emuThread = 0;
    }
 
+	// Clean the m3u storage
+	if(dc)
+		dc_free(dc);
+   
    LOGI("Retro DeInit\n");
 }
 
@@ -266,7 +387,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #define GIT_VERSION ""
 #endif
    info->library_version  = "1.8" GIT_VERSION;
-   info->valid_extensions = "ST|MSA|ZIP|STX|DIM|IPF";
+   info->valid_extensions = "ST|MSA|ZIP|STX|DIM|IPF|M3U";
    info->need_fullpath    = true;
    info->block_extract = false;
 
@@ -333,9 +454,20 @@ void retro_run(void)
       MidiRetroInterface->flush();
 }
 
+#define M3U_FILE_EXT "m3u"
+
 bool retro_load_game(const struct retro_game_info *info)
 {
-   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);
+   // Init
+   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);   
+   path_join(RETRO_TOS, RETRO_DIR, "tos.img");
+   
+   // Verify if tos.img is present
+   if(!file_exists(RETRO_TOS))
+   {
+	   log_cb(RETRO_LOG_ERROR, "TOS image '%s' not found. Content cannot be loaded\n", RETRO_TOS);
+	   return false;
+   }
 
    const char *full_path;
 
@@ -343,7 +475,35 @@ bool retro_load_game(const struct retro_game_info *info)
 
    full_path = info->path;
 
-   strcpy(RPATH,full_path);
+	// If it's a m3u file
+	if(strendswith(full_path, M3U_FILE_EXT))
+	{
+		// Parse the m3u file
+		dc_parse_m3u(dc, full_path);
+
+		// Some debugging
+		log_cb(RETRO_LOG_INFO, "m3u file parsed, %d file(s) found\n", dc->count);
+		for(unsigned i = 0; i < dc->count; i++)
+		{
+			log_cb(RETRO_LOG_INFO, "file %d: %s\n", i+1, dc->files[i]);
+		}
+		
+		// Init first disk
+		dc->index = 0;
+		dc->eject_state = false;
+		strcpy(RPATH,dc->files[0]);
+	}
+	else
+	{
+		// Add the file to disk control context
+		// Maybe, in a later version of retroarch, we could add disk on the fly (didn't find how to do this)
+		dc_add_file(dc, full_path);
+
+		// Init first disk
+		dc->index = 0;
+		dc->eject_state = false;
+		strcpy(RPATH,dc->files[0]);
+	}
 
    co_switch(emuThread);
 

@@ -728,17 +728,7 @@ static void Main_Init(void)
 	{
 		/* If loading of the TOS failed, we bring up the GUI to let the
 		 * user choose another TOS ROM file. */
-#ifdef __LIBRETRO__
-//try to load from retro_system_directory
-// else load GUI
-		if(LoadTosFromRetroSystemDir()){
-			pauseg=1;
-			pause_select();
-		}
-#else
-			Dialog_DoProperty();
-#endif
-
+		Dialog_DoProperty();
 	}
 	if (!bTosImageLoaded || bQuitProgram)
 	{
@@ -899,6 +889,13 @@ int main(int argc, char *argv[])
 		return 1;
 #endif
 	}
+
+#ifdef __LIBRETRO__
+	// After initial configuration was loaded
+	// Set tos.img in retro_system_dir
+	snprintf(ConfigureParams.Rom.szTosImageFileName, FILENAME_MAX, "%s", RETRO_TOS);
+#endif
+
 	/* monitor type option might require "reset" -> true */
 	Configuration_Apply(true);
 
