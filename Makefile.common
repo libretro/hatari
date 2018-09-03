@@ -146,6 +146,8 @@ SOURCES_C += $(LIBRETRO_DIR)/libretro-sdk/libco/libco.c \
 				 $(LIBRETRO_DIR)/vkbd.c \
 				 $(LIBRETRO_DIR)/graph.c \
 				 $(LIBRETRO_DIR)/bmp.c \
-				 $(LIBRETRO_DIR)/disk_control.c
+				 $(LIBRETRO_DIR)/retro_strings.c \
+				 $(LIBRETRO_DIR)/retro_files.c \
+				 $(LIBRETRO_DIR)/retro_disk_control.c
 
 SOURCES_C += $(ZLIB_SRCS)

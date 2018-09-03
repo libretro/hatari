@@ -16,22 +16,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DISK_CONTROL_H__
-#define DISK_CONTROL_H__
+#ifndef RETRO_DISK_CONTROL_H__
+#define RETRO_DISK_CONTROL_H__
 
 #include <stdbool.h>
-
-//*****************************************************************************
-// File helpers functions
-#define PATH_MAX_LEN 512
-
-void path_join(char* out, const char* basedir, const char* filename);
-bool file_exists(const char *filename);
-
-//*****************************************************************************
-// String helpers functions
-bool strstartswith(const char* str, const char* start);
-bool strendswith(const char* str, const char* end);
 
 //*****************************************************************************
 // Disk control structure and functions
@@ -47,8 +35,8 @@ struct dc_storage{
 
 typedef struct dc_storage dc_storage;
 dc_storage* dc_create(void);
-void dc_parse_m3u(dc_storage* dc, char* m3u_file);
-bool dc_add_file(dc_storage* dc, char* filename);
+void dc_parse_m3u(dc_storage* dc, const char* m3u_file);
+bool dc_add_file(dc_storage* dc, const char* filename);
 void dc_free(dc_storage* dc);
 
 #endif
