@@ -4,7 +4,9 @@
 
 #include "STkeymap.h"
 
-#include "disk_control.h"
+#include "retro_strings.h"
+#include "retro_files.h"
+#include "retro_disk_control.h"
 static dc_storage* dc;
 
 // LOG
@@ -215,7 +217,7 @@ static bool disk_set_image_index(unsigned index)
 		{
 			dc->index = index;
 			Floppy_SetDiskFileName(0, dc->files[index], NULL);
-			log_cb(RETRO_LOG_INFO, "Image set (%d): %s\n", index+1, dc->files[index]);
+			log_cb(RETRO_LOG_INFO, "Disk (%d) inserted into drive A : %s\n", dc->index+1, dc->files[dc->index]);
 			return true;
 		}
 	}
@@ -486,26 +488,22 @@ bool retro_load_game(const struct retro_game_info *info)
 		for(unsigned i = 0; i < dc->count; i++)
 		{
 			log_cb(RETRO_LOG_INFO, "file %d: %s\n", i+1, dc->files[i]);
-		}
-		
-		// Init first disk
-		dc->index = 0;
-		dc->eject_state = false;
-		strcpy(RPATH,dc->files[0]);
+		}	
 	}
 	else
 	{
 		// Add the file to disk control context
 		// Maybe, in a later version of retroarch, we could add disk on the fly (didn't find how to do this)
 		dc_add_file(dc, full_path);
-
-		// Init first disk
-		dc->index = 0;
-		dc->eject_state = false;
-		strcpy(RPATH,dc->files[0]);
 	}
 
-   co_switch(emuThread);
+	// Init first disk
+	dc->index = 0;
+	dc->eject_state = false;
+	log_cb(RETRO_LOG_INFO, "Disk (%d) inserted into drive A : %s\n", dc->index+1, dc->files[dc->index]);
+	strcpy(RPATH,dc->files[0]);
+
+	co_switch(emuThread);
 
    return true;
 }
