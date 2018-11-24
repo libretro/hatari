@@ -26,10 +26,13 @@ ifneq ($(GIT_VERSION)," unknown")
 endif
 
 ifeq ($(platform), unix)
-	TARGET := $(TARGET_NAME)_libretro.so
+   TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
-   SHARED :=  -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
+   SHARED :=  -lm -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined -Wl,--as-needed
    PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD
+ifeq ($(ARCH), arm)
+   CFLAGS += -mno-unaligned-access
+endif
 else ifeq ($(platform), android)
    CC = arm-linux-androideabi-gcc
    AR = @arm-linux-androideabi-ar
@@ -147,17 +150,16 @@ else
 endif
 
 ifeq ($(DEBUG), 1)
-   CFLAGS += -O0 -g
+   CFLAGS := $(CFLAGS) -Og -g
 else
-   CFLAGS += -O3
+   CFLAGS := -funroll-loops -ffast-math -fomit-frame-pointer $(CFLAGS) -O3
 endif
+CFLAGS := -fsigned-char -D__LIBRETRO__ -fno-builtin $(CFLAGS)
 
-CFLAGS += \
-	-std=gnu99 -funroll-loops  -fsigned-char -D__LIBRETRO__ \
-	-Wno-strict-prototypes -ffast-math -fomit-frame-pointer -fno-builtin
-
-CXXFLAGS  += $(CFLAGS)
-CPPFLAGS  += $(CFLAGS)
+CFLAGS := $(fpic) $(CFLAGS) $(PLATFLAGS)
+CXXFLAGS := $(CFLAGS)
+CPPFLAGS := $(CFLAGS)
+CFLAGS := -std=gnu99 $(CFLAGS)
 
 EMU = $(CORE_DIR)/src
 CPU = $(EMU)/uae-cpu
@@ -180,12 +182,12 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING_LINK),1)
 	$(AR) rcs $@ $(OBJECTS) 
 else
-	$(CC) $(fpic) $(INCLUDES) -o $@ $(OBJECTS)  -lm -lz $(SHARED)
+	$(CC) $(CFLAGS) $(INCFLAGS) -lm -lz $(SHARED) $(LDFLAGS) $(OBJECTS) -o $@
 endif
 	@echo "** BUILD SUCCESSFUL! GG NO RE **"
 
 %.o: %.c
-	$(CC) $(fpic) $(CFLAGS) $(PLATFLAGS) $(INCFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCFLAGS) -c -o $@ $<
 
 clean:
 	rm -f $(OBJECTS) $(TARGET) 

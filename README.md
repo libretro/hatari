@@ -1,16 +1,18 @@
 # HATARI LIBRETRO
 
-Hatari is an Atari ST/STE/TT/Falcon emulator for Linux, FreeBSD, NetBSD,
-BeOS, Mac-OSX and other Systems which are supported by the SDL library.
-Unlike most other open source ST emulators which try to give you a good
-environment for running GEM applications, Hatari tries to emulate the hardware
-as close as possible so that it is able to run most of the old Atari games
-and demos.  Because of this, it may be somewhat slower than less accurate
-emulators.
+Hatari is an Atari ST/STE/TT/Falcon emulator for Linux, FreeBSD, NetBSD, BeOS, Mac-OSX and other Systems which are supported by the SDL library.
 
-The homepage of hatari : http://hatari.tuxfamily.org/index.html
+Unlike most other open source ST emulators which try to give you a good environment for running GEM applications, Hatari tries to emulate the hardware as close as possible so that it is able to run most of the old Atari games and demos.  Because of this, it may be somewhat slower than less accurate emulators.
 
-Based on https://hg.tuxfamily.org/mercurialroot/hatari/hatari
+Hatari homepage: http://hatari.tuxfamily.org/index.html
+Shallow fork of: https://hg.tuxfamily.org/mercurialroot/hatari/hatari
+
+## Building Hatari-libretro
+```
+git clone http://github.com/libretro/hatari
+cd hatari
+make -f Makefile.libretro EXTERNAL_ZLIB=1
+```
 
 ## The Atari ST
 

@@ -141,12 +141,11 @@ void Emu_init()
    memset(Key_Sate,0,512);
    memset(Key_Sate2,0,512);
 
-   if(!emuThread && !mainThread)
-   {
+   if(!emuThread)
       mainThread = co_active();
-      emuThread = co_create(65536*sizeof(void*), retro_wrap_emulator);
-   }
 
+   if(!emuThread)
+      emuThread = co_create(65536*sizeof(void*), retro_wrap_emulator);
 }
 
 void Emu_uninit()
@@ -358,15 +357,18 @@ void retro_deinit(void)
    Emu_uninit(); 
 
    if(emuThread)
-   {	 
+   {
       co_delete(emuThread);
       emuThread = 0;
    }
 
 	// Clean the m3u storage
 	if(dc)
+	{
 		dc_free(dc);
-   
+		dc = 0;
+	}
+
    LOGI("Retro DeInit\n");
 }
 
