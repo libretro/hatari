@@ -33,7 +33,7 @@ extern int Reset_Cold(void);
 #endif
 
 long frame=0;
-long  Ktime=0 , LastFPSTime=0;
+static unsigned long Ktime=0, LastFPSTime=0;
 
 //VIDEO
 extern SDL_Surface *sdlscrn; 
