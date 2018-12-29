@@ -181,7 +181,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING_LINK),1)
 	$(AR) rcs $@ $(OBJECTS) 
 else
-	$(CC) $(CFLAGS) $(INCFLAGS) -lm -lz $(SHARED) $(LDFLAGS) $(OBJECTS) -o $@
+	$(CC) $(CFLAGS) $(INCFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ $(SHARED)
 endif
 	@echo "** BUILD SUCCESSFUL! GG NO RE **"
 
