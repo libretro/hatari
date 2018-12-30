@@ -697,24 +697,10 @@ void input_gui(void)
       MOUSEMODE=-MOUSEMODE;
    }
 
+   if(slowdown>0)return;
+
    if(MOUSEMODE==1)
    {
-
-	  if(slowdown>0)return;
-
-#if 0
-      //TODO FIX THIS :(
-#if defined(__CELLOS_LV2__) 
-      //Slow Joypad Mouse Emulation for PS3
-      static int pair=-1;
-      pair=-pair;
-      if(pair==1)
-         return;
-      PAS=1;
-#elif defined(GEKKO) 
-      PAS=1;
-#endif
-#endif
 
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
          mouse_x += PAS;
@@ -728,7 +714,7 @@ void input_gui(void)
       mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
 
       PAS=SAVPAS;
-	  slowdown=1;
+	
    }
    else
    {
@@ -737,6 +723,8 @@ void input_gui(void)
       mouse_l    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
       mouse_r    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
    }
+
+   slowdown=1;
 
    static int mmbL = 0, mmbR = 0;
 

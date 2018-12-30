@@ -28,7 +28,7 @@ endif
 ifeq ($(platform), unix)
    TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
-   SHARED :=  -lm -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined -Wl,--as-needed
+   SHARED :=  -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined -Wl,--as-needed
    PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD
 ifeq ($(ARCH), arm)
    CFLAGS += -mno-unaligned-access
@@ -181,7 +181,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING_LINK),1)
 	$(AR) rcs $@ $(OBJECTS) 
 else
-	$(CC) $(CFLAGS) $(INCFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ $(SHARED)
+	$(CC) $(CFLAGS) $(INCFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ -lm -lz $(SHARED)
 endif
 	@echo "** BUILD SUCCESSFUL! GG NO RE **"
 
