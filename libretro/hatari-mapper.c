@@ -3,6 +3,8 @@
 #include "graph.h"
 #include "vkbd.h"
 #include "joy.h"
+#include "screen.h"
+#include "video.h"	/* FIXME: video.h is dependent on HBL_PALETTE_LINES from screen.h */
 
 //CORE VAR
 extern const char *retro_save_directory;
@@ -607,6 +609,14 @@ void update_input(void)
 
 
       for(i=4;i<9;i++)if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )MXjoy0 |= vbt[i]; // Joy press	
+
+      // Joy autofire
+      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B) )
+      {
+         MXjoy0 |= ATARIJOY_BITMASK_FIRE;
+         if ((nVBLs&0x7)<4)
+            MXjoy0 &= ~ATARIJOY_BITMASK_FIRE;
+      }
 
       mouse_x = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
       mouse_y = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
