@@ -70,7 +70,7 @@ void Resolution_Init(void)
 	}
 #else
 DesktopWidth = retrow;
-DesktopHeight =retroh;
+DesktopHeight = retroh;
 ConfigureParams.Screen.nMaxWidth = DesktopWidth;
 ConfigureParams.Screen.nMaxHeight = DesktopHeight;
 #endif
