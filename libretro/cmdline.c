@@ -12,6 +12,9 @@ int PARAMCOUNT=0;
 extern int  hmain(int argc, char *argv[]);
 void parse_cmdline( const char *argv );
 
+// Global variables
+extern bool hatari_borders;
+
 void Add_Option(const char* option)
 {
    static int first=0;
@@ -42,6 +45,10 @@ int pre_main(const char *argv)
    if(Only1Arg)
    {
       Add_Option("hatari");
+      Add_Option("--statusbar");
+      Add_Option("0");
+      Add_Option("--borders");
+      Add_Option(hatari_borders==true?"1":"0");
       Add_Option("--disk-a");
       Add_Option(RPATH/*ARGUV[0]*/);
    }

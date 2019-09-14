@@ -45,6 +45,18 @@ static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
 static retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
+static char buf[64][4096] = { 0 };
+
+unsigned int video_config = 0;
+#define HATARI_VIDEO_HIRES 	0x04
+#define HATARI_VIDEO_CROP 	0x08
+
+#define HATARI_VIDEO_OV_LO 	0x00
+#define HATARI_VIDEO_CR_LO 	HATARI_VIDEO_CROP
+#define HATARI_VIDEO_OV_HI 	HATARI_VIDEO_HIRES
+#define HATARI_VIDEO_CR_HI 	HATARI_VIDEO_HIRES|HATARI_VIDEO_CROP
+
+bool hatari_borders = true;
 
 static struct retro_input_descriptor input_descriptors[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
@@ -67,46 +79,124 @@ void retro_set_environment(retro_environment_t cb)
 {
    environ_cb = cb;
 
-   struct retro_variable variables[] = {
-      {
-         "Hatari_resolution",
-         "Internal resolution; 640x480|832x576|832x588|800x600|960x720|1024x768|1024x1024",
-
+   static struct retro_core_option_definition core_options[] =
+   {
+	   // Resolution
+       {
+         "hatari_video_hires",
+         "High resolution",
+         "Needs restart",
+         {
+            { "true", "enabled" },
+            { "false", "disabled" },
+            { NULL, NULL },
+         },
+         "yes"
       },
-      { NULL, NULL },
-   };
+      {
+         "hatari_video_crop_overscan",
+         "Crop overscan",
+         "Needs restart",
+         {
+            { "false", "disabled" },
+            { "true", "enabled" },
+            { NULL, NULL },
+         },
+         "false"
+      },  
 
-   cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
+      { NULL, NULL, NULL, {{0}}, NULL },
+	};
+
+   // Set options or variables
+   int i = 0;
+   int j = 0;
+   unsigned version = 0;
+   if (cb(RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION, &version) && (version == 1))
+      cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS, core_options);
+   else
+   {
+      // Fallback for older API
+      static struct retro_variable variables[64] = { 0 };
+      i = 0;
+      while(core_options[i].key)
+      {
+         buf[i][0] = 0;
+         variables[i].key = core_options[i].key;
+         strcpy(buf[i], core_options[i].desc);
+         strcat(buf[i], "; ");
+         strcat(buf[i], core_options[i].default_value);
+         j = 0;
+         while(core_options[i].values[j].value && j < RETRO_NUM_CORE_OPTION_VALUES_MAX)
+         {
+            strcat(buf[i], "|");
+            strcat(buf[i], core_options[i].values[j].value);
+            ++j;
+         };
+         variables[i].value = buf[i];
+         ++i;
+      };
+      variables[i].key = NULL;
+      variables[i].value = NULL;
+      cb( RETRO_ENVIRONMENT_SET_VARIABLES, variables);
+   }
 }
 
 
 static void update_variables(void)
 {
-   struct retro_variable var = {
-      .key = "Hatari_resolution",
-   };
+   struct retro_variable var = {0};
+
+   // Resolution
+   var.key = "hatari_video_hires";
+   var.value = NULL;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      char *pch;
-      char str[100];
-	  snprintf(str, sizeof(str), "%s", var.value);
-
-      pch = strtok(str, "x");
-      if (pch)
-         retrow = strtoul(pch, NULL, 0);
-      pch = strtok(NULL, "x");
-      if (pch)
-         retroh = strtoul(pch, NULL, 0);
-
-      fprintf(stderr, "[libretro-test]: Got size: %u x %u.\n", retrow, retroh);
-
-      CROP_WIDTH =retrow;
-      CROP_HEIGHT= (retroh-80);
-      VIRTUAL_WIDTH = retrow;
-      texture_init();
-      //reset_screen();
+	   if(strcmp(var.value, "true") == 0)
+		   video_config |= HATARI_VIDEO_HIRES;
    }
+
+   var.key = "hatari_video_crop_overscan";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	   if(strcmp(var.value, "true") == 0)
+		   video_config |= HATARI_VIDEO_CROP;
+   }
+
+   switch(video_config)
+   {
+		case HATARI_VIDEO_OV_LO:
+			retrow = 416;
+			retroh = 260;
+			hatari_borders = true;
+			break;
+		case HATARI_VIDEO_CR_LO:
+			retrow = 320;
+			retroh = 200;
+			// Strange, do not work if set to false...
+			hatari_borders = true;
+			break;
+		case HATARI_VIDEO_OV_HI:
+			retrow = 832;
+			retroh = 520;
+			hatari_borders = true;
+			break;
+		case HATARI_VIDEO_CR_HI:
+			retrow = 832;
+			retroh = 520;
+			hatari_borders = false;
+			break;
+   }
+
+   printf("Resolution %u x %u.\n", retrow, retroh);
+
+   CROP_WIDTH =retrow;
+   CROP_HEIGHT= (retroh-80);
+   VIRTUAL_WIDTH = retrow;
+   texture_init();
 }
 
 static void retro_wrap_emulator()
@@ -400,7 +490,7 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
-   struct retro_game_geometry geom = { retrow, retroh, 1024, 1024,4.0 / 3.0 };
+   struct retro_game_geometry geom = { retrow, retroh, 1024, 1024, 4.0 / 3.0 };
    struct retro_system_timing timing = { 50.0, 44100.0 };
 
    info->geometry = geom;
