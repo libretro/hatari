@@ -73,6 +73,7 @@ DesktopWidth = retrow;
 DesktopHeight =retroh;
 ConfigureParams.Screen.nMaxWidth = DesktopWidth;
 ConfigureParams.Screen.nMaxHeight = DesktopHeight;
+ConfigureParams.Screen.bShowStatusbar = FALSE;
 #endif
 	DEBUGPRINT(("Desktop resolution: %dx%d\n",DesktopWidth, DesktopHeight));
 	fprintf(stderr, "Configured max Hatari resolution = %dx%d, optimal for ST = %dx%d\n",
