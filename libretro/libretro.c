@@ -325,16 +325,39 @@ static unsigned disk_get_num_images(void)
 
 static bool disk_replace_image_index(unsigned index, const struct retro_game_info *info)
 {
-	// Not implemented
-	// No many infos on this in the libretro doc...
-	return false;
+	if (dc)
+	{
+		if (index >= dc->count)
+			return false;
+
+		if(dc->files[index])
+		{
+			free(dc->files[index]);
+			dc->files[index] = NULL;
+		}
+
+		// TODO : Handling removing of a disk image when info = NULL
+
+		if(info != NULL)
+			dc->files[index] = strdup(info->path);
+	}
+
+    return false;
 }
 
 static bool disk_add_image_index(void)
 {
-	// Not implemented
-	// No many infos on this in the libretro doc...
-	return false;
+	if (dc)
+	{
+		if(dc->count <= DC_MAX_SIZE)
+		{
+			dc->files[dc->count] = NULL;
+			dc->count++;
+			return true;
+		}
+	}
+
+    return false;
 }
 
 static struct retro_disk_control_callback disk_interface = {
