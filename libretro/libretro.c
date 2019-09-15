@@ -57,6 +57,7 @@ unsigned int video_config = 0;
 #define HATARI_VIDEO_CR_HI 	HATARI_VIDEO_HIRES|HATARI_VIDEO_CROP
 
 bool hatari_borders = true;
+char hatari_frameskips[2];
 
 static struct retro_input_descriptor input_descriptors[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
@@ -81,7 +82,7 @@ void retro_set_environment(retro_environment_t cb)
 
    static struct retro_core_option_definition core_options[] =
    {
-	   // Resolution
+	   // Video
        {
          "hatari_video_hires",
          "High resolution",
@@ -104,7 +105,23 @@ void retro_set_environment(retro_environment_t cb)
          },
          "false"
       },  
-
+      {
+         "hatari_frameskips",
+         "Frameskip",
+         "Needs restart",
+         {
+            { "0", "disabled" },
+            { "1", NULL },
+            { "2", NULL },
+            { "3", NULL },
+            { "4", NULL },
+            { "5", "auto (max 5)" },
+            { "10", "auto (max 10)" },
+            { NULL, NULL },
+         },
+         "0"
+      },
+	  
       { NULL, NULL, NULL, {{0}}, NULL },
 	};
 
@@ -147,7 +164,7 @@ static void update_variables(void)
 {
    struct retro_variable var = {0};
 
-   // Resolution
+   // Video
    var.key = "hatari_video_hires";
    var.value = NULL;
 
@@ -164,6 +181,14 @@ static void update_variables(void)
    {
 	   if(strcmp(var.value, "true") == 0)
 		   video_config |= HATARI_VIDEO_CROP;
+   }
+
+   var.key = "hatari_frameskips";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	   strncpy((char*)hatari_frameskips, var.value, 2);
    }
 
    switch(video_config)

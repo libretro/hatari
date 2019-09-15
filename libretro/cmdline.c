@@ -14,9 +14,11 @@ void parse_cmdline( const char *argv );
 
 // Global variables
 extern bool hatari_borders;
+extern char hatari_frameskips[2];
 
 void Add_Option(const char* option)
 {
+   printf("Option : %s\n", option);
    static int first=0;
 
    if(first==0)
@@ -49,6 +51,8 @@ int pre_main(const char *argv)
       Add_Option("0");
       Add_Option("--borders");
       Add_Option(hatari_borders==true?"1":"0");
+      Add_Option("--frameskips");
+      Add_Option(hatari_frameskips);
       Add_Option("--disk-a");
       Add_Option(RPATH/*ARGUV[0]*/);
    }
