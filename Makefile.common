@@ -29,7 +29,6 @@ $(CPU)/readcpu.c \
 $(CPU)/fpp.c
 
 SOURCES_C += $(GUI)/dlgAbout.c \
-$(GUI)/dlgAlert.c \
 $(GUI)/dlgDevice.c \
 $(GUI)/dlgFileSelect.c \
 $(GUI)/dlgFloppy.c \
@@ -141,13 +140,14 @@ $(EMU)/xbios.c \
 $(EMU)/ymFormat.c
 
 SOURCES_C += $(LIBRETRO_DIR)/libretro-sdk/libco/libco.c \
-				 $(LIBRETRO_DIR)/libretro.c \
-				 $(LIBRETRO_DIR)/hatari-mapper.c \
-				 $(LIBRETRO_DIR)/vkbd.c \
-				 $(LIBRETRO_DIR)/graph.c \
-				 $(LIBRETRO_DIR)/bmp.c \
-				 $(LIBRETRO_DIR)/retro_strings.c \
-				 $(LIBRETRO_DIR)/retro_files.c \
-				 $(LIBRETRO_DIR)/retro_disk_control.c
+$(LIBRETRO_DIR)/libretro.c \
+$(LIBRETRO_DIR)/hatari-mapper.c \
+$(LIBRETRO_DIR)/vkbd.c \
+$(LIBRETRO_DIR)/graph.c \
+$(LIBRETRO_DIR)/bmp.c \
+$(LIBRETRO_DIR)/retro_strings.c \
+$(LIBRETRO_DIR)/retro_files.c \
+$(LIBRETRO_DIR)/retro_disk_control.c \
+$(LIBRETRO_DIR)/stub/dlgAlert.c
 
 SOURCES_C += $(ZLIB_SRCS)
