@@ -79,6 +79,28 @@ else ifeq ($(platform), osx)
    SHARED := -dynamiclib
    PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD
 
+# ARM
+else ifneq (,$(findstring armv,$(platform)))
+   CC = gcc
+	TARGET := $(TARGET_NAME)_libretro.so
+   fpic := -fPIC -fsigned-char
+   SHARED :=  -lz -lpthread -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
+   PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD
+   CFLAGS += -marm
+ifneq (,$(findstring neon,$(platform)))
+   CFLAGS += -mfpu=neon
+   ASFLAGS += -mfpu=neon
+   HAVE_NEON = 1
+endif
+ifneq (,$(findstring softfloat,$(platform)))
+   CFLAGS += -mfloat-abi=softfp
+   ASFLAGS += -mfloat-abi=softfp
+else ifneq (,$(findstring hardfloat,$(platform)))
+   CFLAGS += -mfloat-abi=hard
+   ASFLAGS += -mfloat-abi=hard
+endif
+   CFLAGS += -DARM
+
 # iOS
 else ifneq (,$(findstring ios,$(platform)))
 
