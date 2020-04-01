@@ -174,6 +174,15 @@ else ifeq ($(platform), ps3)
    EXTERNAL_ZLIB = 1
 	STATIC_LINKING=1
 	STATIC_LINKING_LINK=1
+else ifeq ($(platform), vita)
+	TARGET := $(TARGET_NAME)_libretro_vita.a
+   CC = arm-vita-eabi-gcc
+   CXX = arm-vita-eabi-g++
+   AR = arm-vita-eabi-ar
+	CFLAGS += -DLSB_FIRST -DSDL_BYTEORDER=SDL_LIL_ENDIAN 
+   PLATFLAGS :=  -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int -DHAVE_STRTOUL -DVITA -I$(ZLIB_DIR) 
+	STATIC_LINKING=1
+	STATIC_LINKING_LINK=1
 else
    PLATFLAGS :=  -DLSB_FIRST -DALIGN_DWORD -DWIN32PORT -DWIN32
 	TARGET := $(TARGET_NAME)_libretro.dll
@@ -199,7 +208,6 @@ DBG = $(EMU)/debug
 FLP = $(EMU)
 GUI = $(LIBRETRO_DIR)/gui-retro
 CPU_PREGEN = $(LIBRETRO_DIR)/uae-cpu-pregen
-LIBCOOBJ = $(LIBRETRO_DIR)/utils/libco
 LIBUTILS = $(LIBRETRO_DIR)/utils
 
 include Makefile.common

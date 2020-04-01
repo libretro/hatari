@@ -48,7 +48,7 @@ Uint8 type;
 #define SDL_InitSubSystem(...) 1
 #define SDL_Init(...) 1
 //TIME
-#ifdef WIIU
+#if defined(WIIU) || defined(VITA)
 #define SDL_Delay(a) //we are awake
 #else
 #define SDL_Delay(a) usleep((a)*1000)

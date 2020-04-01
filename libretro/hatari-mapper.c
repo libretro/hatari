@@ -629,12 +629,24 @@ void update_input(void)
    }
    else
    {
+
       //Mouse mode
       fmousex=fmousey=0;
 
       //emulate mouse with joy analog right 
       ar[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X));
       ar[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y));
+
+#if defined(VITA)
+	// fix analog to mouse move up alone
+	int analog_deadzone = (15 * 32768 / 100);
+        double analog_r_magnitude = sqrt((ar[0]*ar[0]) + (ar[1]*ar[1]));
+               if (analog_r_magnitude <= analog_deadzone)
+               {
+                  ar[0] = 0;
+                  ar[1] = 0;
+               }
+#endif
 
       if(ar[0]<=-1024)
          fmousex -=(-ar[0])/1024;

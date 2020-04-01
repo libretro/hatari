@@ -219,7 +219,7 @@ static void update_variables(void)
 			break;
    }
 
-   printf("Resolution %u x %u.\n", retrow, retroh);
+   log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
 
    CROP_WIDTH =retrow;
    CROP_HEIGHT= (retroh-80);
@@ -229,8 +229,9 @@ static void update_variables(void)
 
 static void retro_wrap_emulator()
 {
+log_cb(RETRO_LOG_INFO, "WRAP EMU THD\n");
    pre_main(RPATH);
-
+log_cb(RETRO_LOG_INFO, "EXIT EMU THD\n");
    pauseg=-1;
 
    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, 0); 
@@ -241,7 +242,7 @@ static void retro_wrap_emulator()
    // Dead emulator, but libco says not to return
    while(true)
    {
-      LOGI("Running a dead emulator.");
+      log_cb(RETRO_LOG_INFO, "Running a dead emulator.");
       co_switch(mainThread);
    }
 }
@@ -254,17 +255,16 @@ void Emu_init()
    retroh=480;
    MOUSEMODE=1;
 #endif
-
-   update_variables();
-
    memset(Key_Sate,0,512);
    memset(Key_Sate2,0,512);
 
-   if(!emuThread)
+   if(!emuThread && !mainThread)
+   {
       mainThread = co_active();
-
-   if(!emuThread)
       emuThread = co_create(65536*sizeof(void*), retro_wrap_emulator);
+   }
+
+   update_variables();
 }
 
 void Emu_uninit()
@@ -274,7 +274,7 @@ void Emu_uninit()
 
 void retro_shutdown_hatari(void)
 {
-   printf("SHUTDOWN\n");
+   log_cb(RETRO_LOG_INFO, "SHUTDOWN\n");
    texture_uninit();
    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
 }
@@ -447,14 +447,14 @@ void retro_init(void)
    if(retro_system_directory==NULL)sprintf(RETRO_DIR, "%s\0",".");
    else sprintf(RETRO_DIR, "%s\0", retro_system_directory);
 
-   printf("Retro SYSTEM_DIRECTORY %s\n",retro_system_directory);
-   printf("Retro SAVE_DIRECTORY %s\n",retro_save_directory);
-   printf("Retro CONTENT_DIRECTORY %s\n",retro_content_directory);
+   log_cb(RETRO_LOG_INFO, "Retro SYSTEM_DIRECTORY %s\n",retro_system_directory);
+   log_cb(RETRO_LOG_INFO, "Retro SAVE_DIRECTORY %s\n",retro_save_directory);
+   log_cb(RETRO_LOG_INFO, "Retro CONTENT_DIRECTORY %s\n",retro_content_directory);
 
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
    {
-      fprintf(stderr, "RGB565 is not supported.\n");
+      log_cb(RETRO_LOG_INFO, stderr, "RGB565 is not supported.\n");
       exit(0);
    }
 
@@ -516,7 +516,7 @@ void retro_deinit(void)
 		dc = 0;
 	}
 
-   LOGI("Retro DeInit\n");
+   log_cb(RETRO_LOG_INFO, "Retro DeInit\n");
 }
 
 unsigned retro_api_version(void)
@@ -628,6 +628,8 @@ bool retro_load_game(const struct retro_game_info *info)
    (void)info;
 
    full_path = info->path;
+	
+	update_variables();
 
 	// If it's a m3u file
 	if(strendswith(full_path, M3U_FILE_EXT))
@@ -654,6 +656,8 @@ bool retro_load_game(const struct retro_game_info *info)
 	dc->eject_state = false;
 	log_cb(RETRO_LOG_INFO, "Disk (%d) inserted into drive A : %s\n", dc->index+1, dc->files[dc->index]);
 	strcpy(RPATH,dc->files[0]);
+
+	memset(SNDBUF,0,1024*2*2);
 
 	co_switch(emuThread);
 

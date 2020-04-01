@@ -38,7 +38,7 @@ int alphasort(const struct dirent **d1, const struct dirent **d2)
 
 #if !HAVE_SCANDIR
 
-#ifdef WIIU
+#if defined(WIIU) || defined(VITA)
 int scandir(const char *dirp, struct dirent ***namelist,
               int (*filter)(const struct dirent *),
               int (*compar)(const struct dirent **, const struct dirent **))

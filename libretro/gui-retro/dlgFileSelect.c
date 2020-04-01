@@ -21,6 +21,10 @@ const char DlgFileSelect_fileid[] = "Hatari dlgFileSelect.c : " __DATE__ " " __T
 
 #include "gui-retro.h"
 
+#ifdef VITA
+#include "retro_files.h"
+#endif
+
 #define SGFS_NUMENTRIES   16            /* How many entries are displayed at once */
 
 

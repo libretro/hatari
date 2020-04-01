@@ -35,6 +35,8 @@ extern void retro_shutdown_hatari(void);
 #define CONFDIR "sd:/retroarch/cores/system"
 #elif defined(GEKKO)
 #define CONFDIR "sd:/HOMEBREW/ST"
+#elif defined(VITA)
+#define CONFDIR "ux0:/data/retroarch/system"
 #else
 #define CONFDIR "."
 //#warning "conf dir for linux"

@@ -16,6 +16,13 @@ const char Paths_fileid[] = "Hatari paths.c : " __DATE__ " " __TIME__;
 #include "file.h"
 #include "paths.h"
 
+#if defined(VITA)
+#include <psp2/types.h>
+#include <psp2/io/dirent.h>
+#include <psp2/kernel/threadmgr.h>
+#define mkdir(name,mode) sceIoMkdir(name, 0777)
+#endif
+
 #if defined(WIN32) && !defined(mkdir)
 #define mkdir(name,mode) mkdir(name)
 #endif  /* WIN32 */
@@ -23,7 +30,7 @@ const char Paths_fileid[] = "Hatari paths.c : " __DATE__ " " __TIME__;
 #if defined(__MACOSX__)
 	#define HATARI_HOME_DIR "Library/Application Support/Hatari"
 #else
-#ifdef WIIU
+#if defined(WIIU) || defined(VITA)
 	#define HATARI_HOME_DIR "hatari"
 #else
 	#define HATARI_HOME_DIR ".hatari"
@@ -208,6 +215,21 @@ static void Paths_InitHomeDirs(void)
 
 	return;
 #endif
+
+#ifdef VITA
+	strcpy(sUserHomeDir, "ux0:/data/retroarch/system");
+	strcpy(sHatariHomeDir, "ux0:/data/retroarch/system/hatari");
+	if (!File_DirExists(sHatariHomeDir))
+	{
+		if (mkdir(sHatariHomeDir, 0755) != 0)
+		{
+			strcpy(sHatariHomeDir, sUserHomeDir);
+		}
+	}
+
+	return;
+#endif
+
 	psHome = getenv("HOME");
 	if (psHome)
 		strncpy(sUserHomeDir, psHome, FILENAME_MAX);
@@ -270,6 +292,11 @@ void Paths_Init(const char *argv0)
 #ifdef WIIU
 	strcpy(sWorkingDir, "sd:/retroarch/cores");
 	strcpy(sDataDir, "sd:/retroarch/cores/system");
+	Paths_InitHomeDirs();
+	return;
+#elif defined(VITA)
+	strcpy(sWorkingDir, "ux0:/data/retroarch/system");
+	strcpy(sDataDir, "ux0:/data/retroarch/system");
 	Paths_InitHomeDirs();
 	return;
 #else
