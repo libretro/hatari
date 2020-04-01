@@ -1,5 +1,5 @@
 INCFLAGS := -I$(EMU)  -I$(CPU)  -I$(FALCON) -I$(EMU)/includes -I$(DBG) -I$(FLP) \
-	-I$(LIBRETRO_DIR) -I$(LIBRETRO_DIR)/libretro-common/include -I$(LIBRETRO_DIR)/include -I$(LIBUTILS) -I$(CPU_PREGEN)
+	-I$(LIBRETRO_DIR) -I$(LIBRETRO_DIR)/libretro-sdkn/include -I$(LIBRETRO_DIR)/include -I$(LIBUTILS) -I$(CPU_PREGEN)
 
 ifeq ($(EXTERNAL_ZLIB), 1)
 ZLIB_SRCS	:= $(ZLIB_DIR)/adler32.c \
@@ -139,7 +139,7 @@ $(EMU)/wavFormat.c \
 $(EMU)/xbios.c \
 $(EMU)/ymFormat.c
 
-SOURCES_C += $(LIBRETRO_DIR)/libretro-common/libco/libco.c \
+SOURCES_C += $(LIBRETRO_DIR)/libretro-sdk/libco/libco.c \
 $(LIBRETRO_DIR)/libretro.c \
 $(LIBRETRO_DIR)/hatari-mapper.c \
 $(LIBRETRO_DIR)/vkbd.c \
