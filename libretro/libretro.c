@@ -57,6 +57,9 @@ unsigned int video_config = 0;
 #define HATARI_VIDEO_OV_HI 	HATARI_VIDEO_HIRES
 #define HATARI_VIDEO_CR_HI 	HATARI_VIDEO_HIRES|HATARI_VIDEO_CROP
 
+int CHANGE_RATE = 0, CHANGEAV_TIMING = 0;
+float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
+
 bool hatari_borders = true;
 char hatari_frameskips[2];
 int firstpass = 1;
@@ -547,7 +550,7 @@ void retro_get_system_info(struct retro_system_info *info)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    struct retro_game_geometry geom = { retrow, retroh, 1024, 1024, 4.0 / 3.0 };
-   struct retro_system_timing timing = { 50.0, 44100.0 };
+   struct retro_system_timing timing = { FRAMERATE, SAMPLERATE };
 
    info->geometry = geom;
    info->timing   = timing;
@@ -568,6 +571,16 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
    video_cb = cb;
 }
 
+void update_timing(void)
+{
+   struct retro_system_av_info system_av_info;
+   retro_get_system_av_info(&system_av_info);
+   system_av_info.timing.fps = FRAMERATE;
+   system_av_info.timing.sample_rate = SAMPLERATE;
+   environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &system_av_info);
+   snd_sampler = (int)SAMPLERATE / (int)FRAMERATE;
+}
+
 void retro_run(void)
 {
    int x;
@@ -578,6 +591,23 @@ void retro_run(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables();
+
+   if (CHANGE_RATE || CHANGEAV_TIMING)
+   {
+      if (CHANGEAV_TIMING)
+      {
+         update_timing();
+         CHANGEAV_TIMING = 0;
+         CHANGE_RATE = 0;
+      }
+	  
+      if (CHANGE_RATE)
+      {
+         update_timing();
+         CHANGEAV_TIMING = 0;
+         CHANGE_RATE = 0;
+      }	  
+   }
 
    if(pauseg==0)
    {

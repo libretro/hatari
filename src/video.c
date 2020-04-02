@@ -2579,6 +2579,10 @@ static void Video_SetHBLPaletteMaskPointers(void)
 	pHBLPalettes = &HBLPalettes[16*Line];       /* Next colour raster list x16 colours */
 }
 
+#ifdef __LIBRETRO__
+extern int CHANGEAV_TIMING;
+extern float FRAMERATE;
+#endif
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -2623,6 +2627,15 @@ static void Video_ResetShifterTimings(void)
 		nFirstVisibleHbl = FIRST_VISIBLE_HBL_60HZ;
 		nLastVisibleHbl = FIRST_VISIBLE_HBL_60HZ + NUM_VISIBLE_LINES;
 	}
+
+#ifdef __LIBRETRO__
+		float tmp=(float)nScreenRefreshRate;
+		if(tmp!=FRAMERATE)
+		{
+			FRAMERATE=(float)nScreenRefreshRate;
+			CHANGEAV_TIMING=1;
+		}
+#endif
 
 	if (bUseHighRes)
 	{

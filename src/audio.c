@@ -227,6 +227,10 @@ void Audio_Unlock(void)
 	SDL_UnlockAudio();
 }
 
+#ifdef __LIBRETRO__
+extern int CHANGE_RATE;
+extern float SAMPLERATE;
+#endif
 
 /*-----------------------------------------------------------------------*/
 /**
@@ -239,6 +243,15 @@ void Audio_SetOutputAudioFreq(int nNewFrequency)
 	{
 		/* Set new frequency */
 		nAudioFrequency = nNewFrequency;
+
+#ifdef __LIBRETRO__
+		float tmp=(float)nAudioFrequency;
+		if(tmp!=SAMPLERATE)
+		{
+			SAMPLERATE=(float)nAudioFrequency;
+			CHANGE_RATE=1;
+		}
+#endif
 
 		if (ConfigureParams.System.nMachineType == MACHINE_FALCON)
 		{
