@@ -457,7 +457,7 @@ void retro_init(void)
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
    {
-      log_cb(RETRO_LOG_INFO, stderr, "RGB565 is not supported.\n");
+      log_cb(RETRO_LOG_ERROR, "RGB565 is not supported.\n");
       exit(0);
    }
 
