@@ -199,7 +199,7 @@ CFLAGS := -fsigned-char -D__LIBRETRO__ -fno-builtin $(CFLAGS)
 CFLAGS := $(fpic) $(CFLAGS) $(PLATFLAGS)
 CXXFLAGS := $(CFLAGS)
 CPPFLAGS := $(CFLAGS)
-CFLAGS := -std=gnu99 $(CFLAGS)
+CFLAGS   := $(CFLAGS)
 
 EMU = $(CORE_DIR)/src
 CPU = $(EMU)/uae-cpu
