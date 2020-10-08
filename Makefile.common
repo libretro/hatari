@@ -1,3 +1,5 @@
+LIBRETRO_COMM_DIR := $(LIBRETRO_DIR)/libretro-common
+
 INCFLAGS := -I$(EMU) \
 				-I$(CPU) \
 				-I$(FALCON) \
@@ -5,7 +7,8 @@ INCFLAGS := -I$(EMU) \
 				-I$(DBG) \
 				-I$(FLP) \
 				-I$(LIBRETRO_DIR) \
-				-I$(LIBRETRO_DIR)/libretro-sdk/include \
+				-I$(LIBRETRO_COMM_DIR)/include \
+				-I$(LIBRETRO_COMM_DIR)/include/compat/zlib \
 				-I$(LIBRETRO_DIR)/include \
 				-I$(LIBUTILS) \
 				-I$(CPU_PREGEN)
@@ -14,21 +17,22 @@ SOURCES_C   :=
 SOURCES_CXX :=
 
 ifeq ($(EXTERNAL_ZLIB), 1)
-ZLIB_SRCS	:= $(ZLIB_DIR)/adler32.c \
-					$(ZLIB_DIR)/compress.c \
-					$(ZLIB_DIR)/crc32.c \
-					$(ZLIB_DIR)/deflate.c \
-					$(ZLIB_DIR)/gzclose.c \
-					$(ZLIB_DIR)/gzlib.c \
-					$(ZLIB_DIR)/gzread.c \
-					$(ZLIB_DIR)/gzwrite.c \
-					$(ZLIB_DIR)/infback.c \
-					$(ZLIB_DIR)/inffast.c \
-					$(ZLIB_DIR)/inflate.c \
-					$(ZLIB_DIR)/trees.c \
-					$(ZLIB_DIR)/inftrees.c \
-					$(ZLIB_DIR)/uncompr.c \
-					$(ZLIB_DIR)/zutil.c 
+SOURCES_C += \
+				 $(ZLIB_DIR)/adler32.c \
+				 $(ZLIB_DIR)/compress.c \
+				 $(ZLIB_DIR)/crc32.c \
+				 $(ZLIB_DIR)/deflate.c \
+				 $(ZLIB_DIR)/gzclose.c \
+				 $(ZLIB_DIR)/gzlib.c \
+				 $(ZLIB_DIR)/gzread.c \
+				 $(ZLIB_DIR)/gzwrite.c \
+				 $(ZLIB_DIR)/infback.c \
+				 $(ZLIB_DIR)/inffast.c \
+				 $(ZLIB_DIR)/inflate.c \
+				 $(ZLIB_DIR)/trees.c \
+				 $(ZLIB_DIR)/inftrees.c \
+				 $(ZLIB_DIR)/uncompr.c \
+				 $(ZLIB_DIR)/zutil.c 
 endif
 
 SOURCES_C += $(CPU_PREGEN)/cpudefs.c \
@@ -145,7 +149,7 @@ SOURCES_C += $(CPU_PREGEN)/cpudefs.c \
 				 $(EMU)/wavFormat.c \
 				 $(EMU)/xbios.c \
 				 $(EMU)/ymFormat.c \
-				 $(LIBRETRO_DIR)/libretro-sdk/libco/libco.c \
+				 $(LIBRETRO_COMM_DIR)/libco/libco.c \
 				 $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_DIR)/hatari-mapper.c \
 				 $(LIBRETRO_DIR)/vkbd.c \
