@@ -190,17 +190,21 @@ else
 	EXTERNAL_ZLIB = 1
 endif
 
-ifeq ($(DEBUG), 1)
-   CFLAGS := $(CFLAGS) -Og -g
-else
-   CFLAGS := -funroll-loops -ffast-math -fomit-frame-pointer $(CFLAGS) -O3
+ZLIB =
+ifneq ($(EXTERNAL_ZLIB), 1)
+ZLIB = -lz
 endif
-CFLAGS := -fsigned-char -D__LIBRETRO__ -fno-builtin $(CFLAGS)
 
-CFLAGS := $(fpic) $(CFLAGS) $(PLATFLAGS)
+ifeq ($(DEBUG), 1)
+CFLAGS += -Og -g
+else
+CFLAGS += -funroll-loops -ffast-math -fomit-frame-pointer -O3
+endif
+CFLAGS += -fsigned-char -D__LIBRETRO__ -fno-builtin
+
+CFLAGS   += $(fpic) $(PLATFLAGS)
 CXXFLAGS := $(CFLAGS)
 CPPFLAGS := $(CFLAGS)
-CFLAGS   := $(CFLAGS)
 
 EMU = $(CORE_DIR)/src
 CPU = $(EMU)/uae-cpu
@@ -221,7 +225,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING_LINK),1)
 	$(AR) rcs $@ $(OBJECTS) 
 else
-	$(CC) $(CFLAGS) $(INCFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ -lm -lz $(SHARED)
+	$(CC) $(CFLAGS) $(INCFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ -lm $(ZLIB) $(SHARED)
 endif
 
 %.o: %.c
