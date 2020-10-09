@@ -187,6 +187,7 @@ else
    PLATFLAGS :=  -DLSB_FIRST -DALIGN_DWORD -DWIN32PORT -DWIN32
 	TARGET := $(TARGET_NAME)_libretro.dll
    SHARED := -shared -static-libgcc -s -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined 
+	EXTERNAL_ZLIB = 1
 endif
 
 ifeq ($(DEBUG), 1)
