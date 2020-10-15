@@ -123,7 +123,7 @@ long GetTicks(void)
 } 
 
 #ifdef WIIU
-#include <os/time.h>
+#include <features/features_cpu.h>
 retro_time_t current_tus=0,last_tus=0;
 #endif
 int slowdown=0;
@@ -132,7 +132,7 @@ int slowdown=0;
 void gui_poll_events(void)
 {
 #ifdef WIIU
-  current_tus=OSGetSystemTime();
+  current_tus=cpu_features_get_time_usec();
   current_tus/=1000;
 
    if(current_tus - last_tus >= 1000/50)
