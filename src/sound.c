@@ -1496,7 +1496,7 @@ for (i = 0; i < nGeneratedSamples; i++)
 if (nGeneratedSamples >= len/2)
 {
 int remaining = len - nGeneratedSamples;
-memcpy(pBuffer, SNDBUF+(nGeneratedSamples-remaining)*4, remaining*4);
+memcpy(pBuffer, ((Uint8*)SNDBUF)+(nGeneratedSamples-remaining)*4, remaining*4);
 }
 CompleteSndBufIdx += nGeneratedSamples;
 nGeneratedSamples = 0;
