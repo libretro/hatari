@@ -1480,8 +1480,8 @@ static void Retro_Audio_CallBack(int len)
 	if (nGeneratedSamples >= len)
 	{
 		/* Enough samples available: Pass completed buffer to audio system
-		* by write samples into sound buffer and by converting them from
-		* 'signed' to 'unsigned' */
+		 * by write samples into sound buffer and by converting them from
+		 * 'signed' to 'unsigned' */
 		for (i = 0; i < len; i++)
 		{
 			*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][0];
@@ -1497,13 +1497,10 @@ static void Retro_Audio_CallBack(int len)
 			*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][0];
 			*pBuffer++ = MixBuffer[(CompleteSndBufIdx + i) % MIXBUFFER_SIZE][1];
 		}
-		/* If the buffer is filled more than 50%, mirror sample buffer to fake the
-		* missing samples */
-		if (nGeneratedSamples >= len/2)
-		{
-			int remaining = len - nGeneratedSamples;
-			memcpy(pBuffer, ((Uint8*)SNDBUF)+(nGeneratedSamples-remaining)*4, remaining*4);
-		}
+		/* Clear rest of the buffer to ensure we don't play random bytes instead */
+		/* of missing samples */
+		memset(pBuffer, 0, (len - nGeneratedSamples) * 4);
+
 		CompleteSndBufIdx += nGeneratedSamples;
 		nGeneratedSamples = 0;
 	}
