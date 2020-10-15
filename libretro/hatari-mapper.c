@@ -123,7 +123,7 @@ long GetTicks(void)
 } 
 
 #ifdef WIIU
-#include <wiiu/os/time.h>
+#include <os/time.h>
 retro_time_t current_tus=0,last_tus=0;
 #endif
 int slowdown=0;
