@@ -108,8 +108,8 @@ void retro_set_environment(retro_environment_t cb)
          "High resolution",
          "Needs restart",
          {
-            { "false", "disabled" },
             { "true", "enabled" },
+            { "false", "disabled" },
             { NULL, NULL },
          },
          "yes"
