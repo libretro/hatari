@@ -108,8 +108,8 @@ void retro_set_environment(retro_environment_t cb)
          "High resolution",
          "Needs restart",
          {
-            { "true", "enabled" },
             { "false", "disabled" },
+            { "true", "enabled" },
             { NULL, NULL },
          },
          "yes"
@@ -187,6 +187,7 @@ static void update_variables(void)
    // Video
    var.key = "hatari_video_hires";
    var.value = NULL;
+   video_config = 0;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -297,6 +298,7 @@ void retro_shutdown_hatari(void)
 }
 
 void retro_reset(void){
+   update_variables();
    Reset_Warm();
 }
 
