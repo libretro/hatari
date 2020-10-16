@@ -515,7 +515,7 @@ void update_input(void)
 
       virtual_kdb(bmp,vkx,vky);
 
-      i=RETRO_DEVICE_ID_JOYPAD_A;
+      i=RETRO_DEVICE_ID_JOYPAD_B;
       if(input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  && vkflag[4]==0)
          vkflag[4]=1;
       else if( !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  && vkflag[4]==1)
@@ -528,7 +528,6 @@ void update_input(void)
             NPAGE=-NPAGE;oldi=-1;
             //Clear interface zone
             Screen_SetFullUpdate();
-
          }
          else if(i==-1)
             oldi=-1;
@@ -638,8 +637,8 @@ void update_input(void)
       al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
 
 #if defined(VITA)
-	// fix analog to mouse move up alone
-	int analog_deadzone = (15 * 32768 / 100);
+    // fix analog to mouse move up alone
+    int analog_deadzone = (15 * 32768 / 100);
         double analog_r_magnitude = sqrt((al[0]*al[0]) + (al[1]*al[1]));
                if (analog_r_magnitude <= analog_deadzone)
                {
@@ -701,7 +700,7 @@ void update_input(void)
 
 void input_gui(void)
 {
-   int SAVPAS=PAS;	
+   int SAVPAS=PAS;
 
    input_poll_cb();
 
@@ -728,8 +727,8 @@ void input_gui(void)
       al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
 
 #if defined(VITA)
-	// fix analog to mouse move up alone
-	int analog_deadzone = (15 * 32768 / 100);
+    // fix analog to mouse move up alone
+    int analog_deadzone = (15 * 32768 / 100);
         double analog_r_magnitude = sqrt((al[0]*al[0]) + (al[1]*al[1]));
                if (analog_r_magnitude <= analog_deadzone)
                {
@@ -759,7 +758,6 @@ void input_gui(void)
       mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
 
       PAS=SAVPAS;
-	
    }
    else
    {
@@ -775,7 +773,7 @@ void input_gui(void)
 
    if(mmbL==0 && mouse_l)
    {
-      mmbL=1;		
+      mmbL=1;
       touch=1;
    }
    else if(mmbL==1 && !mouse_l)
@@ -785,7 +783,7 @@ void input_gui(void)
    }
 
    if(mmbR==0 && mouse_r)
-      mmbR=1;		
+      mmbR=1;
    else if(mmbR==1 && !mouse_r)
       mmbR=0;
 
@@ -799,6 +797,5 @@ void input_gui(void)
       gmy=0;
    if (gmy>retroh-1)
       gmy=retroh-1;
-
 }
 
