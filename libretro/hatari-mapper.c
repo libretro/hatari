@@ -58,7 +58,6 @@ int pauseg=0; //enter_gui
 
 //JOY
 int al[2];//left analog1
-int ar[2];//right analog1
 unsigned char MXjoy0; // joy
 int NUMjoy=1;
 
@@ -634,29 +633,29 @@ void update_input(void)
       //Mouse mode
       fmousex=fmousey=0;
 
-      //emulate mouse with joy analog right 
-      ar[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X));
-      ar[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y));
+      //emulate mouse with joy analog left
+      al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
+      al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
 
 #if defined(VITA)
 	// fix analog to mouse move up alone
 	int analog_deadzone = (15 * 32768 / 100);
-        double analog_r_magnitude = sqrt((ar[0]*ar[0]) + (ar[1]*ar[1]));
+        double analog_r_magnitude = sqrt((al[0]*al[0]) + (al[1]*al[1]));
                if (analog_r_magnitude <= analog_deadzone)
                {
-                  ar[0] = 0;
-                  ar[1] = 0;
+                  al[0] = 0;
+                  al[1] = 0;
                }
 #endif
 
-      if(ar[0]<=-1024)
-         fmousex -=(-ar[0])/1024;
-      if(ar[0]>= 1024)
-         fmousex +=( ar[0])/1024;
-      if(ar[1]<=-1024)
-         fmousey -=(-ar[1])/1024;
-      if(ar[1]>= 1024)
-         fmousey +=( ar[1])/1024;
+      if(al[0]<=-1024)
+         fmousex -=(-al[0])/1024;
+      if(al[0]>= 1024)
+         fmousex +=( al[0])/1024;
+      if(al[1]<=-1024)
+         fmousey -=(-al[1])/1024;
+      if(al[1]>= 1024)
+         fmousey +=( al[1])/1024;
 
       //emulate mouse with dpad
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
@@ -724,6 +723,29 @@ void input_gui(void)
 
    if(MOUSEMODE==1)
    {
+      //emulate mouse with joy analog left
+      al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
+      al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
+
+#if defined(VITA)
+	// fix analog to mouse move up alone
+	int analog_deadzone = (15 * 32768 / 100);
+        double analog_r_magnitude = sqrt((al[0]*al[0]) + (al[1]*al[1]));
+               if (analog_r_magnitude <= analog_deadzone)
+               {
+                  al[0] = 0;
+                  al[1] = 0;
+               }
+#endif
+
+      if(al[0]<=-1024)
+         mouse_x -=(-al[0])/1024;
+      if(al[0]>= 1024)
+         mouse_x +=( al[0])/1024;
+      if(al[1]<=-1024)
+         mouse_y -=(-al[1])/1024;
+      if(al[1]>= 1024)
+         mouse_y +=( al[1])/1024;
 
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
          mouse_x += PAS;

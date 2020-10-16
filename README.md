@@ -65,6 +65,9 @@ B   Fire / Left mouse button / Virtual keyboard keypress
 A   Auto-Fire / Right mouse button
 Y   Toggle Shift
 X   Hatari GUI
+
+Analog Left - Joystick / Mouse
+Mouse - Mouse
 ```
 
 ## Knows Bugs
