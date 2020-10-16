@@ -283,7 +283,7 @@ void retro_shutdown_hatari(void)
 }
 
 void retro_reset(void){
-
+   Reset_Warm();
 }
 
 //*****************************************************************************
