@@ -65,6 +65,8 @@ int NUMjoy=1;
 int touch=-1; // gui mouse btn
 int fmousex,fmousey; // emu mouse
 extern int gmx,gmy; //gui mouse
+int point_x_last = -1;
+int point_y_last = -1;
 
 //KEYBOARD
 char Key_Sate[512];
@@ -98,7 +100,7 @@ long GetTicks(void)
 
    //#warning "GetTick PS3\n"
 
-   unsigned long	ticks_micro;
+   unsigned long        ticks_micro;
    uint64_t secs;
    uint64_t nsecs;
 
@@ -146,9 +148,9 @@ void gui_poll_events(void)
 
    if(Ktime - LastFPSTime >= 1000/50)
    { 
-	  slowdown=0;
+      slowdown=0;
       frame++; 
-      LastFPSTime = Ktime;		
+      LastFPSTime = Ktime;
       co_switch(mainThread);
    }
 #endif
@@ -157,7 +159,7 @@ void gui_poll_events(void)
 //save bkg for screenshot
 void save_bkg(void)
 {
-   int i, j, k;	
+   int i, j, k; 
    unsigned char *ptr;
 
    k = 0;
@@ -295,7 +297,7 @@ void Print_Statut(void)
    {
       DrawFBoxBmp(bmp,CROP_WIDTH-6*BOXDEC-6-16,CROP_HEIGHT-0,16,16,RGB565(0,7,0));//led A drive
       Draw_text(bmp,CROP_WIDTH-6*BOXDEC-6-16,CROP_HEIGHT-0,0xffff,0x0,1,2,40," A");
-   }	
+   }    
 
    if(LEDB)
    {
@@ -335,37 +337,29 @@ void Process_key(void)
          if( Key_Sate[i] && Key_Sate2[i]==0 )
          {
             if(SHIFTON == 1)
-               retro_key_up(	SDLKeyToSTScanCode[i] );					
+               retro_key_up(   SDLKeyToSTScanCode[i] );
             else if(SHIFTON == -1) 
-               retro_key_down(SDLKeyToSTScanCode[i] );
-
+               retro_key_down( SDLKeyToSTScanCode[i] );
             SHIFTON=-SHIFTON;
-
             Key_Sate2[i]=1;
-
          }
          else if ( !Key_Sate[i] && Key_Sate2[i]==1 )Key_Sate2[i]=0;
-
       }
       else
       {
          if(Key_Sate[i] && SDLKeyToSTScanCode[i]!=-1  && Key_Sate2[i]==0)
          {
-            retro_key_down(	SDLKeyToSTScanCode[i] );
+            retro_key_down( SDLKeyToSTScanCode[i] );
             Key_Sate2[i]=1;
          }
          else if ( !Key_Sate[i] && SDLKeyToSTScanCode[i]!=-1 && Key_Sate2[i]==1 )
          {
-            retro_key_up( SDLKeyToSTScanCode[i] );
+            retro_key_up(   SDLKeyToSTScanCode[i] );
             Key_Sate2[i]=0;
-
          }
-
       }
    }
-
 }
-
 
 /*
    L2  show/hide Status
@@ -377,7 +371,7 @@ void Process_key(void)
    B   fire/mouse-left/valid key in vkbd
    A   mouse-right
    Y   switch Shift ON/OFF
-   X   Emu Gui
+   X   Hatari Gui
    */
 
 void update_input(void)
@@ -636,16 +630,9 @@ void update_input(void)
       al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
       al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
 
-#if defined(VITA)
-    // fix analog to mouse move up alone
-    int analog_deadzone = (15 * 32768 / 100);
-        double analog_r_magnitude = sqrt((al[0]*al[0]) + (al[1]*al[1]));
-               if (analog_r_magnitude <= analog_deadzone)
-               {
-                  al[0] = 0;
-                  al[1] = 0;
-               }
-#endif
+      int deadzone = 0x8000 / 16;
+      if (abs(al[0]) < deadzone) al[0] = 0;
+      if (abs(al[1]) < deadzone) al[1] = 0;
 
       if(al[0]<=-1024)
          fmousex -=(-al[0])/1024;
@@ -700,8 +687,6 @@ void update_input(void)
 
 void input_gui(void)
 {
-   int SAVPAS=PAS;
-
    input_poll_cb();
 
    int mouse_l;
@@ -709,86 +694,75 @@ void input_gui(void)
    int16_t mouse_x,mouse_y;
    mouse_x=mouse_y=0;
 
-   //mouse/joy toggle
-   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, 2) && mbt[2]==0 )
-      mbt[2]=1;
-   else if ( mbt[2]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, 2) )
-   {
-      mbt[2]=0;
-      MOUSEMODE=-MOUSEMODE;
-   }
-
    if(slowdown>0)return;
 
-   if(MOUSEMODE==1)
+   //emulate mouse with joy analog left
+   al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
+   al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
+
+   int deadzone = 0x8000 / 16;
+   if (abs(al[0]) < deadzone) al[0] = 0;
+   if (abs(al[1]) < deadzone) al[1] = 0;
+
+   if(al[0]<=-1024)
+      mouse_x -=(-al[0])/1024;
+   if(al[0]>= 1024)
+      mouse_x +=( al[0])/1024;
+   if(al[1]<=-1024)
+      mouse_y -=(-al[1])/1024;
+   if(al[1]>= 1024)
+      mouse_y +=( al[1])/1024;
+
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
+      mouse_x += PAS;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
+      mouse_x -= PAS;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
+      mouse_y += PAS;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
+      mouse_y -= PAS;
+   mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+   mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
+
+   // joystick mouse control is relative
+   gmx+=mouse_x;
+   gmy+=mouse_y;
+
+   // pointer mouse control is absolute, and overrides joystick when you move it
+   int point_x = input_state_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
+   int point_y = input_state_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
+   int point_b = input_state_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_PRESSED);
+   if (point_x != point_x_last || point_y != point_y_last)
    {
-      //emulate mouse with joy analog left
-      al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
-      al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
-
-#if defined(VITA)
-    // fix analog to mouse move up alone
-    int analog_deadzone = (15 * 32768 / 100);
-        double analog_r_magnitude = sqrt((al[0]*al[0]) + (al[1]*al[1]));
-               if (analog_r_magnitude <= analog_deadzone)
-               {
-                  al[0] = 0;
-                  al[1] = 0;
-               }
-#endif
-
-      if(al[0]<=-1024)
-         mouse_x -=(-al[0])/1024;
-      if(al[0]>= 1024)
-         mouse_x +=( al[0])/1024;
-      if(al[1]<=-1024)
-         mouse_y -=(-al[1])/1024;
-      if(al[1]>= 1024)
-         mouse_y +=( al[1])/1024;
-
-      if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
-         mouse_x += PAS;
-      if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
-         mouse_x -= PAS;
-      if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
-         mouse_y += PAS;
-      if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
-         mouse_y -= PAS;
-      mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
-      mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
-
-      PAS=SAVPAS;
-   }
-   else
-   {
-      mouse_x = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
-      mouse_y = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
-      mouse_l    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
-      mouse_r    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
+      point_x_last = point_x;
+      point_y_last = point_y;
+      const int PMIN = -0x7FFF;
+      const int PMAX = 0x7FFF;
+      gmx = ((point_x - PMIN) * retrow) / (PMAX - PMIN);
+      gmy = ((point_y - PMIN) * retroh) / (PMAX - PMIN);
    }
 
    slowdown=1;
 
    static int mmbL = 0, mmbR = 0;
 
-   if(mmbL==0 && mouse_l)
+   if(mmbL==0 && (mouse_l || point_b))
    {
       mmbL=1;
       touch=1;
    }
-   else if(mmbL==1 && !mouse_l)
+   else if(mmbL==1 && (!mouse_l && !point_b))
    {
       mmbL=0;
       touch=-1;
    }
 
+   // POINTER doesn't have a right button, but Hatari GUI doesn't need it
    if(mmbR==0 && mouse_r)
       mmbR=1;
    else if(mmbR==1 && !mouse_r)
       mmbR=0;
 
-   gmx+=mouse_x;
-   gmy+=mouse_y;
    if (gmx<0)
       gmx=0;
    if (gmx>retrow-1)
@@ -798,4 +772,3 @@ void input_gui(void)
    if (gmy>retroh-1)
       gmy=retroh-1;
 }
-
