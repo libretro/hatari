@@ -55,16 +55,19 @@ Note : zip support is provided by RetroArch and is done before passing the game 
 ## Default Controls
 
 ```
-L2  Show/Hide statut
-R2  Sound on/off
-L   Toggle Num Joy .
+L2  Show/Hide status
+R2  Select virtual keyboard page
+L   Show/hide virtual keyboard
 R   Change Mouse speed 1 to 6 . (for gui and emu)
-SEL Toggle Mouse/Joy mode .
-STR Show/Hide vkbd . 
-A   Fire/Mouse btn A / Valid key in vkbd
-B   Mouse btn B
-X    
-Y   HATARI GUI
+SEL Toggle Mouse/Joy mode
+STR Toggle joystick number
+B   Fire / Left mouse button / Virtual keyboard keypress
+A   Auto-Fire / Right mouse button
+Y   Toggle Shift
+X   Hatari GUI
+
+Analog Left - Joystick / Mouse
+Mouse - Mouse
 ```
 
 ## Knows Bugs
