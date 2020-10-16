@@ -392,7 +392,7 @@ void update_input(void)
    Process_key();
 
    i=RETRO_DEVICE_ID_JOYPAD_X;
-   if (Key_Sate[RETROK_F11] || input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   if (Key_Sate[RETROK_TILDE] || Key_Sate[RETROK_BACKQUOTE] || input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
       pauseg=1;
 
    i=RETRO_DEVICE_ID_JOYPAD_L;//show vkey toggle

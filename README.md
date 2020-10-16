@@ -68,6 +68,7 @@ X   Hatari GUI
 
 Analog Left - Joystick / Mouse
 Mouse - Mouse
+~ key - Hatari GUI
 ```
 
 ## Knows Bugs
