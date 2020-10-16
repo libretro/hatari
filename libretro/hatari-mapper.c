@@ -369,24 +369,21 @@ void Process_key(void)
 
 
 /*
-   L2  show/hide Statut
+   L2  show/hide Status
    R2  swap kbd pages
    L   show/hide vkbd
    R   MOUSE SPEED(gui/emu)
    SEL toggle mouse/joy mode
    STR toggle num joy 
-   A   fire/mousea/valid key in vkbd
-   B   mouseb
-   X   switch Shift ON/OFF
-   Y   Emu Gui
+   B   fire/mouse-left/valid key in vkbd
+   A   mouse-right
+   Y   switch Shift ON/OFF
+   X   Emu Gui
    */
 
 void update_input(void)
 {
    int i;
-   //   RETRO        B    Y    SLT  STA  UP   DWN  LEFT RGT  A    X    L    R    L2   R2   L3   R3
-   //   INDEX        0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
-   static int vbt[16]={0x1C,0x39,0x01,0x3B,0x01,0x02,0x04,0x08,0x80,0x6D,0x15,0x31,0x24,0x1F,0x6E,0x6F};
    static int oldi=-1;
    static int vkx=0,vky=0;
 
@@ -401,10 +398,11 @@ void update_input(void)
 
    Process_key();
 
-   if (Key_Sate[RETROK_F11] || input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y) )
+   i=RETRO_DEVICE_ID_JOYPAD_X;
+   if (Key_Sate[RETROK_F11] || input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
       pauseg=1;
 
-   i=10;//show vkey toggle
+   i=RETRO_DEVICE_ID_JOYPAD_L;//show vkey toggle
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -414,7 +412,7 @@ void update_input(void)
       Screen_SetFullUpdate();
    }
 
-   i=2;//mouse/joy toggle
+   i=RETRO_DEVICE_ID_JOYPAD_SELECT;//mouse/joy toggle
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -423,7 +421,7 @@ void update_input(void)
       MOUSEMODE=-MOUSEMODE;
    }
 
-   i=3;//num joy toggle
+   i=RETRO_DEVICE_ID_JOYPAD_START;//num joy toggle
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -433,7 +431,7 @@ void update_input(void)
       NUMjoy=-NUMjoy;
    }
 
-   i=11;//mouse gui speed
+   i=RETRO_DEVICE_ID_JOYPAD_R;//mouse gui speed
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -442,7 +440,7 @@ void update_input(void)
       PAS++;if(PAS>MAXPAS)PAS=1;
    }
 
-   i=9;//switch shift On/Off 
+   i=RETRO_DEVICE_ID_JOYPAD_Y;//switch shift On/Off 
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -452,7 +450,7 @@ void update_input(void)
       Screen_SetFullUpdate();
    }
 
-   i=12;//show/hide statut
+   i=RETRO_DEVICE_ID_JOYPAD_L2;//show/hide status
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -462,7 +460,7 @@ void update_input(void)
       Screen_SetFullUpdate();
    }
 
-   i=13;//swap kbd pages
+   i=RETRO_DEVICE_ID_JOYPAD_R2;//swap kbd pages
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -477,7 +475,7 @@ void update_input(void)
 
    if(SHOWKEY==1)
    {
-      static int vkflag[5]={0,0,0,0,0};		
+      static int vkflag[5]={0,0,0,0,0};
 
       if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP) && vkflag[0]==0 )
          vkflag[0]=1;
@@ -518,8 +516,8 @@ void update_input(void)
 
       virtual_kdb(bmp,vkx,vky);
 
-      i=8;
-      if(input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  && vkflag[4]==0) 	
+      i=RETRO_DEVICE_ID_JOYPAD_A;
+      if(input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  && vkflag[4]==0)
          vkflag[4]=1;
       else if( !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  && vkflag[4]==1)
       {
@@ -529,7 +527,7 @@ void update_input(void)
          if(i==-2)
          {
             NPAGE=-NPAGE;oldi=-1;
-            //Clear interface zone					
+            //Clear interface zone
             Screen_SetFullUpdate();
 
          }
@@ -544,7 +542,7 @@ void update_input(void)
          }
          else if(i==-4)
          {
-            //VKbd show/hide 			
+            //VKbd show/hide
             oldi=-1;
             Screen_SetFullUpdate();
             SHOWKEY=-SHOWKEY;
@@ -607,11 +605,14 @@ void update_input(void)
       else if (al[0] >= JOYRANGE_RIGHT_VALUE)
          MXjoy0 |= ATARIJOY_BITMASK_RIGHT;
 
-
-      for(i=4;i<9;i++)if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )MXjoy0 |= vbt[i]; // Joy press	
+      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP   ) ) MXjoy0 |= ATARIJOY_BITMASK_UP;
+      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN ) ) MXjoy0 |= ATARIJOY_BITMASK_DOWN;
+      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT ) ) MXjoy0 |= ATARIJOY_BITMASK_LEFT;
+      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT) ) MXjoy0 |= ATARIJOY_BITMASK_RIGHT;
+      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)     ) MXjoy0 |= ATARIJOY_BITMASK_FIRE;
 
       // Joy autofire
-      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B) )
+      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A) )
       {
          MXjoy0 |= ATARIJOY_BITMASK_FIRE;
          if ((nVBLs&0x7)<4)
@@ -667,8 +668,8 @@ void update_input(void)
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
          fmousey -= PAS;
 
-      mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
-      mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+      mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+      mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
    }
 
    if(mbL==0 && mouse_l)
@@ -732,8 +733,8 @@ void input_gui(void)
          mouse_y += PAS;
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
          mouse_y -= PAS;
-      mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
-      mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+      mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+      mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
 
       PAS=SAVPAS;
 	
