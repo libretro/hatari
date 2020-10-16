@@ -1533,10 +1533,16 @@ Retro_Audio_CallBack(CurrentSamplesNb*4);
 	CurrentSamplesNb = 0;					/* VBL is complete, reset counter for next VBL */
 
 	/*Compute a fractional equivalent of SamplesPerFrame for the next VBL, to avoid rounding propagation */
-	SamplesPerFrame_unrounded += (yms64) ClocksTimings_GetSamplesPerVBL ( ConfigureParams.System.nMachineType ,
-			nScreenRefreshRate , nAudioFrequency );
-	SamplesPerFrame = SamplesPerFrame_unrounded >> 28;		/* use integer part */
-	SamplesPerFrame_unrounded &= 0x0fffffff;			/* keep fractional part in the lower 28 bits */
+	//SamplesPerFrame_unrounded += (yms64) ClocksTimings_GetSamplesPerVBL ( ConfigureParams.System.nMachineType ,
+	//		nScreenRefreshRate , nAudioFrequency );
+	//SamplesPerFrame = SamplesPerFrame_unrounded >> 28;		/* use integer part */
+	//SamplesPerFrame_unrounded &= 0x0fffffff;			/* keep fractional part in the lower 28 bits */
+
+	// Hatari's audio system seems to be able to deal with a variable number of samples per frame, keeping aligned with the Atari's not-quite-50/60 Hz,
+	// but our RetroArch interface does not seem to be able to handle it (pads with 0 to fill the rest, creating a constant buzz).
+	// Forcing it to generate all samples every frame:
+	SamplesPerFrame = nAudioFrequency / nScreenRefreshRate;
+	SamplesPerFrame_unrounded = 0;
 
 	/* Reset sound buffer if needed (after pause, fast forward, slow system, ...) */
 	if ( Sound_BufferIndexNeedReset )
