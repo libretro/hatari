@@ -13,6 +13,7 @@ extern int  hmain(int argc, char *argv[]);
 void parse_cmdline( const char *argv );
 
 // Global variables
+extern bool hatari_fastfdc;
 extern bool hatari_borders;
 extern char hatari_frameskips[2];
 
@@ -49,6 +50,8 @@ int pre_main(const char *argv)
       Add_Option("hatari");
       Add_Option("--statusbar");
       Add_Option("0");
+      Add_Option("--fastfdc");
+      Add_Option(hatari_fastfdc==true?"1":"0");
       Add_Option("--borders");
       Add_Option(hatari_borders==true?"1":"0");
       Add_Option("--frameskips");

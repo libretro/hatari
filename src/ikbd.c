@@ -1383,8 +1383,8 @@ static void IKBD_SendRelMousePacket(void)
 }
 
 #ifdef __LIBRETRO__
-//FIXME ADD MXjoy1
 extern unsigned char MXjoy0;
+extern unsigned char MXjoy1;
 extern int NUMjoy;
 #endif
 
@@ -1409,7 +1409,7 @@ if(NUMjoy<0){
 	        || (bBothMouseAndJoy && KeyboardProcessor.MouseMode==AUTOMODE_MOUSEREL))
 		KeyboardProcessor.Joy.JoyData[0] = 
 #ifdef __LIBRETRO__
-			MXjoy0;
+			MXjoy1;
 #else
 			Joy_GetStickData(0);
 #endif

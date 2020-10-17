@@ -60,6 +60,7 @@ unsigned int video_config = 0;
 int CHANGE_RATE = 0, CHANGEAV_TIMING = 0;
 float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 
+bool hatari_fastfdc = true;
 bool hatari_borders = true;
 char hatari_frameskips[2];
 int firstpass = 1;
@@ -72,15 +73,28 @@ static struct retro_input_descriptor input_descriptors[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo Fire" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Fire" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "Enter GUI" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Shift toggle" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Mouse mode toggle" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Keyboard overlay" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Toggle status display" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "Joystick number" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "Hatari Settings" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Shift keyboard toggle" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Joystick/Mouse toggle" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Joystick 2 toggle" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "Virtual keyboard" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Mouse speed" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Status display" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "Virtual keyboard page" },
+   { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Joystick/Mouse X" },
+   { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Joystick/Mouse Y" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo Fire" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Fire" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Joystick 2 toggle" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Status display" },
+   { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Joystick X" },
+   { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Joystick Y" },
    // Terminate
-   { 255, 255, 255, 255, NULL }
+   { 0 }
 };
 
 void retro_set_environment(retro_environment_t cb)
@@ -89,7 +103,19 @@ void retro_set_environment(retro_environment_t cb)
 
    static struct retro_core_option_definition core_options[] =
    {
-	   // Video
+       // Floppy speed
+       {
+         "hatari_fastfdc",
+         "Fast floppy access",
+         "Decreases the time spent loading from disk",
+         {
+           { "true", "enabled" },
+           { "false", "disabled" },
+           { NULL, NULL },
+         },
+         "true"
+       },
+       // Video
        {
          "hatari_video_hires",
          "High resolution",
@@ -99,7 +125,7 @@ void retro_set_environment(retro_environment_t cb)
             { "false", "disabled" },
             { NULL, NULL },
          },
-         "yes"
+         "true"
       },
       {
          "hatari_video_crop_overscan",
@@ -166,19 +192,35 @@ void retro_set_environment(retro_environment_t cb)
    }
 }
 
-
 static void update_variables(void)
 {
    struct retro_variable var = {0};
 
-   // Video
-   var.key = "hatari_video_hires";
+   // Floppy
+   var.key = "hatari_fastfdc";
    var.value = NULL;
+   bool new_hatari_fastfdc = false;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   if(strcmp(var.value, "true") == 0)
-		   video_config |= HATARI_VIDEO_HIRES;
+      if(strcmp(var.value, "true") == 0)
+         new_hatari_fastfdc = true;
+   }
+   if (new_hatari_fastfdc != hatari_fastfdc) // switch immediately
+   {
+      hatari_fastfdc = new_hatari_fastfdc;
+      ConfigureParams.DiskImage.FastFloppy = hatari_fastfdc;
+   }
+
+   // Video
+   var.key = "hatari_video_hires";
+   var.value = NULL;
+   int new_video_config = 0;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if(strcmp(var.value, "true") == 0)
+         new_video_config |= HATARI_VIDEO_HIRES;
    }
 
    var.key = "hatari_video_crop_overscan";
@@ -186,8 +228,8 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   if(strcmp(var.value, "true") == 0)
-		   video_config |= HATARI_VIDEO_CROP;
+      if(strcmp(var.value, "true") == 0)
+         new_video_config |= HATARI_VIDEO_CROP;
    }
 
    var.key = "hatari_frameskips";
@@ -195,40 +237,44 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   strncpy((char*)hatari_frameskips, var.value, 2);
+      strncpy((char*)hatari_frameskips, var.value, 2);
    }
 
-   switch(video_config)
+   if (new_video_config != video_config)
    {
-		case HATARI_VIDEO_OV_LO:
-			retrow = 416;
-			retroh = 260;
-			hatari_borders = true;
-			break;
-		case HATARI_VIDEO_CR_LO:
-			retrow = 320;
-			retroh = 200;
-			// Strange, do not work if set to false...
-			hatari_borders = true;
-			break;
-		case HATARI_VIDEO_OV_HI:
-			retrow = 832;
-			retroh = 520;
-			hatari_borders = true;
-			break;
-		case HATARI_VIDEO_CR_HI:
-			retrow = 832;
-			retroh = 520;
-			hatari_borders = false;
-			break;
+      video_config = new_video_config;
+      switch(video_config)
+      {
+         case HATARI_VIDEO_OV_LO:
+            retrow = 416;
+            retroh = 260;
+            hatari_borders = true;
+            break;
+         case HATARI_VIDEO_CR_LO:
+            retrow = 320;
+            retroh = 200;
+            // Strange, do not work if set to false...
+            hatari_borders = true;
+            break;
+         case HATARI_VIDEO_OV_HI:
+            retrow = 832;
+            retroh = 520;
+            hatari_borders = true;
+            break;
+         case HATARI_VIDEO_CR_HI:
+            retrow = 832;
+            retroh = 520;
+            hatari_borders = false;
+            break;
+      }
+
+      log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
+
+      CROP_WIDTH =retrow;
+      CROP_HEIGHT= (retroh-80);
+      VIRTUAL_WIDTH = retrow;
+      texture_init();
    }
-
-   log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
-
-   CROP_WIDTH =retrow;
-   CROP_HEIGHT= (retroh-80);
-   VIRTUAL_WIDTH = retrow;
-   texture_init();
 }
 
 static void retro_wrap_emulator()
@@ -284,6 +330,7 @@ void retro_shutdown_hatari(void)
 }
 
 void retro_reset(void){
+   update_variables();
    Reset_Warm();
 }
 
@@ -462,27 +509,7 @@ void retro_init(void)
       exit(0);
    }
 
-	struct retro_input_descriptor inputDescriptors[] = {
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "A" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "B" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "X" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Y" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Select" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Start" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "R" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "L" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "R2" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "L2" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "R3" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3, "L3" },
-		// Terminate
-		{ 0 }
-	};
-	environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, &inputDescriptors);
+	environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);
 
    static struct retro_midi_interface midi_interface;
 
@@ -644,7 +671,7 @@ void retro_run(void)
 bool retro_load_game(const struct retro_game_info *info)
 {
    // Init
-   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);   
+   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);
    path_join(RETRO_TOS, RETRO_DIR, "tos.img");
    
    // Verify if tos.img is present

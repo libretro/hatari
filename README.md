@@ -55,21 +55,36 @@ Note : zip support is provided by RetroArch and is done before passing the game 
 ## Default Controls
 
 ```
-L2  Show/Hide status
-R2  Select virtual keyboard page
-L   Show/hide virtual keyboard
-R   Change Mouse speed 1 to 6 . (for gui and emu)
-SEL Toggle Mouse/Joy mode
-STR Toggle joystick number
+Port 1:
+
 B   Fire / Left mouse button / Virtual keyboard keypress
 A   Auto-Fire / Right mouse button
-Y   Toggle Shift
+Y   Toggle virtual keyboard shift
 X   Hatari GUI
+SEL Toggle Joystick / Mouse mode
+STR Toggle 2 joysticks mode
+L   Show/hide virtual keyboard
+R   Change Mouse speed 1 to 6 . (for gui and emu)
+L2  Show/Hide status
+R2  Select virtual keyboard page
+Pad / Analog Left - Joystick / Mouse
 
-Analog Left - Joystick / Mouse
-Mouse - Mouse
+Port 2:
+
+B   Fire
+A   Auto-Fire
+STR Toggle 2 joysticks mode
+L2  Show/Hide status
+Pad / Analog Left - Joystick
+
+Other:
+
+Mouse - Mouse (when port 1 is not in Joystick mode)
+Key ~/` - Hatari GUI
+Keyboard - Atari ST keys
+Scroll Lock - (RetroArch default hotkey) game focus mode disables keyboard shortcuts, captures mouse
+F11 - (RetroArch default hotkey) capture/release mouse
 ```
 
 ## Knows Bugs
-- HATARI GUI is not functionnal because of a mouse bug (too much speed). Usually you don't need to enter the GUI. It was fixed in the P-UAE core with the same GUI, so a patch will be done for this core.
-- It's a debug release, so expect bug.
+- It's a debug release, so expect bug?
