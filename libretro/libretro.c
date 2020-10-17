@@ -107,7 +107,7 @@ void retro_set_environment(retro_environment_t cb)
        {
          "hatari_fastfdc",
          "Fast floppy access",
-         "Needs restart",
+         "Decreases the time spent loading from disk",
          {
            { "true", "enabled" },
            { "false", "disabled" },
@@ -192,7 +192,6 @@ void retro_set_environment(retro_environment_t cb)
    }
 }
 
-
 static void update_variables(void)
 {
    struct retro_variable var = {0};
@@ -200,23 +199,28 @@ static void update_variables(void)
    // Floppy
    var.key = "hatari_fastfdc";
    var.value = NULL;
-   hatari_fastfdc = false;
+   bool new_hatari_fastfdc = false;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if(strcmp(var.value, "true") == 0)
-         hatari_fastfdc = true;
+         new_hatari_fastfdc = true;
+   }
+   if (new_hatari_fastfdc != hatari_fastfdc) // switch immediately
+   {
+      hatari_fastfdc = new_hatari_fastfdc;
+      ConfigureParams.DiskImage.FastFloppy = hatari_fastfdc;
    }
 
    // Video
    var.key = "hatari_video_hires";
    var.value = NULL;
-   video_config = 0;
+   int new_video_config = 0;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   if(strcmp(var.value, "true") == 0)
-		   video_config |= HATARI_VIDEO_HIRES;
+      if(strcmp(var.value, "true") == 0)
+         new_video_config |= HATARI_VIDEO_HIRES;
    }
 
    var.key = "hatari_video_crop_overscan";
@@ -224,8 +228,8 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   if(strcmp(var.value, "true") == 0)
-		   video_config |= HATARI_VIDEO_CROP;
+      if(strcmp(var.value, "true") == 0)
+         new_video_config |= HATARI_VIDEO_CROP;
    }
 
    var.key = "hatari_frameskips";
@@ -233,40 +237,44 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   strncpy((char*)hatari_frameskips, var.value, 2);
+      strncpy((char*)hatari_frameskips, var.value, 2);
    }
 
-   switch(video_config)
+   if (new_video_config != video_config)
    {
-		case HATARI_VIDEO_OV_LO:
-			retrow = 416;
-			retroh = 260;
-			hatari_borders = true;
-			break;
-		case HATARI_VIDEO_CR_LO:
-			retrow = 320;
-			retroh = 200;
-			// Strange, do not work if set to false...
-			hatari_borders = true;
-			break;
-		case HATARI_VIDEO_OV_HI:
-			retrow = 832;
-			retroh = 520;
-			hatari_borders = true;
-			break;
-		case HATARI_VIDEO_CR_HI:
-			retrow = 832;
-			retroh = 520;
-			hatari_borders = false;
-			break;
+      video_config = new_video_config;
+      switch(video_config)
+      {
+         case HATARI_VIDEO_OV_LO:
+            retrow = 416;
+            retroh = 260;
+            hatari_borders = true;
+            break;
+         case HATARI_VIDEO_CR_LO:
+            retrow = 320;
+            retroh = 200;
+            // Strange, do not work if set to false...
+            hatari_borders = true;
+            break;
+         case HATARI_VIDEO_OV_HI:
+            retrow = 832;
+            retroh = 520;
+            hatari_borders = true;
+            break;
+         case HATARI_VIDEO_CR_HI:
+            retrow = 832;
+            retroh = 520;
+            hatari_borders = false;
+            break;
+      }
+
+      log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
+
+      CROP_WIDTH =retrow;
+      CROP_HEIGHT= (retroh-80);
+      VIRTUAL_WIDTH = retrow;
+      texture_init();
    }
-
-   log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
-
-   CROP_WIDTH =retrow;
-   CROP_HEIGHT= (retroh-80);
-   VIRTUAL_WIDTH = retrow;
-   texture_init();
 }
 
 static void retro_wrap_emulator()
