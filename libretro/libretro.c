@@ -60,6 +60,7 @@ unsigned int video_config = 0;
 int CHANGE_RATE = 0, CHANGEAV_TIMING = 0;
 float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 
+bool hatari_fastfdc = true;
 bool hatari_borders = true;
 char hatari_frameskips[2];
 int firstpass = 1;
@@ -102,7 +103,19 @@ void retro_set_environment(retro_environment_t cb)
 
    static struct retro_core_option_definition core_options[] =
    {
-	   // Video
+       // Floppy speed
+       {
+         "hatari_fastfdc",
+         "Fast floppy access",
+         "Needs restart",
+         {
+           { "true", "enabled" },
+           { "false", "disabled" },
+           { NULL, NULL },
+         },
+         "true"
+       },
+       // Video
        {
          "hatari_video_hires",
          "High resolution",
@@ -112,7 +125,7 @@ void retro_set_environment(retro_environment_t cb)
             { "false", "disabled" },
             { NULL, NULL },
          },
-         "yes"
+         "true"
       },
       {
          "hatari_video_crop_overscan",
@@ -183,6 +196,17 @@ void retro_set_environment(retro_environment_t cb)
 static void update_variables(void)
 {
    struct retro_variable var = {0};
+
+   // Floppy
+   var.key = "hatari_fastfdc";
+   var.value = NULL;
+   hatari_fastfdc = false;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if(strcmp(var.value, "true") == 0)
+         hatari_fastfdc = true;
+   }
 
    // Video
    var.key = "hatari_video_hires";
