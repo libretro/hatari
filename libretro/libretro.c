@@ -60,6 +60,7 @@ unsigned int video_config = 0;
 int CHANGE_RATE = 0, CHANGEAV_TIMING = 0;
 float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 
+extern bool UseNonPolarizedLowPassFilter;
 bool hatari_fastfdc = true;
 bool hatari_borders = true;
 char hatari_frameskips[2];
@@ -114,6 +115,18 @@ void retro_set_environment(retro_environment_t cb)
            { NULL, NULL },
          },
          "true"
+       },
+       // Audio
+       {
+         "hatari_polarized_filter",
+         "Polarized audio filter",
+         "Uses hatari's polarized lowpass filters on audio to simulate distortion",
+         {
+           { "false", "disabled" },
+           { "true", "enabled" },
+           { NULL, NULL },
+         },
+         "false"
        },
        // Video
        {
@@ -210,6 +223,16 @@ static void update_variables(void)
    {
       hatari_fastfdc = new_hatari_fastfdc;
       ConfigureParams.DiskImage.FastFloppy = hatari_fastfdc;
+   }
+
+   // Audio
+   var.key = "hatari_polarized_filter";
+   var.value = NULL;
+   UseNonPolarizedLowPassFilter = true;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if(strcmp(var.value, "true") == 0)
+         UseNonPolarizedLowPassFilter = false;
    }
 
    // Video
