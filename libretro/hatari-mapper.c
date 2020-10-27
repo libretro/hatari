@@ -133,7 +133,10 @@ bool hatari_mapper_serialize(char* data, char version)
 bool hatari_mapper_unserialize(const char* data, char version)
 {
 	serialize_forward = false;
-	return hatari_mapper_serialize_bidi((char*)data, version);
+	int pauseg_old = pauseg;
+	bool result = hatari_mapper_serialize_bidi((char*)data, version);
+	if (pauseg_old) pauseg = pauseg_old; // because of the co-thread implementation there's really no way to save-state out of the GUI, so: stay paused
+	return result;
 }
 
 // input state
