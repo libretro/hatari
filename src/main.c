@@ -330,7 +330,13 @@ return;
 //	FrameDuration_micro = (Sint64) ( 1000000.0 / nScreenRefreshRate + 0.5 );	/* round to closest integer */
 	FrameDuration_micro = ClocksTimings_GetVBLDuration_micro ( ConfigureParams.System.nMachineType , nScreenRefreshRate );
 	FrameDuration_micro *= nVBLSlowdown;
+#ifdef __LIBRETRO__
+	/* Libretro is responsible for synchronizing the timing, allowing it to drive fast-forward, etc. Every time this point
+	   is reached, we must assume we're ready for exactly the next frame. */
+	CurrentTicks = DestTicks;
+#else
 	CurrentTicks = Time_GetTicks();
+#endif
 
 	if (DestTicks == 0)			/* on first call, init DestTicks */
 	{

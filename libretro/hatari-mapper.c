@@ -124,37 +124,15 @@ long GetTicks(void)
 
 } 
 
-#ifdef WIIU
-#include <features/features_cpu.h>
-retro_time_t current_tus=0,last_tus=0;
-#endif
 int slowdown=0;
 
 //NO SURE FIND BETTER WAY TO COME BACK IN MAIN THREAD IN HATARI GUI
 void gui_poll_events(void)
 {
-#ifdef WIIU
-  current_tus=cpu_features_get_time_usec();
-  current_tus/=1000;
-
-   if(current_tus - last_tus >= 1000/50)
-   { 
-      slowdown=0;
-      frame++; 
-      last_tus = current_tus;		
-      co_switch(mainThread);
-   }
-#else
-   Ktime = GetTicks();
-
-   if(Ktime - LastFPSTime >= 1000/50)
-   { 
-      slowdown=0;
-      frame++; 
-      LastFPSTime = Ktime;
-      co_switch(mainThread);
-   }
-#endif
+   slowdown=0;
+   frame++; 
+   LastFPSTime = Ktime;
+   co_switch(mainThread);
 }
 
 //save bkg for screenshot
