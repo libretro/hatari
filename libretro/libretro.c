@@ -763,9 +763,13 @@ const char RETRO_SAVE_VERSION = 1;
 char* retro_save_buffer = NULL;
 int retro_save_pos = 0;
 int retro_save_size = 0;
-int retro_save_head = 16; // bytes reserved for libretro header/state
+int retro_save_head = 1; // bytes reserved for libretro header/state
 int retro_save_max = 0;
 int retro_save_error = 0;
+
+extern int hatari_mapper_serialize_size();
+extern bool hatari_mapper_serialize(char* data, char version);
+extern bool hatari_mapper_unserialize(const char* data, char version);
 
 size_t retro_serialize_size(void)
 {
@@ -775,11 +779,13 @@ size_t retro_serialize_size(void)
 bool retro_serialize(void *data_, size_t size)
 {
 	retro_save_max = size;
+	retro_save_head = hatari_mapper_serialize_size() + 1;
 	if (size < retro_save_head) return false;
 	retro_save_buffer = data_;
 	memset(retro_save_buffer, 0, size);
 	retro_save_buffer[0] = RETRO_SAVE_VERSION;
-	retro_save_error = 0;
+	retro_save_error = hatari_mapper_serialize(data_+1, retro_save_buffer[0]) ? 0 : 1;
+	retro_save_size = retro_save_head;
 	MemorySnapShot_Capture("", false);
 	return retro_save_error == 0;
 }
@@ -787,10 +793,11 @@ bool retro_serialize(void *data_, size_t size)
 bool retro_unserialize(const void *data_, size_t size)
 {
 	retro_save_max = size;
+	retro_save_head = hatari_mapper_serialize_size() + 1;
 	if (size < retro_save_head) return false;
 	retro_save_buffer = (void*)data_; // discarding const
 	if (retro_save_buffer[0] != RETRO_SAVE_VERSION) return false; // unknown version
-	retro_save_error = 0;
+	retro_save_error = hatari_mapper_unserialize(data_+1, retro_save_buffer[0]) ? 0 : 1;
 	retro_save_size = size;
 	MemorySnapShot_Restore("", false);
 	return retro_save_error == 0;
