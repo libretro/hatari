@@ -64,7 +64,6 @@ extern bool UseNonPolarizedLowPassFilter;
 bool hatari_fastfdc = true;
 bool hatari_borders = true;
 char hatari_frameskips[2];
-int firstpass = 1;
 char savestate_fname[RETRO_PATH_MAX];
 
 static struct retro_input_descriptor input_descriptors[] = {
@@ -684,9 +683,6 @@ void retro_run(void)
 
    if (MidiRetroInterface && MidiRetroInterface->output_enabled())
       MidiRetroInterface->flush();
-  
-   if (firstpass)
-      firstpass=0;
 }
 
 #define M3U_FILE_EXT "m3u"
@@ -763,64 +759,41 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info, 
    return false;
 }
 
+const char RETRO_SAVE_VERSION = 1;
+char* retro_save_buffer = NULL;
+int retro_save_pos = 0;
+int retro_save_size = 0;
+int retro_save_head = 16; // bytes reserved for libretro header/state
+int retro_save_max = 0;
+int retro_save_error = 0;
+
 size_t retro_serialize_size(void)
 {
-   if (firstpass != 1)
-   {
-      snprintf(savestate_fname, sizeof(savestate_fname), "%s%shatari_tempsave.uss", retro_save_directory, RETRO_PATH_SEPARATOR);
-      MemorySnapShot_Capture(savestate_fname, false);
-	  FILE *file = fopen(savestate_fname, "rb");
-	  if (file)
-	  {
-		 size_t size = 0;
-		 fseek(file, 0L, SEEK_END);
-		 size = ftell(file);
-		 fclose(file);
-		 return size;
-	  }
-   }
-   return 0;
+	return 10 * 1024 * 1024; // Hatari uncompressed savestates seem to be about 6MB
 }
 
 bool retro_serialize(void *data_, size_t size)
 {
-   if (firstpass != 1)
-   {
-      snprintf(savestate_fname, sizeof(savestate_fname), "%s%shatari_tempsave.uss", retro_save_directory, RETRO_PATH_SEPARATOR);
-      MemorySnapShot_Capture(savestate_fname, false);
-	  FILE *file = fopen(savestate_fname, "rb");
-	  if (file)
-	  {
-		 if (fread(data_, size, 1, file) == 1)
-		 {
-		    fclose(file);
-		    return true;
-		 }
-		 fclose(file);
-	  }
-   }
-   return false;
+	retro_save_max = size;
+	if (size < retro_save_head) return false;
+	retro_save_buffer = data_;
+	memset(retro_save_buffer, 0, size);
+	retro_save_buffer[0] = RETRO_SAVE_VERSION;
+	retro_save_error = 0;
+	MemorySnapShot_Capture("", false);
+	return retro_save_error == 0;
 }
 
 bool retro_unserialize(const void *data_, size_t size)
 {
-   if (firstpass != 1)
-   {
-      snprintf(savestate_fname, sizeof(savestate_fname), "%s%shatari_tempsave.uss", retro_save_directory, RETRO_PATH_SEPARATOR);
-      FILE *file = fopen(savestate_fname, "wb");
-      if (file)
-      {
-         if (fwrite(data_, size, 1, file) == 1)
-         {
-            fclose(file);
-            MemorySnapShot_Restore(savestate_fname, false);
-            return true;
-         }
-         else
-            fclose(file);
-      }
-   }
-   return false;
+	retro_save_max = size;
+	if (size < retro_save_head) return false;
+	retro_save_buffer = (void*)data_; // discarding const
+	if (retro_save_buffer[0] != RETRO_SAVE_VERSION) return false; // unknown version
+	retro_save_error = 0;
+	retro_save_size = size;
+	MemorySnapShot_Restore("", false);
+	return retro_save_error == 0;
 }
 
 void *retro_get_memory_data(unsigned id)
