@@ -466,7 +466,7 @@ void update_input(void)
    Process_key();
 
    i=RETRO_DEVICE_ID_JOYPAD_START;// Hatari GUI
-   if (Key_Sate[RETROK_TILDE] || Key_Sate[RETROK_BACKQUOTE] || input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
    {
       pauseg=1;
    }

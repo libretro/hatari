@@ -80,7 +80,6 @@ Pad / Analog Left - Joystick
 Other:
 
 Mouse - Mouse (when port 1 is not in Joystick mode)
-Key ~/` - Hatari GUI
 Keyboard - Atari ST keys
 Scroll Lock - (RetroArch default hotkey) game focus mode disables keyboard shortcuts, captures mouse
 F11 - (RetroArch default hotkey) capture/release mouse
