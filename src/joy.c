@@ -196,18 +196,15 @@ extern int NUMjoy;
  */
 Uint8 Joy_GetStickData(int nStJoyId)
 {
-#ifdef __LIBRETRO__
-	if (nStJoyId == 1) return MXjoy0;
-	if (nStJoyId == 0) return MXjoy1;
-	return 0;
-#else
 	Uint8 nData = 0;
 	JOYREADING JoyReading;
 	int nSdlJoyId;
 	int nAxes; /* how many joystick axes are on the current selected SDL joystick? */
 
+#ifndef __LIBRETRO__
 	nSdlJoyId = ConfigureParams.Joysticks.Joy[nStJoyId].nJoyId;
 	nAxes = SDL_JoystickNumAxes(sdlJoystick[nSdlJoyId]);
+#endif
 
 	/* Are we emulating the joystick via the keyboard? */
 	if (ConfigureParams.Joysticks.Joy[nStJoyId].nJoystickMode == JOYSTICK_KEYBOARD)
@@ -218,6 +215,13 @@ Uint8 Joy_GetStickData(int nStJoyId)
 			nData = nJoyKeyEmu[nStJoyId];
 		}
 	}
+#ifdef __LIBRETRO__
+	else if (ConfigureParams.Joysticks.Joy[nStJoyId].nJoystickMode == JOYSTICK_REALSTICK)
+	{
+		if (nStJoyId == 1) nData = MXjoy0;
+		if (nStJoyId == 0) nData = MXjoy1;
+	}
+#else
 	else if (ConfigureParams.Joysticks.Joy[nStJoyId].nJoystickMode == JOYSTICK_REALSTICK
 	         && bJoystickWorking[nSdlJoyId])
 	{
@@ -276,6 +280,7 @@ Uint8 Joy_GetStickData(int nStJoyId)
 			}
 		}
 	}
+#endif
 
 	/* Ignore fire button every 8 frames if enabled autofire (for both cursor emulation and joystick) */
 	if (ConfigureParams.Joysticks.Joy[nStJoyId].bEnableAutoFire)
@@ -285,7 +290,6 @@ Uint8 Joy_GetStickData(int nStJoyId)
 	}
 
 	return nData;
-#endif
 }
 
 
