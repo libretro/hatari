@@ -50,7 +50,7 @@ char RPATH[512];
 int NPAGE=-1, KCOL=1, BKGCOLOR=0, MAXPAS=6;
 int SHIFTON=-1,MOUSEMODE=-1,SHOWKEY=-1,PAS=4,STATUTON=-1;
 int SND=1; //SOUND ON/OFF
-static int firstps=0;
+int firstps=0;
 int pauseg=0; //enter_gui
 int slowdown=0;
 
@@ -59,6 +59,7 @@ int al[2];//left analog1
 unsigned char MXjoy0; // joy 1
 unsigned char MXjoy1; // joy 2
 int NUMjoy=1; // 1 = joystick+mouse, -1 = 2 joysticks no mouse
+int mbt[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 //MOUSE
 int touch=-1; // gui mouse btn
@@ -66,12 +67,15 @@ int fmousex,fmousey; // emu mouse
 extern int gmx,gmy; //gui mouse
 int point_x_last = -1;
 int point_y_last = -1;
+int mbL=0,mbR=0;
+int mmbL=0, mmbR=0;
 
 //KEYBOARD
 char Key_Sate[512];
 char Key_Sate2[512];
-
-static int mbt[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int oldi=-1;
+int vkx=0,vky=0;
+int vkflag[5]={0,0,0,0,0};
 
 //STATS GUI
 extern int LEDA,LEDB,LEDC;
@@ -93,12 +97,15 @@ void serialize_int(int *x) { SERIALIZE_STEP }
 
 int hatari_mapper_serialize_size()
 {
-	return 1023;
+	return 1023; // +1 byte for version makes an even 1kb header
 }
 
 static bool hatari_mapper_serialize_bidi(char* data, char version)
 {
 	// ignoring version, there is only one version so far
+	// (Might be okay to append to this list without increasing version
+	// if 0 is an acceptable fallback for the new value,
+	// but do not reorder without increasing version number.)
 	serialize_data = data;
 	serialize_int(&NPAGE);
 	serialize_int(&KCOL);
@@ -116,6 +123,18 @@ static bool hatari_mapper_serialize_bidi(char* data, char version)
 	serialize_int(&fmousey);
 	serialize_int(&gmx);
 	serialize_int(&gmy);
+	serialize_int(&NUMjoy);
+	serialize_int(&firstps);
+	serialize_int(&mbL);
+	serialize_int(&mbR);
+	serialize_int(&mmbL);
+	serialize_int(&mmbR);
+	serialize_int(&oldi);
+	serialize_int(&vkx);
+	serialize_int(&vky);
+	for (int i=0; i<5;  ++i) serialize_int(&(vkflag[i]));
+	for (int i=0; i<16; ++i) serialize_int(&(mbt[i]));
+
 	if ((int)(data - serialize_data) > hatari_mapper_serialize_size())
 	{
 		fprintf(stderr, "hatari_mapper_serialize_size()=%d insufficient! (Needs: %d)\n", hatari_mapper_serialize_size(), (int)(data - serialize_data));
@@ -419,10 +438,7 @@ void Deadzone(int* a)
 void update_input(void)
 {
    int i;
-   static int oldi=-1;
-   static int vkx=0,vky=0;
 
-   static int mbL=0,mbR=0;
    int mouse_l;
    int mouse_r;
    int16_t mouse_x;
@@ -554,8 +570,6 @@ void update_input(void)
 
    if(SHOWKEY==1)
    {
-      static int vkflag[5]={0,0,0,0,0};
-
       // analog stick can work the keyboard
       al[0] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
       al[1] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
@@ -827,8 +841,6 @@ void input_gui(void)
    }
 
    slowdown=1;
-
-   static int mmbL = 0, mmbR = 0;
 
    if(mmbL==0 && (mouse_l || point_b))
    {
