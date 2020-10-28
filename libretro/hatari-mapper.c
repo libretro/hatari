@@ -5,6 +5,7 @@
 #include "joy.h"
 #include "screen.h"
 #include "video.h"	/* FIXME: video.h is dependent on HBL_PALETTE_LINES from screen.h */
+#include "ikbd.h"
 
 //CORE VAR
 extern const char *retro_save_directory;
@@ -82,6 +83,20 @@ extern int LEDA,LEDB,LEDC;
 int BOXDEC= 32+2;
 int STAT_BASEY;
 
+// deactivate mouse when using 2 joyticks
+
+void update_numjoy()
+{
+	if (NUMjoy < 0)
+	{
+		KeyboardProcessor.MouseMode = AUTOMODE_OFF;
+	}
+	else
+	{
+		KeyboardProcessor.MouseMode = AUTOMODE_MOUSEREL;
+	}
+}
+
 // savestate serialization
 
 static bool serialize_forward;
@@ -155,6 +170,7 @@ bool hatari_mapper_unserialize(const char* data, char version)
 	int pauseg_old = pauseg;
 	bool result = hatari_mapper_serialize_bidi((char*)data, version);
 	if (pauseg_old) pauseg = pauseg_old; // because of the co-thread implementation there's really no way to save-state out of the GUI, so: stay paused
+	update_numjoy();
 	return result;
 }
 
@@ -479,6 +495,7 @@ void update_input(void)
       mbt[i]=0;
       MOUSEMODE=-MOUSEMODE;
       if (MOUSEMODE > 0) NUMjoy=1;
+      update_numjoy();
    }
 
    i=RETRO_DEVICE_ID_JOYPAD_START;//num joy toggle (on either joystick)
@@ -489,6 +506,7 @@ void update_input(void)
       mbt[i]=0;
       NUMjoy=-NUMjoy;
       if (NUMjoy < 0) MOUSEMODE=-1;
+      update_numjoy();
    }
 
    i=RETRO_DEVICE_ID_JOYPAD_R;//mouse gui speed
@@ -653,6 +671,7 @@ void update_input(void)
             NUMjoy=-NUMjoy;
             if (NUMjoy < 0) MOUSEMODE = -1;
             oldi=-1;
+            update_numjoy();
          }
          else
          {

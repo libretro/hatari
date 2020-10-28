@@ -181,6 +181,12 @@ static bool Joy_ReadJoystick(int nSdlJoyID, JOYREADING *pJoyReading)
 }
 
 
+#ifdef __LIBRETRO__
+extern unsigned char MXjoy0;
+extern unsigned char MXjoy1;
+extern int NUMjoy;
+#endif
+
 /*-----------------------------------------------------------------------*/
 /**
  * Read PC joystick and return ST format byte, i.e. lower 4 bits direction
@@ -190,6 +196,11 @@ static bool Joy_ReadJoystick(int nSdlJoyID, JOYREADING *pJoyReading)
  */
 Uint8 Joy_GetStickData(int nStJoyId)
 {
+#ifdef __LIBRETRO__
+	if (nStJoyId == 1) return MXjoy0;
+	if (nStJoyId == 0) return MXjoy1;
+	return 0;
+#else
 	Uint8 nData = 0;
 	JOYREADING JoyReading;
 	int nSdlJoyId;
@@ -274,6 +285,7 @@ Uint8 Joy_GetStickData(int nStJoyId)
 	}
 
 	return nData;
+#endif
 }
 
 
