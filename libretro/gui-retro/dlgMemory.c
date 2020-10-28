@@ -130,7 +130,7 @@ bool Dialog_MemDlg(void)
 			}
 			break;
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != DLGMEM_EXIT && but != SDLGUI_QUIT
 	        && but != SDLGUI_ERROR && !bQuitProgram );

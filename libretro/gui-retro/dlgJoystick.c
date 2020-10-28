@@ -260,7 +260,7 @@ void Dialog_JoyDlg(void)
 			}
 			break;
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != DLGJOY_EXIT && but != SDLGUI_QUIT
 	       && but != SDLGUI_ERROR && !bQuitProgram);

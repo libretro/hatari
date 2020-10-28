@@ -265,7 +265,7 @@ void Dialog_MonitorDlg(void)
 			sprintf(sVdiHeight, "%4i", ConfigureParams.Screen.nVdiHeight);
 			break;
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != DLGSCRN_EXIT_MONITOR && but != SDLGUI_QUIT
 	        && but != SDLGUI_ERROR && !bQuitProgram);
@@ -411,7 +411,7 @@ void Dialog_WindowDlg(void)
 			}
 			break;
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != DLGSCRN_EXIT_WINDOW && but != SDLGUI_QUIT
 	        && but != SDLGUI_ERROR && !bQuitProgram);

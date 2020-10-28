@@ -62,7 +62,7 @@ A   Auto-Fire / Right mouse button
 Y   Toggle virtual keyboard Shift
 X   Show/hide virtual keyboard
 SEL Toggle Joystick / Mouse mode
-STR Hatari GUI
+STR Enter/Exit Hatari GUI
 L   Show/Hide status
 R   Select virtual keyboard page
 L2  Lower Mouse Speed (1-6) for gui and emu

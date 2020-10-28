@@ -51,9 +51,9 @@ char RPATH[512];
 int NPAGE=-1, KCOL=1, BKGCOLOR=0, MAXPAS=6;
 int SHIFTON=-1,MOUSEMODE=-1,SHOWKEY=-1,PAS=4,STATUTON=-1;
 int SND=1; //SOUND ON/OFF
-int firstps=0;
 int pauseg=0; //enter_gui
 int slowdown=0;
+int exitgui=0; // exit gui (not serialized)
 
 //JOY
 int al[2];//left analog1
@@ -124,7 +124,7 @@ static bool hatari_mapper_serialize_bidi(char* data, char version)
 	serialize_int(&gmx);
 	serialize_int(&gmy);
 	int NUMjoy=0; serialize_int(&NUMjoy); // this variable was removed
-	serialize_int(&firstps);
+	int firstps=0; serialize_int(&firstps); // this variable was removed
 	serialize_int(&mbL);
 	serialize_int(&mbR);
 	serialize_int(&mmbL);
@@ -154,7 +154,12 @@ bool hatari_mapper_unserialize(const char* data, char version)
 	serialize_forward = false;
 	int pauseg_old = pauseg;
 	bool result = hatari_mapper_serialize_bidi((char*)data, version);
-	if (pauseg_old) pauseg = pauseg_old; // because of the co-thread implementation there's really no way to save-state out of the GUI, so: stay paused
+	exitgui = 0;
+	if (pauseg_old && !pauseg) // want to exit GUI, turn pauseg back on and tell it to exit on its own
+	{
+		pauseg = pauseg_old;
+		exitgui = 1;
+	}
 	return result;
 }
 
@@ -205,10 +210,11 @@ long GetTicks(void)
 } 
 
 //NO SURE FIND BETTER WAY TO COME BACK IN MAIN THREAD IN HATARI GUI
-void gui_poll_events(void)
+bool gui_poll_events(void)
 {
    slowdown=0;
    co_switch(mainThread);
+   return (exitgui != 0);
 }
 
 //save bkg for screenshot
@@ -318,19 +324,10 @@ void texture_init(void)
 void enter_gui(void)
 {
    save_bkg();
-
+   exitgui=0;
+   pauseg=1; // should already be set
    Dialog_DoProperty();
    pauseg=0;
-}
-
-void pause_select(void)
-{
-   if(pauseg==1 && firstps==0)
-   {
-      firstps=1;
-      enter_gui();
-      firstps=0;
-   }
 }
 
 void Print_Statut(void)
@@ -435,7 +432,7 @@ void Deadzone(int* a)
    L2  MOUSE SPEED DOWN (gui/emu)
    R2  MOUSE SPEED UP(gui/emu)
    SEL toggle mouse/joy mode
-   STR Hatari Gui
+   STR Hatari Gui / Exit Gui
    B   fire/mouse-left/valid key in vkbd
    A   mouse-right
    Y   switch Shift ON/OFF
@@ -466,8 +463,11 @@ void update_input(void)
    Process_key();
 
    i=RETRO_DEVICE_ID_JOYPAD_START;// Hatari GUI
-   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
+      mbt[i]=1;
+   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
    {
+      mbt[i]=0;
       pauseg=1;
    }
 
@@ -820,6 +820,17 @@ void input_gui(void)
       PAS++;if(PAS>MAXPAS)PAS=1;
    }
 
+   // START to exit GUI
+
+   i=RETRO_DEVICE_ID_JOYPAD_START;
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
+      mbt[i]=1;
+   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   {
+      mbt[i]=0;
+      exitgui=1;
+   }
+
    //emulate mouse with joy analog left
    al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
    al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
@@ -885,6 +896,4 @@ void input_gui(void)
       gmy=0;
    if (gmy>retroh-1)
       gmy=retroh-1;
-
-   // TODO could pressing START act like "escape" for the purpose of quitting the GUI back to game?
 }

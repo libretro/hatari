@@ -18,7 +18,7 @@
 
 #include "graph.h"
 
-extern void gui_poll_events();
+extern bool gui_poll_events();
 extern int  GuiGetMouseState( int * x,int * y);
 extern int pauseg;
 

@@ -160,8 +160,7 @@ int Dialog_MainDlg(bool *bReset, bool *bLoadedSnapshot)
 			bQuitProgram = true;
 			break;
 		}
-                gui_poll_events();
-
+		if (gui_poll_events()) retbut = MAINDLG_CANCEL;
 	}
 	while (retbut != MAINDLG_OK && retbut != MAINDLG_CANCEL && retbut != SDLGUI_QUIT
 	        && retbut != SDLGUI_ERROR && !bQuitProgram);

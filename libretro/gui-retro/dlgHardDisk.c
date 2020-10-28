@@ -211,7 +211,7 @@ printf("skip: %d\n", ConfigureParams.HardDisk.nHardDiskDrive);
 				ConfigureParams.HardDisk.bUseHardDiskDirectories = true;
 			break;
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != DISKDLG_EXIT && but != SDLGUI_QUIT
 	        && but != SDLGUI_ERROR && !bQuitProgram);

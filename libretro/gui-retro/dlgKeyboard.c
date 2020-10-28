@@ -82,7 +82,7 @@ void Dialog_KeyboardDlg(void)
 			                      ConfigureParams.Keyboard.szMappingFileName,
 			                      keyboarddlg[DLGKEY_MAPNAME].w, false);
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != DLGKEY_EXIT && but != SDLGUI_QUIT
 	        && but != SDLGUI_ERROR && !bQuitProgram);
