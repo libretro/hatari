@@ -58,8 +58,10 @@ const char MemorySnapShot_fileid[] = "Hatari memorySnapShot.c : " __DATE__ " " _
 #define VERSION_STRING      "1.8.1"   /* Version number of compatible memory snapshots - Always 6 bytes (inc' NULL) */
 #define SNAPSHOT_MAGIC      0xDeadBeef
 
+#ifndef __LIBRETRO__ /* snapshot sizes are not allowed to increase over time in libretro, so compression should not be used */
 #if HAVE_LIBZ
 #define COMPRESS_MEMORYSNAPSHOT       /* Compress snapshots to reduce disk space used */
+#endif
 #endif
 
 #ifdef COMPRESS_MEMORYSNAPSHOT
@@ -68,6 +70,17 @@ const char MemorySnapShot_fileid[] = "Hatari memorySnapShot.c : " __DATE__ " " _
 #undef mkdir
 #include <zlib.h>
 typedef gzFile MSS_File;
+
+#elif defined(__LIBRETRO__)
+
+/* Libretro will write to a memory buffer rather than a file. */
+typedef void* MSS_File;
+extern char* retro_save_buffer; /* allocated and managed by libretro */
+extern int retro_save_pos; /* current read/write position */
+extern int retro_save_size; /* highest used file position */
+extern int retro_save_head; /* reserved space for libretro header */
+extern int retro_save_max; /* maximum size of retro_save_buffer */
+extern int retro_save_error; /* 0 if no error */
 
 #else
 
@@ -88,6 +101,15 @@ static MSS_File MemorySnapShot_fopen(const char *pszFileName, const char *pszMod
 {
 #ifdef COMPRESS_MEMORYSNAPSHOT
 	return gzopen(pszFileName, pszMode);
+#elif defined(__LIBRETRO__)
+	retro_save_pos = retro_save_head;
+	if (retro_save_pos > retro_save_size) retro_save_size = retro_save_pos;
+	if (retro_save_buffer == NULL)
+	{
+		retro_save_error = 1;
+		return NULL;
+	}
+	return (void*)-1;
 #else
 	return fopen(pszFileName, pszMode);
 #endif
@@ -102,6 +124,8 @@ static void MemorySnapShot_fclose(MSS_File fhndl)
 {
 #ifdef COMPRESS_MEMORYSNAPSHOT
 	gzclose(fhndl);
+#elif defined(__LIBRETRO__)
+	/* Nothing to do. */
 #else
 	fclose(fhndl);
 #endif
@@ -116,6 +140,18 @@ static int MemorySnapShot_fread(MSS_File fhndl, char *buf, int len)
 {
 #ifdef COMPRESS_MEMORYSNAPSHOT
 	return gzread(fhndl, buf, len);
+#elif defined(__LIBRETRO__)
+	if (retro_save_pos + len <= retro_save_size)
+	{
+		memcpy(buf, retro_save_buffer + retro_save_pos, len);
+		retro_save_pos += len;
+		return len;
+	}
+	else
+	{
+		retro_save_error = 1;
+		return 0;
+	}
 #else
 	return fread(buf, 1, len, fhndl);
 #endif
@@ -130,6 +166,19 @@ static int MemorySnapShot_fwrite(MSS_File fhndl, const char *buf, int len)
 {
 #ifdef COMPRESS_MEMORYSNAPSHOT
 	return gzwrite(fhndl, buf, len);
+#elif defined(__LIBRETRO__)
+	if (retro_save_pos + len <= retro_save_max)
+	{
+		memcpy(retro_save_buffer + retro_save_pos, buf, len);
+		retro_save_pos += len;
+		if (retro_save_pos > retro_save_size) retro_save_size = retro_save_pos;
+		return len;
+	}
+	else
+	{
+		retro_save_error = 1;
+		return 0;
+	}
 #else
 	return fwrite(buf, 1, len, fhndl);
 #endif
@@ -144,6 +193,9 @@ static int MemorySnapShot_fseek(MSS_File fhndl, int pos)
 {
 #ifdef COMPRESS_MEMORYSNAPSHOT
 	return (int)gzseek(fhndl, pos, SEEK_CUR);	/* return -1 if error, new position >=0 if OK */
+#elif defined(__LIBRETRO__)
+	retro_save_pos = retro_save_head + pos;
+	return 0;
 #else
 	return fseek(fhndl, pos, SEEK_CUR);		/* return -1 if error, 0 if OK */
 #endif

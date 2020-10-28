@@ -34,9 +34,6 @@ extern int Reset_Cold(void);
 #include <time.h>
 #endif
 
-long frame=0;
-static unsigned long Ktime=0, LastFPSTime=0;
-
 //VIDEO
 extern SDL_Surface *sdlscrn; 
 unsigned short int bmp[1024*1024];
@@ -52,9 +49,10 @@ char RPATH[512];
 //EMU FLAGS
 int NPAGE=-1, KCOL=1, BKGCOLOR=0, MAXPAS=6;
 int SHIFTON=-1,MOUSEMODE=-1,SHOWKEY=-1,PAS=4,STATUTON=-1;
-int SND; //SOUND ON/OFF
+int SND=1; //SOUND ON/OFF
 static int firstps=0;
 int pauseg=0; //enter_gui
+int slowdown=0;
 
 //JOY
 int al[2];//left analog1
@@ -79,6 +77,69 @@ static int mbt[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 extern int LEDA,LEDB,LEDC;
 int BOXDEC= 32+2;
 int STAT_BASEY;
+
+// savestate serialization
+
+static bool serialize_forward;
+static char* serialize_data;
+
+#define SERIALIZE_STEP \
+	if (serialize_forward) memcpy(serialize_data, x, sizeof(*x)); \
+	else                   memcpy(x, serialize_data, sizeof(*x)); \
+	serialize_data += sizeof(*x);
+
+void serialize_char(char *x) { SERIALIZE_STEP }
+void serialize_int(int *x) { SERIALIZE_STEP }
+
+int hatari_mapper_serialize_size()
+{
+	return 1023;
+}
+
+static bool hatari_mapper_serialize_bidi(char* data, char version)
+{
+	// ignoring version, there is only one version so far
+	serialize_data = data;
+	serialize_int(&NPAGE);
+	serialize_int(&KCOL);
+	serialize_int(&BKGCOLOR);
+	serialize_int(&MAXPAS);
+	serialize_int(&SHIFTON);
+	serialize_int(&MOUSEMODE);
+	serialize_int(&SHOWKEY);
+	serialize_int(&PAS);
+	serialize_int(&STATUTON);
+	serialize_int(&SND);
+	serialize_int(&pauseg);
+	serialize_int(&slowdown);
+	serialize_int(&fmousex);
+	serialize_int(&fmousey);
+	serialize_int(&gmx);
+	serialize_int(&gmy);
+	if ((int)(data - serialize_data) > hatari_mapper_serialize_size())
+	{
+		fprintf(stderr, "hatari_mapper_serialize_size()=%d insufficient! (Needs: %d)\n", hatari_mapper_serialize_size(), (int)(data - serialize_data));
+		return false;
+	}
+	return true;
+}
+
+bool hatari_mapper_serialize(char* data, char version)
+{
+	serialize_forward = true;
+	return hatari_mapper_serialize_bidi(data, version);
+}
+
+bool hatari_mapper_unserialize(const char* data, char version)
+{
+	serialize_forward = false;
+	int pauseg_old = pauseg;
+	bool result = hatari_mapper_serialize_bidi((char*)data, version);
+	if (pauseg_old) pauseg = pauseg_old; // because of the co-thread implementation there's really no way to save-state out of the GUI, so: stay paused
+	return result;
+}
+
+// input state
 
 static retro_input_state_t input_state_cb;
 static retro_input_poll_t input_poll_cb;
@@ -124,37 +185,11 @@ long GetTicks(void)
 
 } 
 
-#ifdef WIIU
-#include <features/features_cpu.h>
-retro_time_t current_tus=0,last_tus=0;
-#endif
-int slowdown=0;
-
 //NO SURE FIND BETTER WAY TO COME BACK IN MAIN THREAD IN HATARI GUI
 void gui_poll_events(void)
 {
-#ifdef WIIU
-  current_tus=cpu_features_get_time_usec();
-  current_tus/=1000;
-
-   if(current_tus - last_tus >= 1000/50)
-   { 
-      slowdown=0;
-      frame++; 
-      last_tus = current_tus;		
-      co_switch(mainThread);
-   }
-#else
-   Ktime = GetTicks();
-
-   if(Ktime - LastFPSTime >= 1000/50)
-   { 
-      slowdown=0;
-      frame++; 
-      LastFPSTime = Ktime;
-      co_switch(mainThread);
-   }
-#endif
+   slowdown=0;
+   co_switch(mainThread);
 }
 
 //save bkg for screenshot

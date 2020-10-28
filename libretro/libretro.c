@@ -60,10 +60,10 @@ unsigned int video_config = 0;
 int CHANGE_RATE = 0, CHANGEAV_TIMING = 0;
 float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 
+extern bool UseNonPolarizedLowPassFilter;
 bool hatari_fastfdc = true;
 bool hatari_borders = true;
 char hatari_frameskips[2];
-int firstpass = 1;
 char savestate_fname[RETRO_PATH_MAX];
 
 static struct retro_input_descriptor input_descriptors[] = {
@@ -114,6 +114,18 @@ void retro_set_environment(retro_environment_t cb)
            { NULL, NULL },
          },
          "true"
+       },
+       // Audio
+       {
+         "hatari_polarized_filter",
+         "Polarized audio filter",
+         "Uses hatari's polarized lowpass filters on audio to simulate distortion",
+         {
+           { "false", "disabled" },
+           { "true", "enabled" },
+           { NULL, NULL },
+         },
+         "false"
        },
        // Video
        {
@@ -210,6 +222,16 @@ static void update_variables(void)
    {
       hatari_fastfdc = new_hatari_fastfdc;
       ConfigureParams.DiskImage.FastFloppy = hatari_fastfdc;
+   }
+
+   // Audio
+   var.key = "hatari_polarized_filter";
+   var.value = NULL;
+   UseNonPolarizedLowPassFilter = true;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if(strcmp(var.value, "true") == 0)
+         UseNonPolarizedLowPassFilter = false;
    }
 
    // Video
@@ -661,9 +683,6 @@ void retro_run(void)
 
    if (MidiRetroInterface && MidiRetroInterface->output_enabled())
       MidiRetroInterface->flush();
-  
-   if (firstpass)
-      firstpass=0;
 }
 
 #define M3U_FILE_EXT "m3u"
@@ -740,64 +759,48 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info, 
    return false;
 }
 
+const char RETRO_SAVE_VERSION = 1;
+char* retro_save_buffer = NULL;
+int retro_save_pos = 0;
+int retro_save_size = 0;
+int retro_save_head = 1; // bytes reserved for libretro header/state
+int retro_save_max = 0;
+int retro_save_error = 0;
+
+extern int hatari_mapper_serialize_size();
+extern bool hatari_mapper_serialize(char* data, char version);
+extern bool hatari_mapper_unserialize(const char* data, char version);
+
 size_t retro_serialize_size(void)
 {
-   if (firstpass != 1)
-   {
-      snprintf(savestate_fname, sizeof(savestate_fname), "%s%shatari_tempsave.uss", retro_save_directory, RETRO_PATH_SEPARATOR);
-      MemorySnapShot_Capture(savestate_fname, false);
-	  FILE *file = fopen(savestate_fname, "rb");
-	  if (file)
-	  {
-		 size_t size = 0;
-		 fseek(file, 0L, SEEK_END);
-		 size = ftell(file);
-		 fclose(file);
-		 return size;
-	  }
-   }
-   return 0;
+	return 10 * 1024 * 1024; // Hatari uncompressed savestates seem to be about 6MB
 }
 
 bool retro_serialize(void *data_, size_t size)
 {
-   if (firstpass != 1)
-   {
-      snprintf(savestate_fname, sizeof(savestate_fname), "%s%shatari_tempsave.uss", retro_save_directory, RETRO_PATH_SEPARATOR);
-      MemorySnapShot_Capture(savestate_fname, false);
-	  FILE *file = fopen(savestate_fname, "rb");
-	  if (file)
-	  {
-		 if (fread(data_, size, 1, file) == 1)
-		 {
-		    fclose(file);
-		    return true;
-		 }
-		 fclose(file);
-	  }
-   }
-   return false;
+	retro_save_max = size;
+	retro_save_head = hatari_mapper_serialize_size() + 1;
+	if (size < retro_save_head) return false;
+	retro_save_buffer = data_;
+	memset(retro_save_buffer, 0, size);
+	retro_save_buffer[0] = RETRO_SAVE_VERSION;
+	retro_save_error = hatari_mapper_serialize(data_+1, retro_save_buffer[0]) ? 0 : 1;
+	retro_save_size = retro_save_head;
+	MemorySnapShot_Capture("", false);
+	return retro_save_error == 0;
 }
 
 bool retro_unserialize(const void *data_, size_t size)
 {
-   if (firstpass != 1)
-   {
-      snprintf(savestate_fname, sizeof(savestate_fname), "%s%shatari_tempsave.uss", retro_save_directory, RETRO_PATH_SEPARATOR);
-      FILE *file = fopen(savestate_fname, "wb");
-      if (file)
-      {
-         if (fwrite(data_, size, 1, file) == 1)
-         {
-            fclose(file);
-            MemorySnapShot_Restore(savestate_fname, false);
-            return true;
-         }
-         else
-            fclose(file);
-      }
-   }
-   return false;
+	retro_save_max = size;
+	retro_save_head = hatari_mapper_serialize_size() + 1;
+	if (size < retro_save_head) return false;
+	retro_save_buffer = (void*)data_; // discarding const
+	if (retro_save_buffer[0] != RETRO_SAVE_VERSION) return false; // unknown version
+	retro_save_error = hatari_mapper_unserialize(data_+1, retro_save_buffer[0]) ? 0 : 1;
+	retro_save_size = size;
+	MemorySnapShot_Restore("", false);
+	return retro_save_error == 0;
 }
 
 void *retro_get_memory_data(unsigned id)

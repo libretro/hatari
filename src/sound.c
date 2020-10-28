@@ -221,6 +221,9 @@ Uint8		SoundRegs[ 14 ];
 
 int		YmVolumeMixing = YM_TABLE_MIXING;
 bool		UseLowPassFilter = false;
+#ifdef __LIBRETRO__
+bool		UseNonPolarizedLowPassFilter = true;
+#endif
 
 bool		bEnvelopeFreqFlag;			/* Cleared each frame for YM saving */
 
@@ -381,7 +384,18 @@ static ymsample	PWMaliasFilter(ymsample x0)
 	return y0;
 }
 
-
+#ifdef __LIBRETRO__
+// A more "normal" alternative to the lowpass filters above,
+// which affects rising and falling waves the same way rather than unequally.
+// Removes a lot of unpleasant distortion.
+static ymsample	NonPolarizedLowPassFilter(ymsample x0)
+{
+	static	yms32 y0 = 0, x1 = 0;
+	y0 = (3*(x0 + x1) + (y0<<1)) >> 3;
+	x1 = x0;
+	return y0;
+}
+#endif
 
 /*--------------------------------------------------------------*/
 /* Build the volume conversion table used to simulate the	*/
@@ -972,6 +986,11 @@ static ymsample	YM2149_NextSample(void)
 	if ( envPos >= (3*32) << 24 )			/* blocks 0, 1 and 2 were used (envPos 0 to 95) */
 		envPos -= (2*32) << 24;			/* replay/loop blocks 1 and 2 (envPos 32 to 95) */
 
+#ifdef __LIBRETRO__
+	if ( UseNonPolarizedLowPassFilter )
+		return NonPolarizedLowPassFilter(sample);
+#endif
+
 	/* Apply low pass filter ? */
 	if ( UseLowPassFilter )
 		return LowPassFilter(sample);
@@ -1040,6 +1059,11 @@ static ymsample	YM2149_NextSample(void)
 	envPos += envStep;
 	if ( envPos >= (3*32) << 24 )			/* blocks 0, 1 and 2 were used (envPos 0 to 95) */
 		envPos -= (2*32) << 24;			/* replay/loop blocks 1 and 2 (envPos 32 to 95) */
+
+#ifdef __LIBRETRO__
+	if ( UseNonPolarizedLowPassFilter )
+		return NonPolarizedLowPassFilter(sample);
+#endif
 
 	/* Apply low pass filter ? */
 	if ( UseLowPassFilter )
