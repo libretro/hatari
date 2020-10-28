@@ -67,6 +67,7 @@ L   Show/Hide status
 R   Select virtual keyboard page
 L2  Lower Mouse Speed (1-6) for gui and emu
 R2  Raise Mouse speed (1-6)
+R3  Keyboard space
 Pad / Analog Left - Joystick / Mouse
 
 Port 2:

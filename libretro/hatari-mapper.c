@@ -384,6 +384,12 @@ void Process_key(void)
    {
       Key_Sate[i]=input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0,i) ? 0x80: 0;
 
+      if (i == RETROK_SPACE) // can map R3 to space bar
+      {
+         char joyspace = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ? 0x80 : 0;
+         Key_Sate[i] |= joyspace;
+      }
+
       if(SDLKeyToSTScanCode[i]==0x2a )
       {  //SHIFT CASE
 
@@ -434,6 +440,7 @@ void Deadzone(int* a)
    A   mouse-right
    Y   switch Shift ON/OFF
    X   show/hide vkbd
+   R3  keyboard space
    */
 
 void update_input(void)
@@ -785,6 +792,7 @@ void input_gui(void)
 {
    input_poll_cb();
 
+   int i;
    int mouse_l;
    int mouse_r;
    int16_t mouse_x,mouse_y;
@@ -794,7 +802,7 @@ void input_gui(void)
 
    // ability to adjust mouse speed in hatari GUI
 
-   int i=RETRO_DEVICE_ID_JOYPAD_L2;
+   i=RETRO_DEVICE_ID_JOYPAD_L2;
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -803,7 +811,7 @@ void input_gui(void)
       PAS--;if(PAS<0)PAS=MAXPAS;
    }
 
-   int i=RETRO_DEVICE_ID_JOYPAD_R2;
+   i=RETRO_DEVICE_ID_JOYPAD_R2;
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
