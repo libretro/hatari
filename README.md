@@ -59,21 +59,20 @@ Port 1:
 
 B   Fire / Left mouse button / Virtual keyboard keypress
 A   Auto-Fire / Right mouse button
-Y   Toggle virtual keyboard shift
-X   Hatari GUI
+Y   Toggle virtual keyboard Shift
+X   Show/hide virtual keyboard
 SEL Toggle Joystick / Mouse mode
-STR Toggle 2 joysticks mode
-L   Show/hide virtual keyboard
-R   Change Mouse speed 1 to 6 . (for gui and emu)
-L2  Show/Hide status
-R2  Select virtual keyboard page
+STR Hatari GUI
+L   Show/Hide status
+R   Select virtual keyboard page
+L2  Lower Mouse Speed (1-6) for gui and emu
+R2  Raise Mouse speed (1-6)
 Pad / Analog Left - Joystick / Mouse
 
 Port 2:
 
 B   Fire
 A   Auto-Fire
-STR Toggle 2 joysticks mode
 L2  Show/Hide status
 Pad / Analog Left - Joystick
 

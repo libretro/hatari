@@ -59,7 +59,6 @@ int slowdown=0;
 int al[2];//left analog1
 unsigned char MXjoy0; // joy 1
 unsigned char MXjoy1; // joy 2
-int NUMjoy=1; // 1 = joystick+mouse, -1 = 2 joysticks no mouse
 int mbt[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 //MOUSE
@@ -82,20 +81,6 @@ int vkflag[5]={0,0,0,0,0};
 extern int LEDA,LEDB,LEDC;
 int BOXDEC= 32+2;
 int STAT_BASEY;
-
-// deactivate mouse when using 2 joyticks
-
-void update_numjoy()
-{
-	if (NUMjoy < 0)
-	{
-		KeyboardProcessor.MouseMode = AUTOMODE_OFF;
-	}
-	else
-	{
-		KeyboardProcessor.MouseMode = AUTOMODE_MOUSEREL;
-	}
-}
 
 // savestate serialization
 
@@ -138,7 +123,7 @@ static bool hatari_mapper_serialize_bidi(char* data, char version)
 	serialize_int(&fmousey);
 	serialize_int(&gmx);
 	serialize_int(&gmy);
-	serialize_int(&NUMjoy);
+	int NUMjoy=0; serialize_int(&NUMjoy); // this variable was removed
 	serialize_int(&firstps);
 	serialize_int(&mbL);
 	serialize_int(&mbR);
@@ -170,7 +155,6 @@ bool hatari_mapper_unserialize(const char* data, char version)
 	int pauseg_old = pauseg;
 	bool result = hatari_mapper_serialize_bidi((char*)data, version);
 	if (pauseg_old) pauseg = pauseg_old; // because of the co-thread implementation there's really no way to save-state out of the GUI, so: stay paused
-	update_numjoy();
 	return result;
 }
 
@@ -352,6 +336,7 @@ void pause_select(void)
 void Print_Statut(void)
 {
    STAT_BASEY=CROP_HEIGHT+24;
+   int NUMjoy = (ConfigureParams.Joysticks.Joy[0].nJoystickMode == JOYSTICK_REALSTICK) ? 2 : 1;
 
    DrawFBoxBmp(bmp,0,STAT_BASEY,CROP_WIDTH,STAT_YSZ,RGB565(0,0,0));
 
@@ -359,7 +344,7 @@ void Print_Statut(void)
    if (MOUSEMODE>=0)
    Draw_text(bmp,STAT_DECX+40 ,STAT_BASEY,0xffff,0x8080,1,2,40,"Speed:%d",PAS);
    Draw_text(bmp,STAT_DECX+100,STAT_BASEY,0xffff,0x8080,1,2,40,(SHIFTON>0)?"SHIFT":"     ");
-   Draw_text(bmp,STAT_DECX+150,STAT_BASEY,0xffff,0x8080,1,2,40,"Joysticks:%s",(NUMjoy < 0) ? " 2 " : "1+M");
+   Draw_text(bmp,STAT_DECX+150,STAT_BASEY,0xffff,0x8080,1,2,40,"Joysticks:%s",(NUMjoy > 1) ? " 2 " : " 1 ");
 
    if(LEDA)
    {
@@ -429,7 +414,7 @@ void Process_key(void)
    }
 }
 
-const int DEADZONE = 0x8000 / 16;
+const int DEADZONE = 0x8000 / 12;
 void Deadzone(int* a)
 {
    if (al[0] <= -DEADZONE) al[0] += DEADZONE;
@@ -439,16 +424,16 @@ void Deadzone(int* a)
 }
 
 /*
-   L2  show/hide Status
-   R2  swap kbd pages
-   L   show/hide vkbd
-   R   MOUSE SPEED(gui/emu)
+   L   show/hide Status
+   R   swap kbd pages
+   L2  MOUSE SPEED DOWN (gui/emu)
+   R2  MOUSE SPEED UP(gui/emu)
    SEL toggle mouse/joy mode
-   STR toggle num joy 
+   STR Hatari Gui
    B   fire/mouse-left/valid key in vkbd
    A   mouse-right
    Y   switch Shift ON/OFF
-   X   Hatari Gui
+   X   show/hide vkbd
    */
 
 void update_input(void)
@@ -473,11 +458,13 @@ void update_input(void)
 
    Process_key();
 
-   i=RETRO_DEVICE_ID_JOYPAD_X;
+   i=RETRO_DEVICE_ID_JOYPAD_START;// Hatari GUI
    if (Key_Sate[RETROK_TILDE] || Key_Sate[RETROK_BACKQUOTE] || input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   {
       pauseg=1;
+   }
 
-   i=RETRO_DEVICE_ID_JOYPAD_L;//show vkey toggle
+   i=RETRO_DEVICE_ID_JOYPAD_X;//show vkey toggle
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -494,22 +481,18 @@ void update_input(void)
    {
       mbt[i]=0;
       MOUSEMODE=-MOUSEMODE;
-      if (MOUSEMODE > 0) NUMjoy=1;
-      update_numjoy();
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_START;//num joy toggle (on either joystick)
-   if ( (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) || input_state_cb(1, RETRO_DEVICE_JOYPAD, 0, i)) && mbt[i]==0 )
+   i=RETRO_DEVICE_ID_JOYPAD_L2;//mouse gui speed down
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
-   else if ( mbt[i]==1 && ! (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  || input_state_cb(1, RETRO_DEVICE_JOYPAD, 0, i)) )
+   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
    {
       mbt[i]=0;
-      NUMjoy=-NUMjoy;
-      if (NUMjoy < 0) MOUSEMODE=-1;
-      update_numjoy();
+      PAS--;if(PAS<1)PAS=MAXPAS;
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_R;//mouse gui speed
+   i=RETRO_DEVICE_ID_JOYPAD_R2;//mouse gui speed up
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -528,7 +511,7 @@ void update_input(void)
       Screen_SetFullUpdate();
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_L2;//show/hide status (either joystick)
+   i=RETRO_DEVICE_ID_JOYPAD_L;//show/hide status (either joystick)
    if ( (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) || input_state_cb(1, RETRO_DEVICE_JOYPAD, 0, i)) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) || input_state_cb(1, RETRO_DEVICE_JOYPAD, 0, i)) )
@@ -538,7 +521,7 @@ void update_input(void)
       Screen_SetFullUpdate();
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_R2;//swap kbd pages
+   i=RETRO_DEVICE_ID_JOYPAD_R;//swap kbd pages
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -553,7 +536,7 @@ void update_input(void)
 
    // joystick 2
 
-   if (NUMjoy < 0) // 2 joysticks, no mouse
+   if (ConfigureParams.Joysticks.Joy[0].nJoystickMode == JOYSTICK_REALSTICK) // 2 joysticks
    {
       al[0] =(input_state_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
       al[1] =(input_state_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
@@ -667,11 +650,9 @@ void update_input(void)
          }
          else if(i==-5)
          {
-            //Change Joy number
-            NUMjoy=-NUMjoy;
-            if (NUMjoy < 0) MOUSEMODE = -1;
-            oldi=-1;
-            update_numjoy();
+            //Toggle stats
+            STATUTON=-STATUTON;
+            Screen_SetFullUpdate();
          }
          else
          {
@@ -812,7 +793,17 @@ void input_gui(void)
    if(slowdown>0)return;
 
    // ability to adjust mouse speed in hatari GUI
-   int i=RETRO_DEVICE_ID_JOYPAD_R;
+
+   int i=RETRO_DEVICE_ID_JOYPAD_L2;
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
+      mbt[i]=1;
+   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   {
+      mbt[i]=0;
+      PAS--;if(PAS<0)PAS=MAXPAS;
+   }
+
+   int i=RETRO_DEVICE_ID_JOYPAD_R2;
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -886,4 +877,6 @@ void input_gui(void)
       gmy=0;
    if (gmy>retroh-1)
       gmy=retroh-1;
+
+   // TODO could pressing START act like "escape" for the purpose of quitting the GUI back to game?
 }
