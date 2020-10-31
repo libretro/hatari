@@ -13,6 +13,7 @@ extern const char *retro_system_directory;
 extern const char *retro_content_directory;
 char RETRO_DIR[512];
 char RETRO_TOS[512];
+extern bool hatari_nomouse;
 
 //HATARI PROTOTYPES
 #include "configuration.h"
@@ -49,7 +50,7 @@ char RPATH[512];
 
 //EMU FLAGS
 int NPAGE=-1, KCOL=1, BKGCOLOR=0, MAXPAS=6;
-int SHIFTON=-1,MOUSEMODE=-1,SHOWKEY=-1,PAS=4,STATUTON=-1;
+int SHIFTON=-1,MOUSEMODE=-1,SHOWKEY=-1,PAS=2,STATUTON=-1;
 int SND=1; //SOUND ON/OFF
 int pauseg=0; //enter_gui
 int slowdown=0;
@@ -723,13 +724,20 @@ void update_input(void)
             MXjoy0 &= ~ATARIJOY_BITMASK_FIRE;
       }
 
-      mouse_x = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
-      mouse_y = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
-      mouse_l    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
-      mouse_r    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
-
-      fmousex=mouse_x;
-      fmousey=mouse_y;
+      if (hatari_nomouse)
+      {
+         mouse_l = 0;
+         mouse_r = 0;
+      }
+      else
+      {
+         mouse_x = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
+         mouse_y = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
+         mouse_l = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
+         mouse_r = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
+         fmousex=mouse_x;
+         fmousey=mouse_y;
+      }
 
    }
    else // MOUSEMODE >= 0

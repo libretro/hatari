@@ -62,6 +62,7 @@ float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 
 extern bool UseNonPolarizedLowPassFilter;
 bool hatari_twojoy = true;
+bool hatari_nomouse = false;
 bool hatari_fastfdc = true;
 bool hatari_borders = true;
 char hatari_frameskips[2];
@@ -104,7 +105,7 @@ void retro_set_environment(retro_environment_t cb)
 
    static struct retro_core_option_definition core_options[] =
    {
-       // Second joystick
+       // Input
        {
          "hatari_twojoy",
          "Enable second joystick",
@@ -115,6 +116,17 @@ void retro_set_environment(retro_environment_t cb)
            { NULL, NULL },
          },
          "true"
+       },
+       {
+         "hatari_nomouse",
+         "Disable mouse",
+         "Disables input from your sytem mouse device. Gamepad mouse mode (select) is not disabled.",
+         {
+           { "false", "disabled" },
+           { "true", "enabled" },
+           { NULL, NULL },
+         },
+         "false"
        },
        // Floppy speed
        {
@@ -221,7 +233,8 @@ static void update_variables(void)
 {
    struct retro_variable var = {0};
 
-   // Joystick
+   // Input
+
    var.key = "hatari_twojoy";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -230,6 +243,18 @@ static void update_variables(void)
       if(strcmp(var.value, "false") == 0)
          hatari_twojoy = false;
       ConfigureParams.Joysticks.Joy[0].nJoystickMode = hatari_twojoy ? JOYSTICK_REALSTICK : JOYSTICK_DISABLED;
+   }
+
+   var.key = "hatari_nomouse";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      hatari_nomouse = false;
+      if(strcmp(var.value, "true") == 0)
+         hatari_nomouse = true;
+      // This doesn't correspond to any Hatari configuration setting, as far as I could find,
+      // but instead just disables input from the RetroArch mouse device for the user (outside the Hatari GUI),
+      // to prevent conflicts if needed, because Hatari seems to automatically merge/combine mouse and joystick in a weird way.
    }
 
    // Floppy
