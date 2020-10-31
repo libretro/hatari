@@ -14,6 +14,7 @@ extern const char *retro_content_directory;
 char RETRO_DIR[512];
 char RETRO_TOS[512];
 extern bool hatari_nomouse;
+extern bool hatari_nokeys;
 
 //HATARI PROTOTYPES
 #include "configuration.h"
@@ -380,7 +381,7 @@ void Process_key(void)
    int i;
    for(i=0;i<320;i++)
    {
-      Key_Sate[i]=input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0,i) ? 0x80: 0;
+      Key_Sate[i]= (input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0,i) && !hatari_nokeys) ? 0x80: 0;
 
       if (i == RETROK_SPACE) // can map R3 to space bar
       {

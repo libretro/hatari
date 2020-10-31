@@ -63,6 +63,7 @@ float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 extern bool UseNonPolarizedLowPassFilter;
 bool hatari_twojoy = true;
 bool hatari_nomouse = false;
+bool hatari_nokeys = false;
 bool hatari_fastfdc = true;
 bool hatari_borders = true;
 char hatari_frameskips[2];
@@ -120,7 +121,18 @@ void retro_set_environment(retro_environment_t cb)
        {
          "hatari_nomouse",
          "Disable mouse",
-         "Disables input from your sytem mouse device. Gamepad mouse mode (select) is not disabled.",
+         "Prevents input from your sytem mouse device. Gamepad mouse mode (select) is not disabled.",
+         {
+           { "false", "disabled" },
+           { "true", "enabled" },
+           { NULL, NULL },
+         },
+         "false"
+       },
+       {
+         "hatari_nokeys",
+         "Disable keyboard",
+         "Prevents input from your sytem keyboard. Virtual keyboard is not disabled.",
          {
            { "false", "disabled" },
            { "true", "enabled" },
@@ -255,6 +267,15 @@ static void update_variables(void)
       // This doesn't correspond to any Hatari configuration setting, as far as I could find,
       // but instead just disables input from the RetroArch mouse device for the user (outside the Hatari GUI),
       // to prevent conflicts if needed, because Hatari seems to automatically merge/combine mouse and joystick in a weird way.
+   }
+
+   var.key = "hatari_nokeys";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      hatari_nokeys = false;
+      if(strcmp(var.value, "true") == 0)
+         hatari_nokeys = true;
    }
 
    // Floppy
