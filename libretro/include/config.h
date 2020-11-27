@@ -29,7 +29,11 @@
 //#define HAVE_GLOB_H 1
 
 /* Define to 1 if you have the <strings.h> header file. */
+#if defined(__CELLOS_LV2__)
+#undef HAVE_STRINGS_H
+#else
 #define HAVE_STRINGS_H 1
+#endif
 
 /* Define to 1 if you have the <SDL/SDL_config.h> header file. */
 //#define HAVE_SDL_SDL_CONFIG_H 1
@@ -74,12 +78,12 @@
 
 /* Define to 1 if you have the 'alphasort' function. */
 #ifndef WIN32PORT
-#if !defined(WIIU) && !defined(VITA)
+#if !defined(WIIU) && !defined(VITA) && !defined(__CELLOS_LV2__)
 #define HAVE_ALPHASORT 1
 #endif
 #endif
 /* Define to 1 if you have the 'scandir' function. */
-#if !defined(WIIU) && !defined(VITA)
+#if !defined(WIIU) && !defined(VITA) && !defined(__CELLOS_LV2__)
 #define HAVE_SCANDIR 1
 #endif
 

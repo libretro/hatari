@@ -450,6 +450,9 @@ cleanup:
 	{
 		/* tmpfile() is removed automatically on close */
 		fclose(tempfile);
+#ifdef __CELLOS_LV2__
+		remove(tmpCfg);
+#endif
 		if (bUseTempCfg)
 			unlink(sTempCfgName);
 	}

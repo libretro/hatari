@@ -387,7 +387,12 @@ static void TOS_CreateAutoInf(void)
 	      && fseek(fp, 0, SEEK_SET) == 0))
 	{
 		if (fp)
+		{
 			fclose(fp);
+#ifdef __CELLOS_LV2__
+			remove(tmpCfg);
+#endif
+		}
 		Log_Printf(LOG_ERROR, "Failed to create autostart file for '%s'!\n", TosAutoStart.prgname);
 		return;
 	}

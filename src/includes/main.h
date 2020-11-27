@@ -19,6 +19,19 @@
 #include <SDL_types.h>
 #include <stdbool.h>
 
+#ifdef __CELLOS_LV2__
+#include "SDL.h"
+#define getenv(x) NULL
+#define getcwd(x, y) NULL
+#define chdir(x) 0
+#include <sys/stat.h>
+int FAKEaccess(char* fpath, int unused);
+#define access FAKEaccess
+#define tmpCfg	"/dev_hdd0/game/SSNE10000/USRDIR/cores/system/hatari_temp.cfg"
+FILE* FAKEtmpfile();
+#define tmpfile FAKEtmpfile
+#endif
+
 #if __GNUC__ >= 3
 # define likely(x)      __builtin_expect (!!(x), 1)
 # define unlikely(x)    __builtin_expect (!!(x), 0)

@@ -30,7 +30,7 @@ const char Paths_fileid[] = "Hatari paths.c : " __DATE__ " " __TIME__;
 #if defined(__MACOSX__)
 	#define HATARI_HOME_DIR "Library/Application Support/Hatari"
 #else
-#if defined(WIIU) || defined(VITA)
+#if defined(WIIU) || defined(VITA) || defined(__CELLOS_LV2__)
 	#define HATARI_HOME_DIR "hatari"
 #else
 	#define HATARI_HOME_DIR ".hatari"
@@ -230,6 +230,20 @@ static void Paths_InitHomeDirs(void)
 	return;
 #endif
 
+#ifdef __CELLOS_LV2__
+	strcpy(sUserHomeDir, "/dev_hdd0/game/SSNE10000/USRDIR/cores/system");
+	strcpy(sHatariHomeDir, "/dev_hdd0/game/SSNE10000/USRDIR/cores/system");
+	if (!File_DirExists(sHatariHomeDir))
+	{
+		if (mkdir(sHatariHomeDir, 0755) != 0)
+		{
+			strcpy(sHatariHomeDir, sUserHomeDir);
+		}
+	}
+
+	return;
+#endif
+
 	psHome = getenv("HOME");
 	if (psHome)
 		strncpy(sUserHomeDir, psHome, FILENAME_MAX);
@@ -297,6 +311,11 @@ void Paths_Init(const char *argv0)
 #elif defined(VITA)
 	strcpy(sWorkingDir, "ux0:/data/retroarch/system");
 	strcpy(sDataDir, "ux0:/data/retroarch/system");
+	Paths_InitHomeDirs();
+	return;
+#elif __CELLOS_LV2__
+	strcpy(sWorkingDir, "/dev_hdd0/game/SSNE10000/USRDIR/cores/system");
+	strcpy(sDataDir, "/dev_hdd0/game/SSNE10000/USRDIR/cores/system");
 	Paths_InitHomeDirs();
 	return;
 #else

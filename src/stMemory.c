@@ -14,7 +14,11 @@ const char STMemory_fileid[] = "Hatari stMemory.c : " __DATE__ " " __TIME__;
 #include "gemdos.h"
 #include "ioMem.h"
 #include "log.h"
+#ifdef __CELLOS_LV2__
+#include <sys/memory.h>
+#else
 #include "memory.h"
+#endif
 #include "memorySnapShot.h"
 #include "tos.h"
 #include "vdi.h"

@@ -36,7 +36,9 @@ const char NvRam_fileid[] = "Hatari nvram.c : " __DATE__ " " __TIME__;
 #include "nvram.h"
 #include "paths.h"
 #include "vdi.h"
-
+#ifdef __CELLOS_LV2__
+#include <time.h>
+#endif
 
 // Defs for checksum
 #define CKS_RANGE_START	14

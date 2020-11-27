@@ -61,6 +61,18 @@ const char Main_fileid[] = "Hatari main.c : " __DATE__ " " __TIME__;
 
 #ifdef __LIBRETRO__
 #include "retromain.inc"
+#ifdef __CELLOS_LV2__
+int FAKEaccess(char* fpath, int unused)
+{
+	struct stat buffer;
+	return stat(fpath, &buffer);
+}
+
+FILE* FAKEtmpfile()
+{
+	return fopen(tmpCfg, "w+");
+}
+#endif
 #endif
 
 #if HAVE_GETTIMEOFDAY

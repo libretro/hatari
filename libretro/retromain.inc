@@ -29,7 +29,7 @@ extern void retro_shutdown_hatari(void);
 #define CONFDIR "/mnt/sdcard/st"
     //#warning "conf dir for android"
 #elif defined(__CELLOS_LV2__)
-#define CONFDIR "/dev_hdd0/HOMEBREW/ST"
+#define CONFDIR "/dev_hdd0/game/SSNE10000/USRDIR/cores/system"
 //#warning "conf dir for ps3"
 #elif defined(WIIU)
 #define CONFDIR "sd:/retroarch/cores/system"

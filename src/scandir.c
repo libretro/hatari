@@ -100,7 +100,7 @@ int scandir(const char *dirp, struct dirent ***namelist,
 
 #if (defined(__sun) && defined(__SVR4)) || defined(__CEGCC__)
 # define dirfd(d) ((d)->dd_fd)
-#elif defined(__BEOS__)
+#elif defined(__BEOS__) || defined(__CELLOS_LV2__)
 # define dirfd(d) ((d)->fd)
 #endif
 
