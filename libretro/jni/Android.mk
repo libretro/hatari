@@ -15,7 +15,7 @@ SOURCES_C :=
 
 include $(CORE_DIR)/Makefile.common
 
-COREFLAGS := -DANDROID -DAND -D__LIBRETRO__ $(INCFLAGS)
+COREFLAGS := -DANDROID -DLSB_FIRST -DAND -D__LIBRETRO__ $(INCFLAGS)
 
 GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
 ifneq ($(GIT_VERSION)," unknown")
