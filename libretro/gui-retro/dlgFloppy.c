@@ -289,7 +289,7 @@ void DlgFloppy_Main(void)
 			}
 			break;
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != FLOPPYDLG_EXIT && but != SDLGUI_QUIT
 	        && but != SDLGUI_ERROR && !bQuitProgram);

@@ -61,6 +61,9 @@ int CHANGE_RATE = 0, CHANGEAV_TIMING = 0;
 float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 
 extern bool UseNonPolarizedLowPassFilter;
+bool hatari_twojoy = true;
+bool hatari_nomouse = false;
+bool hatari_nokeys = false;
 bool hatari_fastfdc = true;
 bool hatari_borders = true;
 char hatari_frameskips[2];
@@ -73,14 +76,15 @@ static struct retro_input_descriptor input_descriptors[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo Fire" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Fire" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "Hatari Settings" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "Virtual keyboard" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Shift keyboard toggle" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Joystick/Mouse toggle" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Joystick 2 toggle" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "Virtual keyboard" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Mouse speed" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Hatari Settings" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "Mouse speed down" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Mouse speed up" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Status display" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "Virtual keyboard page" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "Keyboard space" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Joystick/Mouse X" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Joystick/Mouse Y" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
@@ -89,7 +93,6 @@ static struct retro_input_descriptor input_descriptors[] = {
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo Fire" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Fire" },
-   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Joystick 2 toggle" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Status display" },
    { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Joystick X" },
    { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Joystick Y" },
@@ -103,6 +106,40 @@ void retro_set_environment(retro_environment_t cb)
 
    static struct retro_core_option_definition core_options[] =
    {
+       // Input
+       {
+         "hatari_twojoy",
+         "Enable second joystick",
+         "Enables a second joystick on port 2, may conflict with mouse.",
+         {
+           { "true", "enabled" },
+           { "false", "disabled" },
+           { NULL, NULL },
+         },
+         "true"
+       },
+       {
+         "hatari_nomouse",
+         "Disable mouse",
+         "Prevents input from your sytem mouse device. Gamepad mouse mode (select) is not disabled.",
+         {
+           { "false", "disabled" },
+           { "true", "enabled" },
+           { NULL, NULL },
+         },
+         "false"
+       },
+       {
+         "hatari_nokeys",
+         "Disable keyboard",
+         "Prevents input from your sytem keyboard. Virtual keyboard is not disabled.",
+         {
+           { "false", "disabled" },
+           { "true", "enabled" },
+           { NULL, NULL },
+         },
+         "false"
+       },
        // Floppy speed
        {
          "hatari_fastfdc",
@@ -207,6 +244,39 @@ void retro_set_environment(retro_environment_t cb)
 static void update_variables(void)
 {
    struct retro_variable var = {0};
+
+   // Input
+
+   var.key = "hatari_twojoy";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      hatari_twojoy = true;
+      if(strcmp(var.value, "false") == 0)
+         hatari_twojoy = false;
+      ConfigureParams.Joysticks.Joy[0].nJoystickMode = hatari_twojoy ? JOYSTICK_REALSTICK : JOYSTICK_DISABLED;
+   }
+
+   var.key = "hatari_nomouse";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      hatari_nomouse = false;
+      if(strcmp(var.value, "true") == 0)
+         hatari_nomouse = true;
+      // This doesn't correspond to any Hatari configuration setting, as far as I could find,
+      // but instead just disables input from the RetroArch mouse device for the user (outside the Hatari GUI),
+      // to prevent conflicts if needed, because Hatari seems to automatically merge/combine mouse and joystick in a weird way.
+   }
+
+   var.key = "hatari_nokeys";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      hatari_nokeys = false;
+      if(strcmp(var.value, "true") == 0)
+         hatari_nokeys = true;
+   }
 
    // Floppy
    var.key = "hatari_fastfdc";

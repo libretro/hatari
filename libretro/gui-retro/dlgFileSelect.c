@@ -833,7 +833,7 @@ char* SDLGui_FileSelect(const char *title,const char *path_and_name, char **zip_
 				scrollbar_Ypos = 0.0;
 			}
 		} /* other button code */
-                gui_poll_events();
+		if (gui_poll_events()) retbut=SGFSDLG_CANCEL;
 
 	} /* do */
 	while (retbut!=SGFSDLG_OKAY && retbut!=SGFSDLG_CANCEL

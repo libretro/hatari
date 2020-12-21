@@ -87,7 +87,7 @@ void DlgRom_Main(void)
 					      false);
 			break;
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != DLGROM_EXIT && but != SDLGUI_QUIT
 	       && but != SDLGUI_ERROR && !bQuitProgram);

@@ -114,7 +114,7 @@ Mvk MVk[NPLGN*NLIGN*2]={
 	{ " 5" ," 5"  ,76},
 	{ " 6" ,"Rgt" ,77},
 	{ " 1" ,"End" ,79},
-	{ "Njoy","Njoy",-5},
+	{ "Stat","Stat",-5},
 	{ "Col" ,"Col",-3},
 	{ "Ent" ,"Ent",28},
 	{ "Kbd" ,"Kbd",-4},

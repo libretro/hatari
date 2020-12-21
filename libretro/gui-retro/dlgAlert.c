@@ -171,11 +171,10 @@ static int DlgAlert_ShowDlg(const char *text)
 	bOldMouseVisibility = SDL_ShowCursor(SDL_QUERY);
 	SDL_ShowCursor(SDL_ENABLE);
 
-        do
-	{                     
-	       i = SDLGui_DoDialog(alertdlg, NULL);
-               gui_poll_events();
-
+	do
+	{
+		i = SDLGui_DoDialog(alertdlg, NULL);
+		if (gui_poll_events()) break;
 	}
 	while (i != DLGALERT_OK && i != DLGALERT_CANCEL && i != SDLGUI_QUIT
 	        && i != SDLGUI_ERROR && !bQuitProgram);

@@ -19,7 +19,7 @@ extern char RETRO_DIR[512];
 extern char RETRO_TOS[512];
 extern char RPATH[512];
 extern long GetTicks(void);
-extern void pause_select();
+extern void enter_gui();
 extern int LoadTosFromRetroSystemDir();
 extern void retro_shutdown_hatari(void);
 

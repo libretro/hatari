@@ -257,13 +257,12 @@ void Dialog_SystemDlg(void)
 int but;
 do
 {
-       
 	/* Show the dialog: */
 	but=SDLGui_DoDialog(systemdlg, NULL);
-        gui_poll_events();
+	if (gui_poll_events()) break;
 }
 while (but != DLGSYS_EXIT && but != SDLGUI_QUIT
-	       && but != SDLGUI_ERROR && !bQuitProgram);
+       && but != SDLGUI_ERROR && !bQuitProgram);
 
 	/* Read values from dialog: */
 

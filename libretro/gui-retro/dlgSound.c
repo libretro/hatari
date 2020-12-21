@@ -171,7 +171,7 @@ void Dialog_SoundDlg(void)
 			}
 			break;
 		}
-                gui_poll_events();
+		if (gui_poll_events()) break;
 	}
 	while (but != DLGSOUND_EXIT && but != SDLGUI_QUIT
 	        && but != SDLGUI_ERROR && !bQuitProgram );

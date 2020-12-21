@@ -5,6 +5,7 @@
 #include "joy.h"
 #include "screen.h"
 #include "video.h"	/* FIXME: video.h is dependent on HBL_PALETTE_LINES from screen.h */
+#include "ikbd.h"
 
 //CORE VAR
 extern const char *retro_save_directory;
@@ -12,6 +13,8 @@ extern const char *retro_system_directory;
 extern const char *retro_content_directory;
 char RETRO_DIR[512];
 char RETRO_TOS[512];
+extern bool hatari_nomouse;
+extern bool hatari_nokeys;
 
 //HATARI PROTOTYPES
 #include "configuration.h"
@@ -48,17 +51,17 @@ char RPATH[512];
 
 //EMU FLAGS
 int NPAGE=-1, KCOL=1, BKGCOLOR=0, MAXPAS=6;
-int SHIFTON=-1,MOUSEMODE=-1,SHOWKEY=-1,PAS=4,STATUTON=-1;
+int SHIFTON=-1,MOUSEMODE=-1,SHOWKEY=-1,PAS=2,STATUTON=-1;
 int SND=1; //SOUND ON/OFF
-static int firstps=0;
 int pauseg=0; //enter_gui
 int slowdown=0;
+int exitgui=0; // exit gui (not serialized)
 
 //JOY
 int al[2];//left analog1
 unsigned char MXjoy0; // joy 1
 unsigned char MXjoy1; // joy 2
-int NUMjoy=1; // 1 = joystick+mouse, -1 = 2 joysticks no mouse
+int mbt[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 //MOUSE
 int touch=-1; // gui mouse btn
@@ -66,12 +69,15 @@ int fmousex,fmousey; // emu mouse
 extern int gmx,gmy; //gui mouse
 int point_x_last = -1;
 int point_y_last = -1;
+int mbL=0,mbR=0;
+int mmbL=0, mmbR=0;
 
 //KEYBOARD
 char Key_Sate[512];
 char Key_Sate2[512];
-
-static int mbt[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int oldi=-1;
+int vkx=0,vky=0;
+int vkflag[5]={0,0,0,0,0};
 
 //STATS GUI
 extern int LEDA,LEDB,LEDC;
@@ -93,12 +99,15 @@ void serialize_int(int *x) { SERIALIZE_STEP }
 
 int hatari_mapper_serialize_size()
 {
-	return 1023;
+	return 1023; // +1 byte for version makes an even 1kb header
 }
 
 static bool hatari_mapper_serialize_bidi(char* data, char version)
 {
 	// ignoring version, there is only one version so far
+	// (Might be okay to append to this list without increasing version
+	// if 0 is an acceptable fallback for the new value,
+	// but do not reorder without increasing version number.)
 	serialize_data = data;
 	serialize_int(&NPAGE);
 	serialize_int(&KCOL);
@@ -116,6 +125,18 @@ static bool hatari_mapper_serialize_bidi(char* data, char version)
 	serialize_int(&fmousey);
 	serialize_int(&gmx);
 	serialize_int(&gmy);
+	int NUMjoy=0; serialize_int(&NUMjoy); // this variable was removed
+	int firstps=0; serialize_int(&firstps); // this variable was removed
+	serialize_int(&mbL);
+	serialize_int(&mbR);
+	serialize_int(&mmbL);
+	serialize_int(&mmbR);
+	serialize_int(&oldi);
+	serialize_int(&vkx);
+	serialize_int(&vky);
+	for (int i=0; i<5;  ++i) serialize_int(&(vkflag[i]));
+	for (int i=0; i<16; ++i) serialize_int(&(mbt[i]));
+
 	if ((int)(data - serialize_data) > hatari_mapper_serialize_size())
 	{
 		fprintf(stderr, "hatari_mapper_serialize_size()=%d insufficient! (Needs: %d)\n", hatari_mapper_serialize_size(), (int)(data - serialize_data));
@@ -135,7 +156,12 @@ bool hatari_mapper_unserialize(const char* data, char version)
 	serialize_forward = false;
 	int pauseg_old = pauseg;
 	bool result = hatari_mapper_serialize_bidi((char*)data, version);
-	if (pauseg_old) pauseg = pauseg_old; // because of the co-thread implementation there's really no way to save-state out of the GUI, so: stay paused
+	exitgui = 0;
+	if (pauseg_old && !pauseg) // want to exit GUI, turn pauseg back on and tell it to exit on its own
+	{
+		pauseg = pauseg_old;
+		exitgui = 1;
+	}
 	return result;
 }
 
@@ -186,10 +212,11 @@ long GetTicks(void)
 } 
 
 //NO SURE FIND BETTER WAY TO COME BACK IN MAIN THREAD IN HATARI GUI
-void gui_poll_events(void)
+bool gui_poll_events(void)
 {
    slowdown=0;
    co_switch(mainThread);
+   return (exitgui != 0);
 }
 
 //save bkg for screenshot
@@ -299,24 +326,16 @@ void texture_init(void)
 void enter_gui(void)
 {
    save_bkg();
-
+   exitgui=0;
+   pauseg=1; // should already be set
    Dialog_DoProperty();
    pauseg=0;
-}
-
-void pause_select(void)
-{
-   if(pauseg==1 && firstps==0)
-   {
-      firstps=1;
-      enter_gui();
-      firstps=0;
-   }
 }
 
 void Print_Statut(void)
 {
    STAT_BASEY=CROP_HEIGHT+24;
+   int NUMjoy = (ConfigureParams.Joysticks.Joy[0].nJoystickMode == JOYSTICK_REALSTICK) ? 2 : 1;
 
    DrawFBoxBmp(bmp,0,STAT_BASEY,CROP_WIDTH,STAT_YSZ,RGB565(0,0,0));
 
@@ -324,7 +343,7 @@ void Print_Statut(void)
    if (MOUSEMODE>=0)
    Draw_text(bmp,STAT_DECX+40 ,STAT_BASEY,0xffff,0x8080,1,2,40,"Speed:%d",PAS);
    Draw_text(bmp,STAT_DECX+100,STAT_BASEY,0xffff,0x8080,1,2,40,(SHIFTON>0)?"SHIFT":"     ");
-   Draw_text(bmp,STAT_DECX+150,STAT_BASEY,0xffff,0x8080,1,2,40,"Joysticks:%s",(NUMjoy < 0) ? " 2 " : "1+M");
+   Draw_text(bmp,STAT_DECX+150,STAT_BASEY,0xffff,0x8080,1,2,40,"Joysticks:%s",(NUMjoy > 1) ? " 2 " : " 1 ");
 
    if(LEDA)
    {
@@ -362,7 +381,13 @@ void Process_key(void)
    int i;
    for(i=0;i<320;i++)
    {
-      Key_Sate[i]=input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0,i) ? 0x80: 0;
+      Key_Sate[i]= (input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0,i) && !hatari_nokeys) ? 0x80: 0;
+
+      if (i == RETROK_SPACE) // can map R3 to space bar
+      {
+         char joyspace = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ? 0x80 : 0;
+         Key_Sate[i] |= joyspace;
+      }
 
       if(SDLKeyToSTScanCode[i]==0x2a )
       {  //SHIFT CASE
@@ -394,7 +419,7 @@ void Process_key(void)
    }
 }
 
-const int DEADZONE = 0x8000 / 16;
+const int DEADZONE = 0x8000 / 12;
 void Deadzone(int* a)
 {
    if (al[0] <= -DEADZONE) al[0] += DEADZONE;
@@ -404,25 +429,23 @@ void Deadzone(int* a)
 }
 
 /*
-   L2  show/hide Status
-   R2  swap kbd pages
-   L   show/hide vkbd
-   R   MOUSE SPEED(gui/emu)
+   L   show/hide Status
+   R   swap kbd pages
+   L2  MOUSE SPEED DOWN (gui/emu)
+   R2  MOUSE SPEED UP(gui/emu)
    SEL toggle mouse/joy mode
-   STR toggle num joy 
+   STR Hatari Gui / Exit Gui
    B   fire/mouse-left/valid key in vkbd
    A   mouse-right
    Y   switch Shift ON/OFF
-   X   Hatari Gui
+   X   show/hide vkbd
+   R3  keyboard space
    */
 
 void update_input(void)
 {
    int i;
-   static int oldi=-1;
-   static int vkx=0,vky=0;
 
-   static int mbL=0,mbR=0;
    int mouse_l;
    int mouse_r;
    int16_t mouse_x;
@@ -441,11 +464,16 @@ void update_input(void)
 
    Process_key();
 
-   i=RETRO_DEVICE_ID_JOYPAD_X;
-   if (Key_Sate[RETROK_TILDE] || Key_Sate[RETROK_BACKQUOTE] || input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   i=RETRO_DEVICE_ID_JOYPAD_START;// Hatari GUI
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
+      mbt[i]=1;
+   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   {
+      mbt[i]=0;
       pauseg=1;
+   }
 
-   i=RETRO_DEVICE_ID_JOYPAD_L;//show vkey toggle
+   i=RETRO_DEVICE_ID_JOYPAD_X;//show vkey toggle
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -462,20 +490,18 @@ void update_input(void)
    {
       mbt[i]=0;
       MOUSEMODE=-MOUSEMODE;
-      if (MOUSEMODE > 0) NUMjoy=1;
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_START;//num joy toggle (on either joystick)
-   if ( (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) || input_state_cb(1, RETRO_DEVICE_JOYPAD, 0, i)) && mbt[i]==0 )
+   i=RETRO_DEVICE_ID_JOYPAD_L2;//mouse gui speed down
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
-   else if ( mbt[i]==1 && ! (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  || input_state_cb(1, RETRO_DEVICE_JOYPAD, 0, i)) )
+   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
    {
       mbt[i]=0;
-      NUMjoy=-NUMjoy;
-      if (NUMjoy < 0) MOUSEMODE=-1;
+      PAS--;if(PAS<1)PAS=MAXPAS;
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_R;//mouse gui speed
+   i=RETRO_DEVICE_ID_JOYPAD_R2;//mouse gui speed up
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -494,7 +520,7 @@ void update_input(void)
       Screen_SetFullUpdate();
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_L2;//show/hide status (either joystick)
+   i=RETRO_DEVICE_ID_JOYPAD_L;//show/hide status (either joystick)
    if ( (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) || input_state_cb(1, RETRO_DEVICE_JOYPAD, 0, i)) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) || input_state_cb(1, RETRO_DEVICE_JOYPAD, 0, i)) )
@@ -504,7 +530,7 @@ void update_input(void)
       Screen_SetFullUpdate();
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_R2;//swap kbd pages
+   i=RETRO_DEVICE_ID_JOYPAD_R;//swap kbd pages
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
@@ -519,7 +545,7 @@ void update_input(void)
 
    // joystick 2
 
-   if (NUMjoy < 0) // 2 joysticks, no mouse
+   if (ConfigureParams.Joysticks.Joy[0].nJoystickMode == JOYSTICK_REALSTICK) // 2 joysticks
    {
       al[0] =(input_state_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
       al[1] =(input_state_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
@@ -554,8 +580,6 @@ void update_input(void)
 
    if(SHOWKEY==1)
    {
-      static int vkflag[5]={0,0,0,0,0};
-
       // analog stick can work the keyboard
       al[0] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
       al[1] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
@@ -635,10 +659,9 @@ void update_input(void)
          }
          else if(i==-5)
          {
-            //Change Joy number
-            NUMjoy=-NUMjoy;
-            if (NUMjoy < 0) MOUSEMODE = -1;
-            oldi=-1;
+            //Toggle stats
+            STATUTON=-STATUTON;
+            Screen_SetFullUpdate();
          }
          else
          {
@@ -702,13 +725,20 @@ void update_input(void)
             MXjoy0 &= ~ATARIJOY_BITMASK_FIRE;
       }
 
-      mouse_x = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
-      mouse_y = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
-      mouse_l    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
-      mouse_r    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
-
-      fmousex=mouse_x;
-      fmousey=mouse_y;
+      if (hatari_nomouse)
+      {
+         mouse_l = 0;
+         mouse_r = 0;
+      }
+      else
+      {
+         mouse_x = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
+         mouse_y = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
+         mouse_l = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
+         mouse_r = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
+         fmousex=mouse_x;
+         fmousey=mouse_y;
+      }
 
    }
    else // MOUSEMODE >= 0
@@ -727,13 +757,13 @@ void update_input(void)
 
       //emulate mouse with dpad
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
-         fmousex += PAS;
+         fmousex += PAS*3;
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
-         fmousex -= PAS;
+         fmousex -= PAS*3;
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
-         fmousey += PAS;
+         fmousey += PAS*3;
       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
-         fmousey -= PAS;
+         fmousey -= PAS*3;
 
       mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
       mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
@@ -771,6 +801,7 @@ void input_gui(void)
 {
    input_poll_cb();
 
+   int i;
    int mouse_l;
    int mouse_r;
    int16_t mouse_x,mouse_y;
@@ -779,13 +810,34 @@ void input_gui(void)
    if(slowdown>0)return;
 
    // ability to adjust mouse speed in hatari GUI
-   int i=RETRO_DEVICE_ID_JOYPAD_R;
+
+   i=RETRO_DEVICE_ID_JOYPAD_L2;
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
+      mbt[i]=1;
+   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   {
+      mbt[i]=0;
+      PAS--;if(PAS<0)PAS=MAXPAS;
+   }
+
+   i=RETRO_DEVICE_ID_JOYPAD_R2;
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
    {
       mbt[i]=0;
       PAS++;if(PAS>MAXPAS)PAS=1;
+   }
+
+   // START to exit GUI
+
+   i=RETRO_DEVICE_ID_JOYPAD_START;
+   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
+      mbt[i]=1;
+   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   {
+      mbt[i]=0;
+      exitgui=1;
    }
 
    //emulate mouse with joy analog left
@@ -798,13 +850,13 @@ void input_gui(void)
    mouse_y += al[1]/1024;
 
    if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
-      mouse_x += PAS;
+      mouse_x += PAS*3;
    if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
-      mouse_x -= PAS;
+      mouse_x -= PAS*3;
    if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
-      mouse_y += PAS;
+      mouse_y += PAS*3;
    if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
-      mouse_y -= PAS;
+      mouse_y -= PAS*3;
    mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
    mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
 
@@ -827,8 +879,6 @@ void input_gui(void)
    }
 
    slowdown=1;
-
-   static int mmbL = 0, mmbR = 0;
 
    if(mmbL==0 && (mouse_l || point_b))
    {

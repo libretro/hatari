@@ -54,13 +54,12 @@ void Dialog_AboutDlg(void)
 	aboutdlg[1].x = (aboutdlg[0].w - strlen(PROG_NAME)) / 2;
 
 	SDLGui_CenterDlg(aboutdlg);
-        do
+	do
 	{
-                but=SDLGui_DoDialog(aboutdlg, NULL);
-                gui_poll_events();
-
-        }
-        while (but != DLGABOUT_EXIT && but != SDLGUI_QUIT
+		but=SDLGui_DoDialog(aboutdlg, NULL);
+		if (gui_poll_events()) break;
+	}
+	while (but != DLGABOUT_EXIT && but != SDLGUI_QUIT
 	       && but != SDLGUI_ERROR && !bQuitProgram);
 
 }

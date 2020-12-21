@@ -312,7 +312,7 @@ void Main_WaitOnVbl(void)
 	Sint64 nDelay;
 
 #ifdef __LIBRETRO__
-if(pauseg==1)pause_select();
+if(pauseg==1)enter_gui();
 co_switch(mainThread);
 #if defined(WIIU) || defined(VITA)
 return;
