@@ -16,7 +16,7 @@ char RETRO_TOS[512];
 extern bool hatari_nomouse;
 extern bool hatari_nokeys;
 
-//HATARI PROTOTYPES
+/* HATARI PROTOTYPES */
 #include "configuration.h"
 #include "file.h"
 extern bool Dialog_DoProperty(void);
@@ -26,18 +26,19 @@ extern void Main_UnInit(void);
 extern int  hmain(int argc, char *argv[]);
 extern int Reset_Cold(void);
 
-//TIME
-#ifdef __CELLOS_LV2__
-#include "sys/sys_time.h"
-#include "sys/timer.h"
+#ifdef __PS3__
+#ifndef __PSL1GHT__
+#include <sys/sys_time.h>
+#include <sys/timer.h>
 #define usleep  sys_timer_usleep
-#else
+#endif
+#endif
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <time.h>
-#endif
 
-//VIDEO
+/* VIDEO */
 extern SDL_Surface *sdlscrn; 
 unsigned short int bmp[1024*1024];
 unsigned char savbkg[1024*1024* 2];
@@ -97,17 +98,21 @@ static char* serialize_data;
 void serialize_char(char *x) { SERIALIZE_STEP }
 void serialize_int(int *x) { SERIALIZE_STEP }
 
-int hatari_mapper_serialize_size()
+int hatari_mapper_serialize_size(void)
 {
 	return 1023; // +1 byte for version makes an even 1kb header
 }
 
 static bool hatari_mapper_serialize_bidi(char* data, char version)
 {
-	// ignoring version, there is only one version so far
-	// (Might be okay to append to this list without increasing version
-	// if 0 is an acceptable fallback for the new value,
-	// but do not reorder without increasing version number.)
+   int i;
+   int NUMjoy  = 0;
+   int firstps = 0;
+	/* ignoring version, there is only one version so far
+	 * (Might be okay to append to this list without increasing version
+	 * if 0 is an acceptable fallback for the new value,
+	 * but do not reorder without increasing version number.)
+    */
 	serialize_data = data;
 	serialize_int(&NPAGE);
 	serialize_int(&KCOL);
@@ -125,8 +130,8 @@ static bool hatari_mapper_serialize_bidi(char* data, char version)
 	serialize_int(&fmousey);
 	serialize_int(&gmx);
 	serialize_int(&gmy);
-	int NUMjoy=0; serialize_int(&NUMjoy); // this variable was removed
-	int firstps=0; serialize_int(&firstps); // this variable was removed
+	serialize_int(&NUMjoy); // this variable was removed
+	serialize_int(&firstps); // this variable was removed
 	serialize_int(&mbL);
 	serialize_int(&mbR);
 	serialize_int(&mmbL);
@@ -134,8 +139,10 @@ static bool hatari_mapper_serialize_bidi(char* data, char version)
 	serialize_int(&oldi);
 	serialize_int(&vkx);
 	serialize_int(&vky);
-	for (int i=0; i<5;  ++i) serialize_int(&(vkflag[i]));
-	for (int i=0; i<16; ++i) serialize_int(&(mbt[i]));
+	for (i=0; i<5;  ++i)
+      serialize_int(&(vkflag[i]));
+	for (i=0; i<16; ++i)
+      serialize_int(&(mbt[i]));
 
 	if ((int)(data - serialize_data) > hatari_mapper_serialize_size())
 	{
@@ -154,19 +161,20 @@ bool hatari_mapper_serialize(char* data, char version)
 bool hatari_mapper_unserialize(const char* data, char version)
 {
 	serialize_forward = false;
-	int pauseg_old = pauseg;
-	bool result = hatari_mapper_serialize_bidi((char*)data, version);
-	exitgui = 0;
-	if (pauseg_old && !pauseg) // want to exit GUI, turn pauseg back on and tell it to exit on its own
+	int pauseg_old    = pauseg;
+	bool result       = hatari_mapper_serialize_bidi((char*)data, version);
+	exitgui            = 0;
+	if (pauseg_old && !pauseg)
 	{
+      /* want to exit GUI, turn pauseg back on 
+       * and tell it to exit on its own */
 		pauseg = pauseg_old;
 		exitgui = 1;
 	}
 	return result;
 }
 
-// input state
-
+/* input state */
 static retro_input_state_t input_state_cb;
 static retro_input_poll_t input_poll_cb;
 
@@ -180,19 +188,26 @@ void retro_set_input_poll(retro_input_poll_t cb)
    input_poll_cb = cb;
 }
 
+#ifdef __PS3__
+#ifndef __PSL1GHT__
+#define sysGetCurrentTime sys_time_get_current_time
+#endif
+#endif
+
+/* in milliseconds */
 long GetTicks(void)
-{ // in MSec
-#ifndef _ANDROID_
-
-#ifdef __CELLOS_LV2__
-
-   //#warning "GetTick PS3\n"
-
+{
+#ifdef _ANDROID_
+   struct timespec now;
+   clock_gettime(CLOCK_MONOTONIC, &now);
+   return (now.tv_sec*1000000 + now.tv_nsec/1000)/1000;
+#else
+#ifdef __PS3__
    unsigned long        ticks_micro;
    uint64_t secs;
    uint64_t nsecs;
 
-   sys_time_get_current_time(&secs, &nsecs);
+   sysGetCurrentTime(&secs, &nsecs);
    ticks_micro =  secs * 1000000UL + (nsecs / 1000);
 
    return ticks_micro/1000;
@@ -201,12 +216,6 @@ long GetTicks(void)
    gettimeofday (&tv, NULL);
    return (tv.tv_sec*1000000 + tv.tv_usec)/1000;
 #endif
-
-#else
-
-   struct timespec now;
-   clock_gettime(CLOCK_MONOTONIC, &now);
-   return (now.tv_sec*1000000 + now.tv_nsec/1000)/1000;
 #endif
 
 } 
@@ -311,7 +320,6 @@ SDL_Surface *prepare_texture(int w,int h,int b)
    bitmp->clip_rect.w=w;
    bitmp->clip_rect.h=h;
 
-   //printf("fin prepare tex:%dx%dx%d\n",bitmp->w,bitmp->h,bitmp->format->BytesPerPixel);
    return bitmp;
 }      
 
@@ -799,17 +807,19 @@ void update_input(void)
 
 void input_gui(void)
 {
-   input_poll_cb();
 
    int i;
    int mouse_l;
    int mouse_r;
-   int16_t mouse_x,mouse_y;
-   mouse_x=mouse_y=0;
+   int16_t mouse_x = 0;
+   int16_t mouse_y = 0;
 
-   if(slowdown>0)return;
+   input_poll_cb();
 
-   // ability to adjust mouse speed in hatari GUI
+   if(slowdown>0)
+      return;
+
+   /* ability to adjust mouse speed in hatari GUI */
 
    i=RETRO_DEVICE_ID_JOYPAD_L2;
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
@@ -870,12 +880,12 @@ void input_gui(void)
    int point_b = input_state_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_PRESSED);
    if (point_x != point_x_last || point_y != point_y_last)
    {
-      point_x_last = point_x;
-      point_y_last = point_y;
       const int PMIN = -0x7FFF;
       const int PMAX = 0x7FFF;
-      gmx = ((point_x - PMIN) * retrow) / (PMAX - PMIN);
-      gmy = ((point_y - PMIN) * retroh) / (PMAX - PMIN);
+      point_x_last   = point_x;
+      point_y_last   = point_y;
+      gmx            = ((point_x - PMIN) * retrow) / (PMAX - PMIN);
+      gmy            = ((point_y - PMIN) * retroh) / (PMAX - PMIN);
    }
 
    slowdown=1;

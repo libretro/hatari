@@ -162,18 +162,7 @@ else ifeq ($(platform), wiiu)
    STATIC_LINKING=1
    STATIC_LINKING_LINK = 1
    CFLAGS +=  -DALIGN_DWORD $(PLATFORM_DEFINES) -I$(ZLIB_DIR) 
-else ifeq ($(platform), ps3)
-	TARGET := $(TARGET_NAME)_libretro_ps3.a
-   CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
-   CXX = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-g++.exe
-   AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
-   SHARED :=   -lm -lpthread -lc
-   CFLAGS += -DSDL_BYTEORDER=SDL_BIG_ENDIAN -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN  -DBYTE_ORDER=BIG_ENDIAN \
-	-D__CELLOS_LV2 -DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) 
-   PLATFLAGS :=  -DALIGN_DWORD 
-   EXTERNAL_ZLIB = 1
-	STATIC_LINKING=1
-	STATIC_LINKING_LINK=1
+
 else ifeq ($(platform), vita)
 	TARGET := $(TARGET_NAME)_libretro_vita.a
    CC = arm-vita-eabi-gcc

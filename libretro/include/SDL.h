@@ -84,15 +84,18 @@ Uint8 type;
 //MOUSE
 #define SDL_GetMouseState(X,Y) GuiGetMouseState((X),(Y))
 
-//PS3 HACK
-#if defined(__CELLOS_LV2__) 
+#if defined(__PS3__) 
 #include <unistd.h> //stat() is defined here
+
+#ifndef __PSL1GHT__
 #define S_ISDIR(x) (x & CELL_FS_S_IFDIR)
 #define F_OK 0
 
-#include "sys/sys_time.h"
-#include "sys/timer.h"
+#include <sys/sys_time.h>
+#include <sys/timer.h>
 #define usleep  sys_timer_usleep
+#endif
+
 #endif
 
 

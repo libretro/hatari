@@ -48,11 +48,10 @@ typedef struct SDL_error
 } SDL_error;
 
 
-#ifdef __CELLOS_LV2__
+#ifdef __PS3__
 
 #include <pthread.h>
 #include <semaphore.h>
-
 
 struct SDL_semaphore
 {

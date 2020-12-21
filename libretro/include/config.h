@@ -50,7 +50,7 @@
 //#define HAVE_UNIX_DOMAIN_SOCKETS 1
 
 #ifdef __LIBRETRO__
-#if defined(AND) || defined(__CELLOS_LV2__) || defined(WIIU) || defined(VITA)
+#if defined(AND) || defined(__PS3__) || defined(WIIU) || defined(VITA)
 #undef HAVE_POSIX_MEMALIGN
 #else
 #define HAVE_POSIX_MEMALIGN 1
@@ -84,7 +84,7 @@
 #endif
 
 #ifdef __LIBRETRO__
-#if defined(AND) || defined(__CELLOS_LV2__) || defined(WIN32PORT) || defined(WIIU) || defined(VITA)
+#if defined(AND) || defined(__PS3__) || defined(WIN32PORT) || defined(WIIU) || defined(VITA)
 #undef HAVE_STATVFS
 #else
 #define HAVE_STATVFS 1
