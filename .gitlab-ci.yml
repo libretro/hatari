@@ -32,14 +32,6 @@ include:
     file: '/android-jni.yml'
     
   ################################## CONSOLES ################################
-  # Nintendo GameCube
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/ngc-static.yml'
-
-  # Nintendo Wii
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/wii-static.yml'
-    
   # PlayStation Vita
   - project: 'libretro-infrastructure/ci-templates'
     file: '/vita-static.yml'
@@ -99,18 +91,6 @@ android-x86:
     - .core-defs
 
 ################################### CONSOLES #################################
-# Nintendo GameCube
-libretro-build-ngc:
-  extends:
-    - .libretro-ngc-static-retroarch-master
-    - .core-defs
-
-# Nintendo Wii
-libretro-build-wii:
-  extends:
-    - .libretro-wii-static-retroarch-master
-    - .core-defs
-
 # PlayStation Vita
 libretro-build-vita:
   extends:
