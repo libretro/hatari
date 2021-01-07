@@ -17,7 +17,7 @@ else ifneq ($(findstring win,$(shell uname -a)),)
 endif
 endif
 
-EXTERNAL_ZLIB = 0
+EXTERNAL_ZLIB ?= 0
 
 TARGET_NAME	:= hatari
 GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
