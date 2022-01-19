@@ -42,29 +42,3 @@ void path_join(char* out, const char* basedir, const char* filename)
 {
 	snprintf(out, RETRO_PATH_MAX, "%s%s%s", basedir, RETRO_PATH_SEPARATOR, filename);
 }	
-
-#ifdef VITA
-#include <psp2/types.h>
-#include <psp2/io/dirent.h>
-#include <psp2/kernel/threadmgr.h>
-
-#define rmdir(name) sceIoRmdir(name)
-
-
-int chdir( const char* path)
-{
-  return 0;
-}
-
-char* getcwd( char* buf, size_t size )
-{
-  if ( buf != NULL && size >= 2 )
-  {
-    buf[ 0 ] = '.';
-    buf[ 1 ] = 0;
-    return buf;
-  }
-
-  return NULL;
-}
-#endif
