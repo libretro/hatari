@@ -18,7 +18,11 @@ const char FPP_fileid[] = "Hatari fpp.c : " __DATE__ " " __TIME__;
 
 #include "sysdeps.h"
 #include "hatari-glue.h"
+#ifdef __PS3__
+#include <sys/memory.h>
+#else
 #include "memory.h"
+#endif
 #include "newcpu.h"
 #include "savestate.h"
 

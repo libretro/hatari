@@ -30,7 +30,11 @@ const char HatariGlue_fileid[] = "Hatari hatari-glue.c : " __DATE__ " " __TIME__
 
 #include "sysdeps.h"
 #include "maccess.h"
+#ifdef __PS3__
+#include <sys/memory.h>
+#else
 #include "memory.h"
+#endif
 #include "m68000.h"
 #include "newcpu.h"
 #include "hatari-glue.h"

@@ -1,7 +1,11 @@
 #include "sysdeps.h"
 #include "hatari-glue.h"
 #include "maccess.h"
+#ifdef __PS3__
+#include <sys/memory.h>
+#else
 #include "memory.h"
+#endif
 #include "newcpu.h"
 #include "cputbl.h"
 #define CPUFUNC(x) x##_ff
