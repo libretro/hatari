@@ -39,6 +39,10 @@ const char File_fileid[] = "Hatari file.c : " __DATE__ " " __TIME__;
 #include "retro_files.h"
 #endif
 
+#ifdef __PS3__
+#include "SDL.h"
+#endif
+
 /*-----------------------------------------------------------------------*/
 /**
  * Remove any '/'s from end of filenames, but keeps / intact

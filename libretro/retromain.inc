@@ -3,12 +3,6 @@ extern cothread_t mainThread;
 extern cothread_t emuThread;
 extern int pauseg;
 
-#ifdef __PS3__
-#ifndef __PSL1GHT__
-#undef HAVE_GETTIMEOFDAY
-#undef HAVE_NANOSLEEP
-#endif
-#endif
 extern int gmx,gmy;
 extern int fmousex,fmousey;
 extern int SND;
@@ -31,8 +25,18 @@ extern void retro_shutdown_hatari(void);
 #define CONFDIR "/mnt/sdcard/st"
     //#warning "conf dir for android"
 #elif defined(__PS3__)
-#define CONFDIR "/dev_hdd0/HOMEBREW/ST"
+#define CONFDIR "/dev_hdd0/game/RETROARCH/USRDIR/cores/system"
 //#warning "conf dir for ps3"
+int FAKEaccess(char* fpath, int unused)
+{
+	struct stat buffer;
+	return stat(fpath, &buffer);
+}
+
+FILE* FAKEtmpfile()
+{
+	return fopen(tmpCfg, "w+");
+}
 #elif defined(WIIU)
 #define CONFDIR "sd:/retroarch/cores/system"
 #elif defined(GEKKO)

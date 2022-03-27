@@ -445,6 +445,9 @@ cleanup:
 		if (ferror(cfgfile))
 			perror("update_config");
 		fclose(cfgfile);
+#ifdef __PS3__
+		remove(tmpCfg);
+#endif
 	}
 	if (tempfile)
 	{

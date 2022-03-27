@@ -21,7 +21,11 @@
 
 #include "cycles.h"     /* for nCyclesMainCounter */
 #include "sysdeps.h"
+#ifdef __PS3__
+#include <sys/memory.h>
+#else
 #include "memory.h"
+#endif
 #include "newcpu.h"     /* for regs */
 #include "cycInt.h"
 #include "log.h"

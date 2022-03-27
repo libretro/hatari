@@ -29,7 +29,9 @@
 //#define HAVE_GLOB_H 1
 
 /* Define to 1 if you have the <strings.h> header file. */
+#ifndef __PS3__
 #define HAVE_STRINGS_H 1
+#endif
 
 /* Define to 1 if you have the <SDL/SDL_config.h> header file. */
 //#define HAVE_SDL_SDL_CONFIG_H 1
@@ -67,19 +69,21 @@
 #define HAVE_MEMALIGN 1
 
 /* Define to 1 if you have the 'gettimeofday' function. */
+#if !defined(__PS3__) || defined(__PSL1GHT__)
 #define HAVE_GETTIMEOFDAY 1
+#endif
 
 /* Define to 1 if you have the 'nanosleep' function. */
 //#define HAVE_NANOSLEEP 1
 
 /* Define to 1 if you have the 'alphasort' function. */
 #ifndef WIN32PORT
-#if !defined(WIIU) && !defined(VITA)
+#if !defined(WIIU) && !defined(VITA) && !defined(__PS3__)
 #define HAVE_ALPHASORT 1
 #endif
 #endif
 /* Define to 1 if you have the 'scandir' function. */
-#if !defined(WIIU) && !defined(VITA)
+#if !defined(WIIU) && !defined(VITA) && !defined(__PS3__)
 #define HAVE_SCANDIR 1
 #endif
 
