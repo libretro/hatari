@@ -167,7 +167,7 @@ const char NewCpu_fileid[] = "Hatari newcpu.c : " __DATE__ " " __TIME__;
 
 #ifdef HAVE_CAPSIMAGE
 #if CAPSIMAGE_VERSION == 5
-#include <caps5/CapsLibAll.h>
+#include <CapsLibAll.h>
 #endif
 #endif
 

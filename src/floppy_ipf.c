@@ -27,7 +27,7 @@ const char floppy_ipf_fileid[] = "Hatari floppy_ipf.c : " __DATE__ " " __TIME__;
 
 #ifdef HAVE_CAPSIMAGE
 #if CAPSIMAGE_VERSION == 5
-#include <caps5/CapsLibAll.h>
+#include <CapsLibAll.h>
 #else
 #include <caps/fdc.h>
 #define CAPS_LIB_RELEASE	4
