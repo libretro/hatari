@@ -201,6 +201,10 @@ ifneq ($(EXTERNAL_ZLIB), 1)
 ZLIB = -lz
 endif
 
+ifeq ($(capsimg), 1)
+PLATFLAGS += -DHAVE_CAPSIMAGE -DCAPSIMAGE_VERSION=5 -I$(capssrc)/LibIPF/ -I$(capssrc)/Core/
+endif
+
 ifeq ($(DEBUG), 1)
 CFLAGS += -Og -g
 else
