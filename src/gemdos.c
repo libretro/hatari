@@ -63,8 +63,6 @@ const char Gemdos_fileid[] = "Hatari gemdos.c : " __DATE__ " " __TIME__;
 #include <psp2/types.h>
 #include <psp2/io/dirent.h>
 #include <psp2/kernel/threadmgr.h>
-#define mkdir(name,mode) sceIoMkdir(name, 0777)
-#define rmdir(name) sceIoRmdir(name)
 #endif
 
 /* Maximum supported length of a GEMDOS path: */
