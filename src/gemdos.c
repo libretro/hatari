@@ -30,7 +30,9 @@ const char Gemdos_fileid[] = "Hatari gemdos.c : " __DATE__ " " __TIME__;
 #include <sys/statvfs.h>
 #endif
 #include <sys/types.h>
+#if !defined(VITA)
 #include <utime.h>
+#endif
 #include <time.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -241,9 +243,10 @@ static bool GemDOS_SetFileInformation(int Handle, DATETIME *DateTime)
 		return false;
 	timebuf.actime = filestat.st_atime;
 
+#if !defined(VITA)
 	if (utime(filename, &timebuf) != 0)
 		return false;
-	// fprintf(stderr, "set date '%s' for %s\n", asctime(&timespec), name);
+#endif
 	return true;
 }
 
