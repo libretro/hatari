@@ -30,13 +30,19 @@ const char Gemdos_fileid[] = "Hatari gemdos.c : " __DATE__ " " __TIME__;
 #include <sys/statvfs.h>
 #endif
 #include <sys/types.h>
-#if !defined(VITA)
-#include <utime.h>
-#endif
 #include <time.h>
 #include <ctype.h>
 #include <unistd.h>
 #include <errno.h>
+
+#if defined(VITA)
+#include <psp2/types.h>
+#include <psp2/io/dirent.h>
+#include <psp2/kernel/threadmgr.h>
+#else
+#include <utime.h>
+#define HAVE_UTIME
+#endif
 
 #include "main.h"
 #include "cart.h"
@@ -61,11 +67,6 @@ const char Gemdos_fileid[] = "Hatari gemdos.c : " __DATE__ " " __TIME__;
 #include "maccess.h"
 #include "symbols.h"
 
-#if defined(VITA)
-#include <psp2/types.h>
-#include <psp2/io/dirent.h>
-#include <psp2/kernel/threadmgr.h>
-#endif
 
 /* Maximum supported length of a GEMDOS path: */
 #define MAX_GEMDOS_PATH 256
@@ -214,7 +215,9 @@ static bool GemDOS_GetFileInformation(int Handle, DATETIME *DateTime)
 static bool GemDOS_SetFileInformation(int Handle, DATETIME *DateTime)
 {
 	const char *filename;
+#ifdef HAVE_UTIME
 	struct utimbuf timebuf;
+#endif
 	struct stat filestat;
 	struct tm timespec;
 
@@ -235,15 +238,16 @@ static bool GemDOS_SetFileInformation(int Handle, DATETIME *DateTime)
 	/* check whether DST should be taken into account */
 	timespec.tm_isdst = -1;
 
+#ifdef HAVE_UTIME
 	/* set new modification time */
 	timebuf.modtime = mktime(&timespec);
+#endif
 
 	/* but keep previous access time */
 	if (stat(filename, &filestat) != 0)
 		return false;
+#ifdef HAVE_UTIME
 	timebuf.actime = filestat.st_atime;
-
-#if !defined(VITA)
 	if (utime(filename, &timebuf) != 0)
 		return false;
 #endif
