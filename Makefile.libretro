@@ -97,6 +97,10 @@ else
    SHARED := -shared -static-libgcc -s -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined 
 endif
 
+ifeq ($(capsimg), 1)
+PLATFLAGS += -DHAVE_CAPSIMAGE -DCAPSIMAGE_VERSION=5 -I$(capssrc)/LibIPF/ -I$(capssrc)/Core/
+endif
+
 ifeq ($(DEBUG), 1)
    CFLAGS += -O0 -g
 else
