@@ -339,7 +339,7 @@ static void update_variables(void)
       {
          case HATARI_VIDEO_OV_LO:
             retrow = 416;
-            retroh = 260;
+            retroh = 274;
             hatari_borders = true;
             break;
          case HATARI_VIDEO_CR_LO:
@@ -350,12 +350,12 @@ static void update_variables(void)
             break;
          case HATARI_VIDEO_OV_HI:
             retrow = 832;
-            retroh = 520;
+            retroh = 548;
             hatari_borders = true;
             break;
          case HATARI_VIDEO_CR_HI:
             retrow = 832;
-            retroh = 520;
+            retroh = 548;
             hatari_borders = false;
             break;
       }
