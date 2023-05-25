@@ -356,7 +356,7 @@ static void update_variables(void)
          case HATARI_VIDEO_CR_HI:
             retrow = 732;
             retroh = 486;
-            hatari_borders = false;
+            hatari_borders = true;
             break;
       }
 
