@@ -77,7 +77,15 @@ else ifeq ($(platform), osx)
 	TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-   PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD
+   PLATFLAGS := -DLSB_FIRST -DALIGN_DWORD -DHAVE_POSIX_MEMALIGN=1
+
+   ifeq ($(CROSS_COMPILE),1)
+		TARGET_RULE   = -target $(LIBRETRO_APPLE_PLATFORM) -isysroot $(LIBRETRO_APPLE_ISYSROOT)
+		CFLAGS   += $(TARGET_RULE)
+		CPPFLAGS += $(TARGET_RULE)
+		CXXFLAGS += $(TARGET_RULE)
+		LDFLAGS  += $(TARGET_RULE)
+   endif
 
 # ARM
 else ifneq (,$(findstring armv,$(platform)))
@@ -134,6 +142,8 @@ else ifeq ($(platform), tvos-arm64)
 	ifeq ($(IOSSDK),)
 		IOSSDK := $(shell xcodebuild -version -sdk appletvos Path)
 	endif
+	CC = clang -arch arm64 -isysroot $(IOSSDK)
+	CXX = clang++ -arch arm64 -isysroot $(IOSSDK)
 	CFLAGS += -DIOS -marm -DHAVE_POSIX_MEMALIGN=1 -w
 
 else ifeq ($(platform), wii)
