@@ -343,8 +343,8 @@ static void update_variables(void)
             hatari_borders = true;
             break;
          case HATARI_VIDEO_CR_LO:
-            retrow = 320;
-            retroh = 200;
+            retrow = 366;
+            retroh = 243;
             // Strange, do not work if set to false...
             hatari_borders = true;
             break;
@@ -354,9 +354,9 @@ static void update_variables(void)
             hatari_borders = true;
             break;
          case HATARI_VIDEO_CR_HI:
-            retrow = 832;
-            retroh = 548;
-            hatari_borders = false;
+            retrow = 732;
+            retroh = 486;
+            hatari_borders = true;
             break;
       }
 
