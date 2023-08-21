@@ -37,50 +37,36 @@
  *
  ****************************************************************************************/
 
-#ifndef RETRO_DISK_CONTROL_H__
-#define RETRO_DISK_CONTROL_H__
 
+#ifndef RETRO_UTILS_H__
+#define RETRO_UTILS_H__
+
+#include <stdio.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 //*****************************************************************************
-// Disk control structure and functions
-#define DC_MAX_SIZE 20
+// File helpers functions
+#define RETRO_PATH_MAX 512
 
-//static INLINE bool string_is_empty(const char* data)
-//{
-//	return !data || (*data == '\0');
-//}
+#ifdef _WIN32
+#define RETRO_PATH_SEPARATOR   		"\\"
+// Windows also support the unix path separator
+#define RETRO_PATH_SEPARATOR_ALT   	"/"
+#else
+#define RETRO_PATH_SEPARATOR   		"/"
+#endif
 
-enum dc_image_type {
-	DC_IMAGE_TYPE_NONE = 0,
-	DC_IMAGE_TYPE_FLOPPY,
-	DC_IMAGE_TYPE_TAPE,
-	DC_IMAGE_TYPE_MEM,
-	DC_IMAGE_TYPE_UNKNOWN
-};
+bool file_check_extension(const char *filename, const size_t filename_size, const char *ext, const size_t ext_size);
+bool file_check_flag(const char *filename, const size_t filename_size, const char *flag, const size_t flag_size);
+void path_join(char* out, const char* basedir, const char* filename);
+char* path_join_dup(const char* basedir, const char* filename);
 
-struct dc_storage{
-	char* command;
-	char* files[DC_MAX_SIZE];
-	char* names[DC_MAX_SIZE];
-	enum dc_image_type types[DC_MAX_SIZE];
-	unsigned unit;
-	unsigned count;
-	int index;
-	bool eject_state;
-	bool replace;
-	unsigned index_prev;
-};
+bool file_exists(const char *filename);
+int file_size (int file_num);
+uint32_t get_hash(const char *filename);
 
-typedef struct dc_storage dc_storage;
-dc_storage* dc_create(void);
-
-void dc_parse_m3u(dc_storage* dc, const char* m3u_file);
-bool dc_add_file(dc_storage* dc, const char* filename);
-void dc_free(dc_storage* dc);
-void dc_reset(dc_storage* dc);
-int dc_replace_file(dc_storage* dc, int index, const char* filename);
-bool dc_remove_file(dc_storage* dc, int index);
-enum dc_image_type dc_get_image_type(const char* filename);
+void *retro_malloc(size_t size);
+void retro_free(void * mem);
 
 #endif

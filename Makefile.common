@@ -156,7 +156,16 @@ SOURCES_C += $(CPU_PREGEN)/cpudefs.c \
 				 $(LIBRETRO_DIR)/graph.c \
 				 $(LIBRETRO_DIR)/bmp.c \
 				 $(LIBRETRO_DIR)/retro_strings.c \
-				 $(LIBRETRO_DIR)/retro_files.c \
+				 $(LIBRETRO_DIR)/retro_utils.c \
 				 $(LIBRETRO_DIR)/retro_disk_control.c \
+				 $(LIBRETRO_COMM_DIR)/compat/compat_strl.c \
+				 $(LIBRETRO_COMM_DIR)/compat/compat_strcasestr.c \
+				 $(LIBRETRO_COMM_DIR)/compat/fopen_utf8.c  \
+				 $(LIBRETRO_COMM_DIR)/encodings/encoding_utf.c  \
+				 $(LIBRETRO_COMM_DIR)/file/file_path.c  \
+				 $(LIBRETRO_COMM_DIR)/file/file_path_io.c \
+				 $(LIBRETRO_COMM_DIR)/string/stdstring.c \
+				 $(LIBRETRO_COMM_DIR)/time/rtime.c \
+				 $(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.c \
 				 $(LIBRETRO_DIR)/stub/dlgAlert.c \
 				 $(ZLIB_SRCS)

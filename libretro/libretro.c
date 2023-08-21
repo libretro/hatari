@@ -1,4 +1,7 @@
+#include <stdarg.h>
+#include <string/stdstring.h>
 #include "libretro.h"
+#include "libretro_core_options.h"
 
 #include "libretro-hatari.h"
 
@@ -8,10 +11,12 @@
 #include "retro_strings.h"
 #include "retro_files.h"
 #include "retro_disk_control.h"
+
 static dc_storage* dc;
 
 // LOG
-retro_log_printf_t log_cb;
+static void fallback_log(enum retro_log_level level, const char* fmt, ...);
+retro_log_printf_t log_cb = fallback_log;
 
 cothread_t mainThread;
 cothread_t emuThread;
@@ -102,8 +107,11 @@ static struct retro_input_descriptor input_descriptors[] = {
 
 void retro_set_environment(retro_environment_t cb)
 {
-   environ_cb = cb;
+    bool option_cats_supported;
 
+    environ_cb = cb;
+
+#if 0
    static struct retro_core_option_definition core_options[] =
    {
        // Input
@@ -239,6 +247,10 @@ void retro_set_environment(retro_environment_t cb)
       variables[i].value = NULL;
       cb( RETRO_ENVIRONMENT_SET_VARIABLES, variables);
    }
+#endif
+
+   /* Initialise core options */
+   libretro_set_core_options(environ_cb, &option_cats_supported);
 }
 
 static void update_variables(void)
@@ -433,21 +445,98 @@ extern bool Floppy_EjectDiskFromDrive(int Drive);
 extern const char* Floppy_SetDiskFileName(int Drive, const char *pszFileName, const char *pszZipPath);
 extern bool Floppy_InsertDiskIntoDrive(int Drive);
 
-static bool disk_set_eject_state(bool ejected)
-{
-	if (dc)
-	{
-		dc->eject_state = ejected;
-		
-		if(dc->eject_state)
-			return Floppy_EjectDiskFromDrive(0);
-		else
-			return Floppy_InsertDiskIntoDrive(0);			
-	}
-	
-	return true;
+void retro_message(const char* text, unsigned int frames, int alt) {
+    struct retro_message msg;
+    struct retro_message_ext msg_ext;
+
+    char msg_local[256];
+    unsigned int message_interface_version;
+
+    snprintf(msg_local, sizeof(msg_local), "Atari800: %s", text);
+    msg.msg = msg_local;
+    msg.frames = frames;
+
+    msg_ext.msg = msg_local;
+    msg_ext.duration = frames;
+    msg_ext.priority = 3;
+    msg_ext.level = RETRO_LOG_INFO;
+    msg_ext.target = RETRO_MESSAGE_TYPE_NOTIFICATION_ALT;
+    msg_ext.type = -1;
+
+    if (environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION, &message_interface_version) && (message_interface_version >= 1))
+    {
+        if (alt)
+            environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, (void*)&msg_ext);
+        else
+            environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, (void*)&msg);
+    }
+    else
+        environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
 }
 
+// might not need this if floppy image is the only type we are going to worry about.
+static int get_image_unit()
+{
+    int unit = dc->unit;
+    if (dc->index < dc->count)
+    {
+        if (dc_get_image_type(dc->files[dc->index]) == DC_IMAGE_TYPE_FLOPPY)
+            dc->unit = DC_IMAGE_TYPE_FLOPPY;
+        else
+            dc->unit = DC_IMAGE_TYPE_FLOPPY;
+    }
+    else
+        unit = DC_IMAGE_TYPE_FLOPPY;
+
+    return unit;
+}
+
+static void disk_insert_image()
+{
+    if (dc->unit == DC_IMAGE_TYPE_FLOPPY)
+    {
+        int error = Floppy_SetDiskFileName(0, dc->files[dc->index], NULL);
+
+        if (error)
+        {
+            log_cb(RETRO_LOG_INFO, "[disk_insert_image] Disk (%d) Error : %s\n", dc->index + 1, dc->files[dc->index]);
+            return;
+        }
+
+        log_cb(RETRO_LOG_INFO, "[disk_insert_image] Disk (%d) inserted into drive 1 : %s\n", dc->index + 1, dc->files[dc->index]);
+    }
+    else
+    {
+        log_cb(RETRO_LOG_INFO, "[disk_insert_image] unsupported image-type : %u\n", dc->unit);
+    }
+}
+
+static bool disk_set_eject_state(bool ejected)
+{
+    if (dc)
+    {
+        int unit = get_image_unit();
+
+        if (dc->eject_state == ejected)
+            return true;
+
+        if (ejected && dc->index <= dc->count && dc->files[dc->index] != NULL)
+            Floppy_EjectDiskFromDrive(0);
+        else if (!ejected && dc->index < dc->count && dc->files[dc->index] != NULL)
+        {
+            disk_insert_image();
+            Floppy_InsertDiskIntoDrive(0);
+        }
+
+        dc->eject_state = ejected;
+
+        return true;
+    }
+
+    return false;
+}
+
+/* Gets current eject state. The initial state is 'not ejected'. */
 static bool disk_get_eject_state(void)
 {
 	if (dc)
@@ -464,26 +553,34 @@ static unsigned disk_get_image_index(void)
 	return 0;
 }
 
+/* Sets image index. Can only be called when disk is ejected.
+ * The implementation supports setting "no disk" by using an
+ * index >= get_num_images().
+ */
 static bool disk_set_image_index(unsigned index)
 {
-	// Insert disk
-	if (dc)
-	{
-		// Same disk...
-		// This can mess things in the emu
-		if(index == dc->index)
-			return true;
-		
-		if ((index < dc->count) && (dc->files[index]))
-		{
-			dc->index = index;
-			Floppy_SetDiskFileName(0, dc->files[index], NULL);
-			log_cb(RETRO_LOG_INFO, "Disk (%d) inserted into drive A : %s\n", dc->index+1, dc->files[dc->index]);
-			return true;
-		}
-	}
-	
-	return false;
+    // Insert image
+    if (dc)
+    {
+        if (index == dc->index)
+            return true;
+
+        if (dc->replace)
+        {
+            dc->replace = false;
+            index = 0;
+        }
+
+        if (index < dc->count && dc->files[index])
+        {
+            dc->index = index;
+            int unit = get_image_unit();
+            log_cb(RETRO_LOG_INFO, "[retro_set_image_index] Unit (%d) image (%d/%d) inserted: %s\n", dc->index + 1, unit, dc->count, dc->files[dc->index]);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static unsigned disk_get_num_images(void)
@@ -494,39 +591,86 @@ static unsigned disk_get_num_images(void)
 	return 0;
 }
 
-static bool disk_replace_image_index(unsigned index, const struct retro_game_info *info)
+/* Adds a new valid index (get_num_images()) to the internal disk list.
+ * This will increment subsequent return values from get_num_images() by 1.
+ * This image index cannot be used until a disk image has been set
+ * with replace_image_index.
+ */
+static bool disk_add_image_index(void)
 {
-	if (dc)
-	{
-		if (index >= dc->count)
-			return false;
-
-		if(dc->files[index])
-		{
-			free(dc->files[index]);
-			dc->files[index] = NULL;
-		}
-
-		// TODO : Handling removing of a disk image when info = NULL
-
-		if(info != NULL)
-			dc->files[index] = strdup(info->path);
-	}
+    if (dc)
+    {
+        if (dc->count <= DC_MAX_SIZE)
+        {
+            dc->files[dc->count] = NULL;
+            dc->names[dc->count] = NULL;
+            dc->types[dc->count] = DC_IMAGE_TYPE_NONE;
+            dc->count++;
+            return true;
+        }
+    }
 
     return false;
 }
 
-static bool disk_add_image_index(void)
+static bool disk_replace_image_index(unsigned index, const struct retro_game_info* info)
 {
-	if (dc)
-	{
-		if(dc->count <= DC_MAX_SIZE)
-		{
-			dc->files[dc->count] = NULL;
-			dc->count++;
-			return true;
-		}
-	}
+    if (dc)
+    {
+        if (info != NULL)
+        {
+            int error = dc_replace_file(dc, index, info->path);
+
+            if (error == 2)
+                retro_message("Duplicate Disk selected.  Use Index", 6000, 1);
+        }
+        else
+        {
+            dc_remove_file(dc, index);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+static bool disk_get_image_path(unsigned index, char* path, size_t len)
+{
+    if (len < 1)
+        return false;
+
+    if (dc)
+    {
+        if (index < dc->count)
+        {
+            if (!string_is_empty(dc->files[index]))
+            {
+                strncpy(path, dc->files[index], len);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static bool disk_get_image_label(unsigned index, char* label, size_t len)
+{
+    if (len < 1)
+        return false;
+
+    if (dc)
+    {
+        if (index < dc->count)
+        {
+            if (!string_is_empty(dc->names[index]))
+            {
+                strncpy(label, dc->names[index], len);
+                return true;
+            }
+        }
+    }
 
     return false;
 }
@@ -541,24 +685,44 @@ static struct retro_disk_control_callback disk_interface = {
    disk_add_image_index,
 };
 
+static struct retro_disk_control_ext_callback disk_interface_ext = {
+   disk_set_eject_state,
+   disk_get_eject_state,
+   disk_get_image_index,
+   disk_set_image_index,
+   disk_get_num_images,
+   disk_replace_image_index,
+   disk_add_image_index,
+   NULL, /* disk_set_initial_image, not even sure if I want to use this */
+   disk_get_image_path,
+   disk_get_image_label,
+};
+
 //*****************************************************************************
 //*****************************************************************************
 // Init
-static void fallback_log(enum retro_log_level level, const char *fmt, ...)
+static void fallback_log(enum retro_log_level level, const char* fmt, ...)
 {
+    va_list va;
+
+    (void)level;
+
+    va_start(va, fmt);
+    vfprintf(stderr, fmt, va);
+    va_end(va);
 }
 
 void retro_init(void)
 {    	
 	struct retro_log_callback log;	
 	const char *system_dir = NULL;
+    unsigned dci_version = 0;
+
 	dc = dc_create();
 
 	// Init log
 	if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
 		log_cb = log.log;
-	else
-		log_cb = fallback_log;
 
 	if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) && system_dir)
    {
@@ -611,7 +775,10 @@ void retro_init(void)
       MidiRetroInterface = NULL;
 
  	// Disk control interface
-	environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &disk_interface);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_DISK_CONTROL_INTERFACE_VERSION, &dci_version) && (dci_version >= 1))
+       environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE, &disk_interface_ext);
+   else
+       environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &disk_interface);
 
    // Savestates
    static uint32_t quirks = RETRO_SERIALIZATION_QUIRK_INCOMPLETE | RETRO_SERIALIZATION_QUIRK_MUST_INITIALIZE | RETRO_SERIALIZATION_QUIRK_CORE_VARIABLE_SIZE;
