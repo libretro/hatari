@@ -85,10 +85,11 @@ static struct retro_input_descriptor input_descriptors[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Shift keyboard toggle" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Joystick/Mouse toggle" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Hatari Settings" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "Mouse speed down" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Mouse speed up" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Status display" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "Virtual keyboard page" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "Status display" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Virtual keyboard page" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Mouse speed down" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "Mouse speed up" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3, "" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "Keyboard space" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Joystick/Mouse X" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Joystick/Mouse Y" },
@@ -452,7 +453,7 @@ void retro_message(const char* text, unsigned int frames, int alt) {
     char msg_local[256];
     unsigned int message_interface_version;
 
-    snprintf(msg_local, sizeof(msg_local), "Atari800: %s", text);
+    snprintf(msg_local, sizeof(msg_local), "Hatari: %s", text);
     msg.msg = msg_local;
     msg.frames = frames;
 
@@ -495,15 +496,19 @@ static void disk_insert_image()
 {
     if (dc->unit == DC_IMAGE_TYPE_FLOPPY)
     {
-        int error = Floppy_SetDiskFileName(0, dc->files[dc->index], NULL);
-
-        if (error)
+        if (Floppy_SetDiskFileName(0, dc->files[dc->index], NULL) == NULL)
         {
             log_cb(RETRO_LOG_INFO, "[disk_insert_image] Disk (%d) Error : %s\n", dc->index + 1, dc->files[dc->index]);
             return;
         }
 
-        log_cb(RETRO_LOG_INFO, "[disk_insert_image] Disk (%d) inserted into drive 1 : %s\n", dc->index + 1, dc->files[dc->index]);
+#ifndef HAVE_CAPSIMAGE
+        //display warning if IPF image selected when CAPS image support is not compiled.
+        if (strendswith(dc->files[dc->index], "ipf"))
+            retro_message("Warning: CAPS support for IPF files not in this build", 6000, 1);
+#endif
+
+        log_cb(RETRO_LOG_INFO, "[disk_insert_image] Disk (%d) inserted into drive A : %s\n", dc->index + 1, dc->files[dc->index]);
     }
     else
     {
@@ -958,12 +963,22 @@ bool retro_load_game(const struct retro_game_info *info)
 			log_cb(RETRO_LOG_INFO, "file %d: %s\n", i+1, dc->files[i]);
 		}	
 	}
-	else
+	else if (strendswith(full_path, "st") ||
+        strendswith(full_path, "msa") ||
+        strendswith(full_path, "stx") ||
+        strendswith(full_path, "dim") ||
+        strendswith(full_path, "ipf"))
 	{
 		// Add the file to disk control context
 		// Maybe, in a later version of retroarch, we could add disk on the fly (didn't find how to do this)
 		dc_add_file(dc, full_path);
 	}
+
+#ifndef HAVE_CAPSIMAGE
+    //display warning if IPF image selected when CAPS image support is not compiled.
+    if (strendswith(full_path, "ipf"))
+        retro_message("Warning: CAPS support for IPF files not in this build", 6000, 1);
+#endif
 
 	// Init first disk
 	dc->index = 0;
