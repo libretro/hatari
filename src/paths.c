@@ -23,6 +23,10 @@ const char Paths_fileid[] = "Hatari paths.c : " __DATE__ " " __TIME__;
 #define mkdir(name,mode) sceIoMkdir(name, 0777)
 #endif
 
+#ifdef __LIBRETRO__
+#include "retromain.inc"
+#endif
+
 #if defined(WIN32) && !defined(mkdir)
 #define mkdir(name,mode) mkdir(name)
 #endif  /* WIN32 */
@@ -300,9 +304,11 @@ static void Paths_InitHomeDirs(void)
  * have to find out where the executable is. But thanks to this effort, we get
  * a relocatable package (we don't have any absolute path names in the program)!
  */
-void Paths_Init(const char *argv0)
+void Paths_Init(const char* argv0)
 {
-	char *psExecDir;  /* Path string where the hatari executable can be found */
+	char* psExecDir;  /* Path string where the hatari executable can be found */
+
+#ifdef __LIBRETRO__
 #ifdef WIIU
 	strcpy(sWorkingDir, "sd:/retroarch/cores");
 	strcpy(sDataDir, "sd:/retroarch/cores/system");
@@ -319,13 +325,22 @@ void Paths_Init(const char *argv0)
 	Paths_InitHomeDirs();
 	return;
 #else
+	snprintf(sWorkingDir, FILENAME_MAX, "%s%chatari", RETRO_DIR, PATHSEP);
+	snprintf(sDataDir, FILENAME_MAX, "%s%chatari", RETRO_DIR, PATHSEP);
+	printf("RetroWorking:'%s'\n", sWorkingDir);
+	printf("RetroData:'%s'\n", sDataDir);
+	Paths_InitHomeDirs();
+	return;
+#endif
+#endif /* __LIBRETRO__ */
+
 	/* Init working directory string */
 	if (getcwd(sWorkingDir, FILENAME_MAX) == NULL)
 	{
 		/* This should never happen... just in case... */
 		strcpy(sWorkingDir, ".");
 	}
-#endif
+
 	/* Init the user's home directory string */
 	Paths_InitHomeDirs();
 

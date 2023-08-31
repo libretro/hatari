@@ -2582,6 +2582,7 @@ static void Video_SetHBLPaletteMaskPointers(void)
 #ifdef __LIBRETRO__
 extern int CHANGEAV_TIMING;
 extern float FRAMERATE;
+extern int hatari_forcerefresh;
 #endif
 
 /*-----------------------------------------------------------------------*/
@@ -2596,45 +2597,74 @@ static void Video_ResetShifterTimings(void)
 	Uint8 nSyncByte;
 
 	nSyncByte = IoMem_ReadByte(0xff820a);
+#ifdef __LIBRETRO__
+	if (hatari_forcerefresh)
+	{
+		if (hatari_forcerefresh == 2)
+		{
+			/* 50 Hz */
+			nScreenRefreshRate = 50;
+			nScanlinesPerFrame = SCANLINES_PER_FRAME_50HZ;
+			nCyclesPerLine = CYCLES_PER_LINE_50HZ;
+			nStartHBL = VIDEO_START_HBL_50HZ;
+			nFirstVisibleHbl = FIRST_VISIBLE_HBL_50HZ;
+			nLastVisibleHbl = FIRST_VISIBLE_HBL_50HZ + NUM_VISIBLE_LINES;
+		}
+		else
+		{
+			/* 60 Hz */
+			nScreenRefreshRate = 60;
+			nScanlinesPerFrame = SCANLINES_PER_FRAME_60HZ;
+			nCyclesPerLine = CYCLES_PER_LINE_60HZ;
+			nStartHBL = VIDEO_START_HBL_60HZ;
+			nFirstVisibleHbl = FIRST_VISIBLE_HBL_60HZ;
+			nLastVisibleHbl = FIRST_VISIBLE_HBL_60HZ + NUM_VISIBLE_LINES;
 
-	if ((IoMem_ReadByte(0xff8260) & 3) == 2)
-	{
-		/* 71 Hz, monochrome */
-		nScreenRefreshRate = 71;
-		nScanlinesPerFrame = SCANLINES_PER_FRAME_71HZ;
-		nCyclesPerLine = CYCLES_PER_LINE_71HZ;
-		nStartHBL = VIDEO_START_HBL_71HZ;
-		nFirstVisibleHbl = FIRST_VISIBLE_HBL_71HZ;
-		nLastVisibleHbl = FIRST_VISIBLE_HBL_71HZ + VIDEO_HEIGHT_HBL_MONO;
-	}
-	else if (nSyncByte & 2)  /* Check if running in 50 Hz or in 60 Hz */
-	{
-		/* 50 Hz */
-		nScreenRefreshRate = 50;
-		nScanlinesPerFrame = SCANLINES_PER_FRAME_50HZ;
-		nCyclesPerLine = CYCLES_PER_LINE_50HZ;
-		nStartHBL = VIDEO_START_HBL_50HZ;
-		nFirstVisibleHbl = FIRST_VISIBLE_HBL_50HZ;
-		nLastVisibleHbl = FIRST_VISIBLE_HBL_50HZ + NUM_VISIBLE_LINES;
+		}
 	}
 	else
 	{
-		/* 60 Hz */
-		nScreenRefreshRate = 60;
-		nScanlinesPerFrame = SCANLINES_PER_FRAME_60HZ;
-		nCyclesPerLine = CYCLES_PER_LINE_60HZ;
-		nStartHBL = VIDEO_START_HBL_60HZ;
-		nFirstVisibleHbl = FIRST_VISIBLE_HBL_60HZ;
-		nLastVisibleHbl = FIRST_VISIBLE_HBL_60HZ + NUM_VISIBLE_LINES;
-	}
+#endif
+		if ((IoMem_ReadByte(0xff8260) & 3) == 2)
+		{
+			/* 71 Hz, monochrome */
+			nScreenRefreshRate = 71;
+			nScanlinesPerFrame = SCANLINES_PER_FRAME_71HZ;
+			nCyclesPerLine = CYCLES_PER_LINE_71HZ;
+			nStartHBL = VIDEO_START_HBL_71HZ;
+			nFirstVisibleHbl = FIRST_VISIBLE_HBL_71HZ;
+			nLastVisibleHbl = FIRST_VISIBLE_HBL_71HZ + VIDEO_HEIGHT_HBL_MONO;
+		}
+		else if (nSyncByte & 2)  /* Check if running in 50 Hz or in 60 Hz */
+		{
+			/* 50 Hz */
+			nScreenRefreshRate = 50;
+			nScanlinesPerFrame = SCANLINES_PER_FRAME_50HZ;
+			nCyclesPerLine = CYCLES_PER_LINE_50HZ;
+			nStartHBL = VIDEO_START_HBL_50HZ;
+			nFirstVisibleHbl = FIRST_VISIBLE_HBL_50HZ;
+			nLastVisibleHbl = FIRST_VISIBLE_HBL_50HZ + NUM_VISIBLE_LINES;
+		}
+		else
+		{
+			/* 60 Hz */
+			nScreenRefreshRate = 60;
+			nScanlinesPerFrame = SCANLINES_PER_FRAME_60HZ;
+			nCyclesPerLine = CYCLES_PER_LINE_60HZ;
+			nStartHBL = VIDEO_START_HBL_60HZ;
+			nFirstVisibleHbl = FIRST_VISIBLE_HBL_60HZ;
+			nLastVisibleHbl = FIRST_VISIBLE_HBL_60HZ + NUM_VISIBLE_LINES;
+		}
 
 #ifdef __LIBRETRO__
-		float tmp=(float)nScreenRefreshRate;
-		if(tmp!=FRAMERATE)
-		{
-			FRAMERATE=(float)nScreenRefreshRate;
-			CHANGEAV_TIMING=1;
-		}
+	}
+
+	float tmp=(float)nScreenRefreshRate;
+	if(tmp!=FRAMERATE)
+	{
+		FRAMERATE=(float)nScreenRefreshRate;
+		CHANGEAV_TIMING=1;
+	}
 #endif
 
 	if (bUseHighRes)

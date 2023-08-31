@@ -810,7 +810,7 @@ static void Main_LoadInitialConfig(void)
 	if (psGlobalConfig)
 	{
 #ifdef __LIBRETRO__
-snprintf(psGlobalConfig, FILENAME_MAX, "%s%chatari.cfg",RETRO_DIR, PATHSEP);
+snprintf(psGlobalConfig, FILENAME_MAX, "%s%chatari%chatari.cfg",RETRO_DIR, PATHSEP, PATHSEP);
 printf("RetroConf:'%s'\n",psGlobalConfig);
 #else
 
@@ -888,7 +888,10 @@ int main(int argc, char *argv[])
 	Configuration_SetDefault();
 
 	/* Now load the values from the configuration file */
-	Main_LoadInitialConfig();
+#ifdef __LIBRETRO__
+	if (hatari_autoload_config)
+#endif /* __LIBRETRO__ */
+		Main_LoadInitialConfig();
 
 	/* Check for any passed parameters */
 	if (!Opt_ParseParameters(argc, (const char * const *)argv))

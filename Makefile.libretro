@@ -171,7 +171,7 @@ else ifeq ($(platform), wiiu)
    PLATFORM_DEFINES += -DWIIU -DHW_RVL -mwup -DWORDS_BIGENDIAN=1 -Dpowerpc -D__POWERPC__ -D__ppc__ 
    STATIC_LINKING=1
    STATIC_LINKING_LINK = 1
-   CFLAGS +=  -DALIGN_DWORD $(PLATFORM_DEFINES) -I$(ZLIB_DIR) 
+   CFLAGS +=  -DALIGN_DWORD -D_FILE_OFFSET_BITS=64 $(PLATFORM_DEFINES) -I$(ZLIB_DIR)
 
 # Lightweight PS3 Homebrew SDK
 else ifneq (,$(filter $(platform), ps3 psl1ght))
@@ -201,6 +201,7 @@ else ifeq ($(platform), vita)
 	STATIC_LINKING_LINK=1
 else
    PLATFLAGS :=  -DLSB_FIRST -DALIGN_DWORD -DWIN32PORT -DWIN32
+   CFLAGS += -D_FILE_OFFSET_BITS=64
 	TARGET := $(TARGET_NAME)_libretro.dll
    SHARED := -shared -static-libgcc -s -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined 
 	EXTERNAL_ZLIB = 1

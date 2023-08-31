@@ -1,20 +1,30 @@
 #include "libretro.h"
 #include "libretro-hatari.h"
+#include "retro_files.h"
 #include "graph.h"
 #include "vkbd.h"
 #include "joy.h"
 #include "screen.h"
 #include "video.h"	/* FIXME: video.h is dependent on HBL_PALETTE_LINES from screen.h */
 #include "ikbd.h"
+#include "main.h"
+
+//RETRO LIB
+extern void retro_message(const char* text, unsigned int frames, int alt);
 
 //CORE VAR
 extern const char *retro_save_directory;
 extern const char *retro_system_directory;
 extern const char *retro_content_directory;
-char RETRO_DIR[512];
-char RETRO_TOS[512];
+char RETRO_DIR[RETRO_PATH_MAX];
+char RETRO_TOS[RETRO_PATH_MAX];
+char RETRO_HD[RETRO_PATH_MAX];
+char RETRO_GD[RETRO_PATH_MAX];
+char RETRO_IDE[RETRO_PATH_MAX];
+char RETRO_FID[RETRO_PATH_MAX];
 extern bool hatari_nomouse;
 extern bool hatari_nokeys;
+extern int hatari_mouse_control_stick;
 
 /* HATARI PROTOTYPES */
 #include "configuration.h"
@@ -48,7 +58,8 @@ short signed int SNDBUF[1024*2];
 int snd_sampler = 44100 / 50;
 
 //PATH
-char RPATH[512];
+char RPATH[RETRO_PATH_MAX];
+char RPATH2[RETRO_PATH_MAX];
 
 //EMU FLAGS
 int NPAGE=-1, KCOL=1, BKGCOLOR=0, MAXPAS=6;
@@ -436,6 +447,96 @@ void Deadzone(int* a)
    if (al[1] >=  DEADZONE) al[1] -= DEADZONE;
 }
 
+//preliminary mouse via Wii-U touch tablet will need time checks to distinguish double clicks plus relative mouse handling since Hatari ignores ABS values.
+bool input_mouse_via_pointer(void)
+{
+    int i;
+    int mouse_l;
+    int mouse_r;
+    int16_t mouse_x = 0;
+    int16_t mouse_y = 0;
+    //  might not need thesetwo
+    int ratio_x = retrow / KeyboardProcessor.Abs.MaxX;
+    int ratio_y = retroh / KeyboardProcessor.Abs.MaxY;
+
+    input_poll_cb();
+
+    //if (slowdown > 0)
+    //    return;
+
+    // pointer mouse control.  x,y return 0 if point_b is 0.
+    int point_x = input_state_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
+    int point_y = input_state_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
+    int point_b = input_state_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_PRESSED);
+
+    if (point_x != point_x_last || point_y != point_y_last)
+    {
+        const int PMIN = -0x7FFF;
+        const int PMAX = 0x7FFF;
+        point_x_last = point_x;
+        point_y_last = point_y;
+        mouse_x = ((point_x - PMIN) * retrow) / (PMAX - PMIN);
+        mouse_y = ((point_y - PMIN) * retroh) / (PMAX - PMIN);
+    }
+
+    if (mouse_x < 0)
+        mouse_x = 0;
+    if (mouse_x > retrow - 1)
+        mouse_x = retrow - 1;
+    if (mouse_y < 0)
+        mouse_y = 0;
+    if (mouse_y > retroh - 1)
+        mouse_y = retroh - 1;
+
+    //may not need cause ABS is unusable.
+    mouse_x /= ratio_x;
+    mouse_y /= ratio_y;
+
+    //this guy will need time stamps in order to work properly.
+    if (mbL == 0 && point_b)
+    {
+        mbL = 1;
+        Keyboard.bLButtonDown |= BUTTON_MOUSE;
+    }
+    else if (mbL == 1 && !point_b)
+    {
+        mbL = 0;
+        Keyboard.bLButtonDown &= ~BUTTON_MOUSE;
+    }
+
+    /* Wii-U doesn't do multi-touch?  A shame.. :P
+    if (mbR == 0 && mouse_r)
+    {
+        mbR = 1;
+        Keyboard.bRButtonDown |= BUTTON_MOUSE;
+        Keyboard.bRButtonDown |= BUTTON_MOUSE;
+    }
+    else if (mbR == 1 && !mouse_r)
+    {
+        mbR = 0;
+        Keyboard.bRButtonDown &= ~BUTTON_MOUSE;
+    }
+*/
+
+    if (point_b)
+    {
+        // do something clever here...
+    }
+
+    //status display so we know what numbers are being fed.
+    char msg[256];
+    // mouse_x, mouse_y, point_b,
+    sprintf(msg, "touchX=%i, touchY=%i.\n", mouse_x, mouse_y);
+        //KeyboardProcessor.Mouse.DeltaX, KeyboardProcessor.Mouse.DeltaY, KeyboardProcessor.Mouse.dx, KeyboardProcessor.Mouse.dy) ;
+    retro_message(msg, 60, 0);
+
+    // might not need to return this.. but we will figure out later
+    if (!point_b)
+        return false;
+    else
+        return true;
+}
+
 /*
    L   show/hide Status
    R   swap kbd pages
@@ -453,7 +554,6 @@ void Deadzone(int* a)
 void update_input(void)
 {
    int i;
-
    int mouse_l;
    int mouse_r;
    int16_t mouse_x;
@@ -488,6 +588,7 @@ void update_input(void)
    {
       mbt[i]=0;
       SHOWKEY=-SHOWKEY;
+      texture_init();           //clear kbd bmp so complete keyboard is cleared
       Screen_SetFullUpdate();
    }
 
@@ -647,6 +748,7 @@ void update_input(void)
          {
             NPAGE=-NPAGE;oldi=-1;
             //Clear interface zone
+            texture_init();           //clear kbd bmp so complete keyboard is cleared
             Screen_SetFullUpdate();
          }
          else if(i==-1)
@@ -662,6 +764,7 @@ void update_input(void)
          {
             //VKbd show/hide
             oldi=-1;
+            texture_init();           //clear kbd bmp so complete keyboard is cleared
             Screen_SetFullUpdate();
             SHOWKEY=-SHOWKEY;
          }
@@ -704,9 +807,9 @@ void update_input(void)
    {
       //Joy mode (joystick controls joystick, mouse controls mouse)
 
-      //emulate Joy0 with joy analog left 
-      al[0] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
-      al[1] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
+      //emulate Joy0 with joy analog left.  User should really set this in the Controls section if they want this
+      //al[0] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
+      //al[1] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
 
       /* Directions */
       if (al[1] <= JOYRANGE_UP_VALUE)
@@ -751,54 +854,56 @@ void update_input(void)
    }
    else // MOUSEMODE >= 0
    {
-      //Mouse mode (joystick controls mouse)
-      fmousex=fmousey=0;
+       //Mouse mode (joystick controls mouse) unless touch pad pressed
+       fmousex = fmousey = 0;
 
-      //emulate mouse with joy analog left
-      al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
-      al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
-      Deadzone(al);
-      al[0] = (al[0] * PAS) / MAXPAS;
-      al[1] = (al[1] * PAS) / MAXPAS;
-      fmousex += al[0]/1024;
-      fmousey += al[1]/1024;
+       //emulate mouse with joy analog left
+       al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, hatari_mouse_control_stick, RETRO_DEVICE_ID_ANALOG_X));
+       al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, hatari_mouse_control_stick, RETRO_DEVICE_ID_ANALOG_Y));
+       Deadzone(al);
+       al[0] = (al[0] * PAS) / MAXPAS;
+       al[1] = (al[1] * PAS) / MAXPAS;
+       fmousex += al[0] / 1024;
+       fmousey += al[1] / 1024;
 
-      //emulate mouse with dpad
-      if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
-         fmousex += PAS*3;
-      if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
-         fmousex -= PAS*3;
-      if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
-         fmousey += PAS*3;
-      if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
-         fmousey -= PAS*3;
+       //emulate mouse with dpad.  May change this in future to be more userdefinable
+       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
+           fmousex += PAS * 3;
+       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
+           fmousex -= PAS * 3;
+       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
+           fmousey += PAS * 3;
+       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
+           fmousey -= PAS * 3;
 
-      mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
-      mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
+       mouse_l = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+       mouse_r = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
    }
 
-   if(mbL==0 && mouse_l)
+   if (mbL == 0 && mouse_l)
    {
-      mbL=1;
-      Keyboard.bLButtonDown |= BUTTON_MOUSE;
+       mbL = 1;
+       Keyboard.bLButtonDown |= BUTTON_MOUSE;
    }
-   else if(mbL==1 && !mouse_l)
+   else if (mbL == 1 && !mouse_l)
    {
-      Keyboard.bLButtonDown &= ~BUTTON_MOUSE;
-      mbL=0;
+       Keyboard.bLButtonDown &= ~BUTTON_MOUSE;
+       mbL = 0;
    }
 
-   if(mbR==0 && mouse_r)
+   if (mbR == 0 && mouse_r)
    {
-      mbR=1;
-      Keyboard.bRButtonDown |= BUTTON_MOUSE;
+       mbR = 1;
+       Keyboard.bRButtonDown |= BUTTON_MOUSE;
    }
-   else if(mbR==1 && !mouse_r)
+   else if (mbR == 1 && !mouse_r)
    {
-      Keyboard.bRButtonDown &= ~BUTTON_MOUSE;
-      mbR=0;
+       Keyboard.bRButtonDown &= ~BUTTON_MOUSE;
+       mbR = 0;
    }
 
+   // maybe some day..
+   //input_mouse_via_pointer();
    Main_HandleMouseMotion();
 
    if(STATUTON==1)

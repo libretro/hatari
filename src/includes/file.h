@@ -10,9 +10,9 @@
 
 #include "config.h"
 
-#ifndef HAVE_FSEEKO
-#define fseeko fseek
-#endif
+//#ifndef HAVE_FSEEKO
+//#define fseeko fseek
+//#endif
 
 extern void File_CleanFileName(char *pszFileName);
 extern void File_AddSlashToEndFileName(char *pszFileName);

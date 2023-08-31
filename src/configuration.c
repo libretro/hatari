@@ -12,6 +12,7 @@
 const char Configuration_fileid[] = "Hatari configuration.c : " __DATE__ " " __TIME__;
 #ifdef __LIBRETRO__
 #include "SDL.h"
+#include "retromain.inc"
 #endif
 #include <SDL_keyboard.h>
 
@@ -450,7 +451,11 @@ void Configuration_SetDefault(void)
 		ConfigureParams.DiskImage.szDiskZipPath[i][0] = '\0';
 		ConfigureParams.DiskImage.szDiskFileName[i][0] = '\0';
 	}
+#ifdef __LIBRETRO__
+	strcpy(ConfigureParams.DiskImage.szDiskImageDirectory, RETRO_FID);
+#else
 	strcpy(ConfigureParams.DiskImage.szDiskImageDirectory, psWorkingDir);
+#endif /* __LIBRETRO__ */
 	File_AddSlashToEndFileName(ConfigureParams.DiskImage.szDiskImageDirectory);
 
 	/* Set defaults for hard disks */

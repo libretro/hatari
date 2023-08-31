@@ -31,9 +31,9 @@ const char File_fileid[] = "Hatari file.c : " __DATE__ " " __TIME__;
 #ifdef HAVE_FLOCK
 # include <sys/file.h>
 #endif
-#ifndef HAVE_FTELLO
-#define ftello ftell
-#endif
+//#ifndef HAVE_FTELLO
+//#define ftello ftell
+//#endif
 
 #ifdef VITA
 #include "retro_files.h"
@@ -42,6 +42,9 @@ const char File_fileid[] = "Hatari file.c : " __DATE__ " " __TIME__;
 #ifdef __PS3__
 #include "SDL.h"
 #endif
+
+#define fseek fseeko
+#define ftell ftello
 
 /*-----------------------------------------------------------------------*/
 /**

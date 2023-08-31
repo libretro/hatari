@@ -15,8 +15,12 @@ void parse_cmdline( const char *argv );
 // Global variables
 extern bool hatari_twojoy;
 extern bool hatari_fastfdc;
+extern bool hatari_autoloadb;
+extern bool hatari_fastboot;
 extern bool hatari_borders;
 extern char hatari_frameskips[2];
+extern char hatari_ramsize[2];
+extern char hatari_machinetype[6];
 
 void Add_Option(const char* option)
 {
@@ -49,18 +53,45 @@ int pre_main(const char *argv)
    if(Only1Arg)
    {
       Add_Option("hatari");
+      //logfile use when debugging
+      //Add_Option("--log-file");
+      //Add_Option("E:\\Hatari.log");
       Add_Option("--statusbar");
       Add_Option("0");
       Add_Option("--joy0");
-      Add_Option(hatari_twojoy==true?"real":"none");
+      Add_Option(hatari_twojoy==true ? "real":"none");
       Add_Option("--fastfdc");
-      Add_Option(hatari_fastfdc==true?"1":"0");
+      Add_Option(hatari_fastfdc==true ? "1":"0");
+      Add_Option("--fast-boot");
+      Add_Option(hatari_fastboot ==true ? "1":"0");
       Add_Option("--borders");
-      Add_Option(hatari_borders==true?"1":"0");
+      Add_Option(hatari_borders==true ? "1":"0");
       Add_Option("--frameskips");
       Add_Option(hatari_frameskips);
+      Add_Option("--machine");
+      Add_Option(hatari_machinetype);
+      Add_Option("--memsize");
+      Add_Option(hatari_ramsize);
       Add_Option("--disk-a");
-      Add_Option(RPATH/*ARGUV[0]*/);
+      Add_Option(RPATH[0]==0 ? "":RPATH/*ARGUV[0]*/);
+      Add_Option("--disk-b");
+      Add_Option(hatari_autoloadb==true ? RPATH2[0]==0 ? "" : RPATH2 : "");
+      if (RETRO_GD[0] == 0 && RETRO_IDE[0]==0)
+      {
+          Add_Option("--acsi");
+          Add_Option(RETRO_HD[0] == 0 ? "" : RETRO_HD);
+      }
+      else if (RETRO_IDE[0] == 0)
+      {
+          Add_Option("--harddrive");
+          //Add_Option("E:\\Games_RetroArch\\Atari\\Atari - ST\\GEM\\Chaos Engine Gamex\\");
+          Add_Option(RETRO_GD[0] == 0 ? "" : RETRO_GD);
+      }
+      else
+      {
+          Add_Option("--ide-master");
+          Add_Option(RETRO_IDE[0] == 0 ? "" : RETRO_IDE);
+      }
    }
    else
    { // Pass all cmdline args
