@@ -1331,7 +1331,7 @@ enum retro_mod
                                             */
 
 #define RETRO_ENVIRONMENT_SET_MESSAGE_EXT 60
-                                           /* const struct rc * --
+                                            /* const struct retro_message_ext * --
                                             * Sets a message to be displayed in an implementation-specific
                                             * manner for a certain amount of 'frames'. Additionally allows
                                             * the core to specify message logging level, priority and
