@@ -3075,7 +3075,6 @@ static const char* GemDOS_Opcode2Name(Uint16 opcode)
 		"Frename",
 		"Fdatime"
 	};
-	Log_Printf(LOG_INFO, "GemDOS_Opcode2Name");
 	if (opcode < ARRAYSIZE(names))
 		return names[opcode];
 	return "MiNT?";

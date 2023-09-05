@@ -21,6 +21,8 @@ extern bool hatari_borders;
 extern char hatari_frameskips[2];
 extern char hatari_ramsize[2];
 extern char hatari_machinetype[6];
+extern char hatari_writeprotect_floppy[5];
+extern char hatari_writeprotect_hd[5];
 
 void Add_Option(const char* option)
 {
@@ -76,6 +78,10 @@ int pre_main(const char *argv)
       Add_Option(RPATH[0]==0 ? "":RPATH/*ARGUV[0]*/);
       Add_Option("--disk-b");
       Add_Option(hatari_autoloadb==true ? RPATH2[0]==0 ? "" : RPATH2 : "");
+      Add_Option("--protect-floppy");
+      Add_Option(hatari_writeprotect_floppy);
+      Add_Option("--protect-hd");
+      Add_Option(hatari_writeprotect_hd);
       if (RETRO_GD[0] == 0 && RETRO_IDE[0]==0)
       {
           Add_Option("--acsi");

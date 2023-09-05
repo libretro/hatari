@@ -2707,10 +2707,8 @@ void Ide_UnInit(void)
 		{
 			if (bdrv_is_inserted(hd_table[i]))
 			{
-				Log_Printf(LOG_INFO, "Close hd_table[%i]\n", i);
 				bdrv_close(hd_table[i]);
 			}
-			Log_Printf(LOG_INFO, "Free hd_table[%i]\n", i);
 			free(hd_table[i]);
 			hd_table[i] = NULL;
 		}
@@ -2722,12 +2720,10 @@ void Ide_UnInit(void)
 		{
 			if (opaque_ide_if[i].io_buffer)
 			{
-				Log_Printf(LOG_INFO, "Free opaque_ide_if[%i]\n", i);
 				qemu_free(opaque_ide_if[i].io_buffer);
 				opaque_ide_if[i].io_buffer = NULL;
 			}
 		}
-		Log_Printf(LOG_INFO, "Free opaque_ide_if\n");
 		free(opaque_ide_if);
 		opaque_ide_if = NULL;
 	}

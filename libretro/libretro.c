@@ -5,8 +5,7 @@
 #include "libretro.h"
 #include "libretro-hatari.h"
 #include "libretro_core_options.h"
-
-#include "libretro-hatari.h"
+#include "hatari-mapper.h"
 
 #include "STkeymap.h"
 #include "memorySnapShot.h"
@@ -81,6 +80,7 @@ int CHANGE_RATE = 0, CHANGEAV_TIMING = 0;
 float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 bool closedViaEmu = false;
 
+// core option vars
 extern bool UseNonPolarizedLowPassFilter;
 bool hatari_twojoy = true;
 bool hatari_nomouse = false;
@@ -90,23 +90,66 @@ bool hatari_borders = true;
 bool hatari_autoloadb = true;
 bool hatari_fastboot = false;
 bool hatari_start_in_mouse_mode = true;
+bool hatari_led_status_display = true;
 int hatari_autoload_config = false;
 int hatari_forcerefresh = 0;
 int hatari_emulated_mouse_speed = 2;
 int hatari_mouse_control_stick = 0;
+int hatari_boot_hd = 1;
+int hatari_joymousestatus_display = 1;
+int hatari_reset_type = 1;
 char hatari_machinetype[6];
 char hatari_ramsize[2];
 char hatari_frameskips[2];
+char hatari_writeprotect_floppy[5];
+char hatari_writeprotect_hd[5];
 
 char savestate_fname[RETRO_PATH_MAX];
+unsigned hatari_devices[4];
 
+#define RETRO_DEVICE_HATARI_KEYBOARD RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_KEYBOARD, 0)
+#define RETRO_DEVICE_HATARI_JOYSTICK RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 1)
+
+#if 1
 static struct retro_input_descriptor input_descriptors[] = {
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo Fire/Mouse Button 2" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Fire/Mouse Button 1" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Set in RetroPad Mapping" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Joystick Up" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Joystick Down" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Joystick Left" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Joystick Right" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo fire" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Fire" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Status display" },
+   { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Joystick X" },
+   { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Joystick Y" },
+   // Terminate
+   { 0 }
+};
+#else // old settings before RETRO_MAPPER added
+static struct retro_input_descriptor input_descriptors[] = {
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Joystick Up" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Joystick Down" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Joystick Left" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Joystick Right" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo fire/Mouse button 2" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Fire/Mouse button 1" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "Virtual keyboard" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Shift keyboard toggle" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Joystick/Mouse toggle" },
@@ -119,11 +162,11 @@ static struct retro_input_descriptor input_descriptors[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "Keyboard space" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Joystick/Mouse X" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Joystick/Mouse Y" },
-   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
-   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down" },
-   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left" },
-   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right" },
-   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo Fire" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Joystick Up" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Joystick Down" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Joystick Left" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Joystick Right" },
+   { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Turbo fire" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Fire" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "Status display" },
    { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Joystick X" },
@@ -131,6 +174,7 @@ static struct retro_input_descriptor input_descriptors[] = {
    // Terminate
    { 0 }
 };
+#endif
 
 void retro_message(unsigned int frames, int level, const char *format, ...)
 {
@@ -170,11 +214,50 @@ void retro_message(unsigned int frames, int level, const char *format, ...)
         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
 }
 
+void retro_status(unsigned int frames, const char *format, ...)
+{
+    struct retro_message msg;
+    struct retro_message_ext msg_ext;
+    char msg_passed[512], msg_local[512];
+    unsigned int message_interface_version;
+    va_list ap;
+
+    msg_local[0] = msg_passed[0] = 0;
+
+    if (string_is_empty(format))
+        return;
+
+    va_start(ap, format);
+    vsprintf(msg_passed, format, ap);
+    va_end(ap);
+
+    snprintf(msg_local, sizeof(msg_local), msg_passed);
+
+    msg.msg = msg_local;
+    msg.frames = frames;
+
+    msg_ext.msg = msg_local;
+    msg_ext.duration = frames;
+    msg_ext.priority = 3;
+    msg_ext.level = RETRO_LOG_INFO;
+    msg_ext.target = RETRO_MESSAGE_TARGET_OSD;
+    msg_ext.type = RETRO_MESSAGE_TYPE_STATUS;
+    msg_ext.progress = -1;
+
+    if (environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION, &message_interface_version) && (message_interface_version >= 1))
+    {
+        environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, (void*)&msg_ext);
+    }
+    else
+        environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
+}
+
 void libretro_set_dynamic_core_options()
 {
     unsigned version = 0;
     struct retro_core_option_v2_definition *def;
 
+    /* Fill out core option TOS images found in system\hatari\tos\ */
     if ((def = libretro_get_core_option_def("hatari_tosimage")))
     {
         int j = 0, i = 0;
@@ -210,6 +293,70 @@ void libretro_set_dynamic_core_options()
     else
     {
         retro_message(6000, RETRO_LOG_ERROR, "hatarib_tos entry not found");
+    }
+
+    // Retro_mapping.  Code from Vice64 by rsn887 and sonninnos.
+    /* Fill in the values for all the retro mappers */
+    int i = 0;
+    int j = 0;
+    int hotkey = 0;
+    int hotkeys_skipped = 0;
+    /* Count special hotkeys */
+    while (retro_keys[j].value[0] && j < RETRO_NUM_CORE_OPTION_VALUES_MAX - 1)
+    {
+        if (retro_keys[j].id < 0)
+            hotkeys_skipped++;
+        ++j;
+    }
+    while (option_defs_us[i].key)
+    {
+        if (strstr(option_defs_us[i].key, "hatari_mapper_"))
+        {
+            /* Show different key list for hotkeys (special negatives removed) */
+            if (strstr(option_defs_us[i].key, "hatari_mapper_joymouse")
+                || strstr(option_defs_us[i].key, "hatari_mapper_mouse_speed_down")
+                || strstr(option_defs_us[i].key, "hatari_mapper_mouse_speed_up")
+                || strstr(option_defs_us[i].key, "hatari_mapper_vkbd_toggle")
+                || strstr(option_defs_us[i].key, "hatari_mapper_vkbd_page_toggle")
+                || strstr(option_defs_us[i].key, "hatari_mapper_keyboard_shift_toggle")
+                || strstr(option_defs_us[i].key, "hatari_mapper_hatari_settings")
+                || strstr(option_defs_us[i].key, "hatari_mapper_statusbar"))
+
+                hotkey = 1;
+            else
+                hotkey = 0;
+
+            j = 0;
+            if (hotkey)
+            {
+                while (retro_keys[j].value[0] && j < RETRO_NUM_CORE_OPTION_VALUES_MAX - 1)
+                {
+                    if (j == 0) /* "---" unmapped */
+                    {
+                        option_defs_us[i].values[j].value = retro_keys[j].value;
+                        option_defs_us[i].values[j].label = retro_keys[j].label;
+                    }
+                    else
+                    {
+                        option_defs_us[i].values[j].value = retro_keys[j + hotkeys_skipped ].value;
+                        option_defs_us[i].values[j].label = retro_keys[j + hotkeys_skipped ].label;
+                    }
+                    ++j;
+                }
+            }
+            else
+            {
+                while (retro_keys[j].value[0] && j < RETRO_NUM_CORE_OPTION_VALUES_MAX - 1)
+                {
+                    option_defs_us[i].values[j].value = retro_keys[j].value;
+                    option_defs_us[i].values[j].label = retro_keys[j].label;
+                    ++j;
+                }
+            }
+            option_defs_us[i].values[j].value = NULL;
+            option_defs_us[i].values[j].label = NULL;
+        }
+        ++i;
     }
 }
 
@@ -262,6 +409,24 @@ void retro_set_environment(retro_environment_t cb)
     //sprintf(msg, "%i TOS files found in %s.", num_TOS_files, filepath);
     //retro_message(msg, 6000, 0);
 
+    static const struct retro_controller_description p1_controllers[] = {
+      { "ATARI Joystick", RETRO_DEVICE_HATARI_JOYSTICK },
+      { "ATARI Keyboard", RETRO_DEVICE_HATARI_KEYBOARD },
+    };
+    static const struct retro_controller_description p2_controllers[] = {
+      { "ATARI Joystick", RETRO_DEVICE_HATARI_JOYSTICK },
+      { "ATARI Keyboard", RETRO_DEVICE_HATARI_KEYBOARD },
+    };
+
+    static const struct retro_controller_info ports[] = {
+      { p1_controllers, 2  }, // port 1
+      { p2_controllers, 2  }, // port 2
+      { NULL, 0 }
+    };
+
+    // Disable.  Have user use RETROPAD_MAPPINGS to reduce confusion.
+    //cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+
     /* Set core dynamic options*/
     libretro_set_dynamic_core_options();
 
@@ -269,19 +434,232 @@ void retro_set_environment(retro_environment_t cb)
     libretro_set_core_options(environ_cb, &option_cats_supported);
 }
 
+static void update_retropad_variables(void)
+{
+    struct retro_variable var = { 0 };
+
+    /* RetroPad */
+    var.key = "hatari_mapper_up";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_UP] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_down";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_DOWN] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_left";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_LEFT] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_right";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_RIGHT] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_select";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_SELECT] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_start";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_START] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_b";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_B] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_a";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_A] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_y";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_Y] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_x";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_X] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_l";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_L] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_r";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_R] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_l2";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_L2] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_r2";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_R2] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_l3";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_L3] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_r3";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_R3] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_lr";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_LR] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_ll";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_LL] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_ld";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_LD] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_lu";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_LU] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_rr";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_RR] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_rl";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_RL] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_rd";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_RD] = retro_keymap_id(var.value);
+    }
+
+    var.key = "hatari_mapper_ru";
+    var.value = NULL;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        mapper_keys[RETRO_DEVICE_ID_JOYPAD_RU] = retro_keymap_id(var.value);
+    }
+}
+
 static void update_variables(void)
 {
    struct retro_variable var = {0};
 
-   // Input -> Two joysticks connected?
-   var.key = "hatari_twojoy";
+   // System -> Atari Computer Machine Type 
+   var.key = "hatari_machinetype";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   {
+       strncpy((char*)hatari_machinetype, var.value, 6);
+   }
+
+   // System -> amount of emulated RAM
+   var.key = "hatari_ramsize";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       strncpy((char*)hatari_ramsize, var.value, 2);
+   }
+
+   // System -> selected TOS image
+   var.key = "hatari_tosimage";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       if (strcmp(var.value, "default") == 0)
+           sprintf(RETRO_TOS, "%s%stos.img", retro_system_directory, RETRO_PATH_SEPARATOR);
+       else
+           sprintf(RETRO_TOS, "%s%shatari%stos%s%s", retro_system_directory, RETRO_PATH_SEPARATOR, RETRO_PATH_SEPARATOR, RETRO_PATH_SEPARATOR, var.value);
+   }
+
+   // System -> Fast boot
+   var.key = "hatari_fastboot";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       if (strcmp(var.value, "true") == 0)
+           hatari_fastboot = true;
+       else
+           hatari_fastboot = false;
+   }
+
+   // System -> Reset Type
+   var.key = "hatari_reset_type";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      hatari_twojoy = true;
-      if(strcmp(var.value, "false") == 0)
-         hatari_twojoy = false;
-      ConfigureParams.Joysticks.Joy[0].nJoystickMode = hatari_twojoy ? JOYSTICK_REALSTICK : JOYSTICK_DISABLED;
+       hatari_reset_type = string_to_unsigned(var.value);
    }
 
    // Input -> Start with emulated mouse active
@@ -294,14 +672,6 @@ static void update_variables(void)
            MOUSEMODE = -1;
    }
 
-   // Input -> Emulated mouse speed
-   var.key = "hatari_emulated_mouse_speed";
-   var.value = NULL;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-       PAS = string_to_unsigned(var.value);
-   }
-
    // Input -> Which stick controls the mouse
    var.key = "hatari_mouse_control_stick";
    var.value = NULL;
@@ -310,6 +680,26 @@ static void update_variables(void)
        hatari_mouse_control_stick = string_to_unsigned(var.value);
    }
 
+   // Input -> Emulated mouse speed
+   var.key = "hatari_emulated_mouse_speed";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       PAS = string_to_unsigned(var.value);
+   }
+
+   // Input -> Two joysticks connected?
+   var.key = "hatari_twojoy";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      hatari_twojoy = true;
+      if(strcmp(var.value, "false") == 0)
+         hatari_twojoy = false;
+      ConfigureParams.Joysticks.Joy[0].nJoystickMode = hatari_twojoy ? JOYSTICK_REALSTICK : JOYSTICK_DISABLED;
+   }
+
+   // Enable/Disable Hardware Mouse
    var.key = "hatari_nomouse";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -322,6 +712,7 @@ static void update_variables(void)
       // to prevent conflicts if needed, because Hatari seems to automatically merge/combine mouse and joystick in a weird way.
    }
 
+   // Enable/Disable Hardware Keyboard
    var.key = "hatari_nokeys";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -329,6 +720,100 @@ static void update_variables(void)
       hatari_nokeys = false;
       if(strcmp(var.value, "true") == 0)
          hatari_nokeys = true;
+   }
+
+   // Video High resolution
+   var.key = "hatari_video_hires";
+   var.value = NULL;
+   int new_video_config = 0;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       if (strcmp(var.value, "true") == 0)
+           new_video_config |= HATARI_VIDEO_HIRES;
+   }
+
+   // Video Crop Overscan
+   var.key = "hatari_video_crop_overscan";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       if (strcmp(var.value, "true") == 0)
+           new_video_config |= HATARI_VIDEO_CROP;
+   }
+
+   if (new_video_config != video_config)
+   {
+       video_config = new_video_config;
+       switch (video_config)
+       {
+       case HATARI_VIDEO_OV_LO:
+           retrow = 416;
+           retroh = 274;
+           hatari_borders = true;
+           break;
+       case HATARI_VIDEO_CR_LO:
+           retrow = 366;
+           retroh = 243;
+           // Strange, do not work if set to false...
+           hatari_borders = true;
+           break;
+       case HATARI_VIDEO_OV_HI:
+           retrow = 832;
+           retroh = 548;
+           hatari_borders = true;
+           break;
+       case HATARI_VIDEO_CR_HI:
+           retrow = 732;
+           retroh = 486;
+           hatari_borders = true;
+           break;
+       }
+
+       log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
+
+       CROP_WIDTH = retrow;
+       CROP_HEIGHT = (retroh - 80);
+       VIRTUAL_WIDTH = retrow;
+       texture_init();
+   }
+
+   // Video Force Refresh
+   var.key = "hatari_forcerefresh";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       hatari_forcerefresh = atoi(var.value);       //  Auto = 0, NTSC = 1, PAL = 2
+   }
+
+   // Set location of joystick/mouse toggle message
+   var.key = "hatari_joymousestatus_display";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       hatari_joymousestatus_display = atoi(var.value);  // Off = 0, Status = 1, OSD = 2;
+   }
+
+   // Show drive activity in status info
+   var.key = "hatari_led_status_display";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       hatari_led_status_display = false;
+       if (strcmp(var.value, "true") == 0)
+           hatari_led_status_display = true;
+   }
+
+   // Set frameskip
+   var.key = "hatari_frameskips";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       strncpy((char*)hatari_frameskips, var.value, sizeof(hatari_frameskips));
    }
 
    // Fast Floppy
@@ -359,16 +844,34 @@ static void update_variables(void)
            hatari_autoloadb = false;
    }
 
-   // Fast boot
-   var.key = "hatari_fastboot";
+   // Boot from hard disk.  Currently disabled.. does not seem to be working.
+   var.key = "hatari_boot_hd";
    var.value = NULL;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
        if (strcmp(var.value, "true") == 0)
-           hatari_fastboot = true;
+           hatari_boot_hd = true;
        else
-           hatari_fastboot = false;
+           hatari_boot_hd = false;
+   }
+
+   // Write protect floppy disks.
+   var.key = "hatari_writeprotect_floppy";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       strncpy((char*)hatari_writeprotect_floppy, var.value, sizeof(hatari_writeprotect_floppy));
+   }
+
+   // Write protect hard drives.
+   var.key = "hatari_writeprotect_hd";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+       strncpy((char*)hatari_writeprotect_hd, var.value, sizeof(hatari_writeprotect_hd));
    }
 
    // Audio
@@ -377,8 +880,8 @@ static void update_variables(void)
    UseNonPolarizedLowPassFilter = true;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if(strcmp(var.value, "false") == 0)
-         UseNonPolarizedLowPassFilter = false;
+       if (strcmp(var.value, "false") == 0)
+           UseNonPolarizedLowPassFilter = false;
    }
 
    // Autoload hatari.cfg
@@ -387,119 +890,12 @@ static void update_variables(void)
    hatari_autoload_config = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if(strcmp(var.value, "true") == 0)
-          hatari_autoload_config = true;
+       if (strcmp(var.value, "true") == 0)
+           hatari_autoload_config = true;
    }
 
-   // Video High resolution
-   var.key = "hatari_video_hires";
-   var.value = NULL;
-   int new_video_config = 0;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if(strcmp(var.value, "true") == 0)
-         new_video_config |= HATARI_VIDEO_HIRES;
-   }
-
-   // Video Crop Overscan
-   var.key = "hatari_video_crop_overscan";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if(strcmp(var.value, "true") == 0)
-         new_video_config |= HATARI_VIDEO_CROP;
-   }
-
-   // Video Force Refresh
-   var.key = "hatari_forcerefresh";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-
-       if (strcmp(var.value, "0") == 0)
-           hatari_forcerefresh = 0;             // Auto
-       else if (strcmp(var.value, "1") == 0)
-           hatari_forcerefresh = 1;             // NTSC
-       else
-           hatari_forcerefresh = 2;             // PAL
-   }
-
-   // Atari Computer Machine Type 
-   var.key = "hatari_machinetype";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-       strncpy((char*)hatari_machinetype, var.value, 6);
-   }
-
-   // System amount of emulated RAM
-   var.key = "hatari_ramsize";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-       strncpy((char*)hatari_ramsize, var.value, 2);
-   }
-
-   // selected TOS image
-   var.key = "hatari_tosimage";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-       if (strcmp(var.value, "default") == 0)
-           sprintf(RETRO_TOS, "%s%stos.img", retro_system_directory, RETRO_PATH_SEPARATOR);
-       else
-           sprintf(RETRO_TOS, "%s%shatari%stos%s%s", retro_system_directory, RETRO_PATH_SEPARATOR, RETRO_PATH_SEPARATOR, RETRO_PATH_SEPARATOR, var.value);
-   }
-
-   var.key = "hatari_frameskips";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      strncpy((char*)hatari_frameskips, var.value, 2);
-   }
-
-   if (new_video_config != video_config)
-   {
-      video_config = new_video_config;
-      switch(video_config)
-      {
-         case HATARI_VIDEO_OV_LO:
-            retrow = 416;
-            retroh = 274;
-            hatari_borders = true;
-            break;
-         case HATARI_VIDEO_CR_LO:
-            retrow = 366;
-            retroh = 243;
-            // Strange, do not work if set to false...
-            hatari_borders = true;
-            break;
-         case HATARI_VIDEO_OV_HI:
-            retrow = 832;
-            retroh = 548;
-            hatari_borders = true;
-            break;
-         case HATARI_VIDEO_CR_HI:
-            retrow = 732;
-            retroh = 486;
-            hatari_borders = true;
-            break;
-      }
-
-      log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
-
-      CROP_WIDTH =retrow;
-      CROP_HEIGHT= (retroh-80);
-      VIRTUAL_WIDTH = retrow;
-      texture_init();
-   }
+   // Retropad
+   update_retropad_variables();
 }
 
 static void retro_wrap_emulator()
@@ -561,11 +957,6 @@ void retro_shutdown_hatari(void)
    log_cb(RETRO_LOG_INFO, "SHUTDOWN\n");
    texture_uninit();
    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-}
-
-void retro_reset(void){
-   update_variables();
-   Reset_Warm();
 }
 
 //*****************************************************************************
@@ -807,6 +1198,26 @@ static struct retro_disk_control_ext_callback disk_interface_ext = {
    disk_get_image_label,
 };
 
+void retro_reset(void)
+{
+    update_variables();
+
+    if (hatari_reset_type)
+    {
+        /* Reset DC index to first entry */
+        if (dc)
+        {
+            dc->index = 0;
+            disk_set_eject_state(true);
+            disk_set_eject_state(false);
+        }
+
+        Reset_Cold();
+    }
+    else
+        Reset_Warm();
+}
+
 //*****************************************************************************
 //*****************************************************************************
 // Init
@@ -929,8 +1340,27 @@ unsigned retro_api_version(void)
 
 void retro_set_controller_port_device(unsigned port, unsigned device)
 {
-   (void)port;
-   (void)device;
+    //(void)port;
+    //(void)device;
+
+    if (port < 2)
+    {
+        //if (device == RETRO_DEVICE_HATARI_JOYSTICK)
+        //{
+        //    struct retro_input_descriptor *d = input_descriptors;
+
+        //    for (d; d->port != port; ++d)
+        //    {
+        //    }
+
+        //    d += 4;
+        //    d->description = "Hello There";
+
+        //    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, input_descriptors);
+        //}
+
+        hatari_devices[port] = device; 
+    }
 }
 
 void retro_get_system_info(struct retro_system_info *info)
@@ -1182,8 +1612,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
     if (ptr)
         *ptr = 0;
-
-    retro_message(8000, RETRO_LOG_INFO, "Dfid=%s", ConfigureParams.DiskImage.szDiskImageDirectory);
 
     //clear sound buffer
 	memset(SNDBUF,0,1024*2*2);

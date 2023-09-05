@@ -22,9 +22,6 @@ const char HDC_fileid[] = "Hatari hdc.c : " __DATE__ " " __TIME__;
 #include "tos.h"
 #include "statusbar.h"
 
-//#define fseek fseeko
-//#define ftell ftello
-
 /*
   ACSI emulation: 
   ACSI commands are six byte-packets sent to the
@@ -764,7 +761,7 @@ bool HDC_Init(void)
 		filesize = File_Length(filename);
 		if (filesize <= 0 || (filesize & 0x1ff) != 0)
 		{
-			Log_Printf(LOG_ERROR, "ERROR: HD file has strange size(%i)!\n",filesize);
+			Log_Printf(LOG_ERROR, "ERROR: HD file has strange size!\n");
 			continue;
 		}
 

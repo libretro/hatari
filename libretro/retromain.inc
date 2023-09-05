@@ -20,6 +20,7 @@ extern void enter_gui();
 extern int LoadTosFromRetroSystemDir();
 extern void retro_shutdown_hatari(void);
 extern int hatari_autoload_config;
+extern int hatari_writeprotect_hd;
 
 #include <unistd.h>
 

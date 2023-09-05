@@ -1,5 +1,6 @@
 #include "libretro.h"
 #include "libretro-hatari.h"
+#include "hatari-mapper.h"
 #include "retro_files.h"
 #include "graph.h"
 #include "vkbd.h"
@@ -10,7 +11,8 @@
 #include "main.h"
 
 //RETRO LIB
-extern void retro_message(const char* text, unsigned int frames, int alt);
+extern void retro_message(unsigned int frames, int level, const char* format, ...);
+extern void retro_status(unsigned int frames, const char* format, ...);
 
 //CORE VAR
 extern const char *retro_save_directory;
@@ -24,7 +26,9 @@ char RETRO_IDE[RETRO_PATH_MAX];
 char RETRO_FID[RETRO_PATH_MAX];
 extern bool hatari_nomouse;
 extern bool hatari_nokeys;
+extern bool hatari_led_status_display;
 extern int hatari_mouse_control_stick;
+extern int hatari_joymousestatus_display;
 
 /* HATARI PROTOTYPES */
 #include "configuration.h"
@@ -90,6 +94,7 @@ char Key_Sate2[512];
 int oldi=-1;
 int vkx=0,vky=0;
 int vkflag[5]={0,0,0,0,0};
+int mapper_keys[RETRO_MAPPER_LAST] = { 0 };
 
 //STATS GUI
 extern int LEDA,LEDB,LEDC;
@@ -183,6 +188,18 @@ bool hatari_mapper_unserialize(const char* data, char version)
 		exitgui = 1;
 	}
 	return result;
+}
+
+int retro_keymap_id(const char* val)
+{
+    int i = 0;
+    while (retro_keys[i].id < RETROK_LAST)
+    {
+        if (!strcmp(retro_keys[i].value, val))
+            return retro_keys[i].id;
+        i++;
+    }
+    return 0;
 }
 
 /* input state */
@@ -397,15 +414,24 @@ void retro_key_up(unsigned char retrok)
 
 void Process_key(void)
 {
-   int i;
-   for(i=0;i<320;i++)
-   {
-      Key_Sate[i]= (input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0,i) && !hatari_nokeys) ? 0x80: 0;
+   int i,j,d;
 
-      if (i == RETROK_SPACE) // can map R3 to space bar
+   for(i = 0; i < 320; i++)
+   {
+      Key_Sate[i] = (input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0,i) && !hatari_nokeys) ? 0x80: 0;
+
+      //if (i == RETROK_SPACE) // can map R3 to space bar
+      //{
+      //    Key_Sate[i] |= input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ? 0x80 : 0;
+      //}
+
+      // RETROMAPPER... mapper... mapper
+      for (j = 0; j < 16; ++j)
       {
-         char joyspace = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ? 0x80 : 0;
-         Key_Sate[i] |= joyspace;
+          if (mapper_keys[j] == i)
+          {
+              Key_Sate[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, j) ? 0x80 : 0;
+          }
       }
 
       if(SDLKeyToSTScanCode[i]==0x2a )
@@ -441,6 +467,8 @@ void Process_key(void)
 const int DEADZONE = 0x8000 / 12;
 void Deadzone(int* a)
 {
+    return; // let retroarch control the deadzone for now
+
    if (al[0] <= -DEADZONE) al[0] += DEADZONE;
    if (al[1] <= -DEADZONE) al[1] += DEADZONE;
    if (al[0] >=  DEADZONE) al[0] -= DEADZONE;
@@ -528,7 +556,7 @@ bool input_mouse_via_pointer(void)
     // mouse_x, mouse_y, point_b,
     sprintf(msg, "touchX=%i, touchY=%i.\n", mouse_x, mouse_y);
         //KeyboardProcessor.Mouse.DeltaX, KeyboardProcessor.Mouse.DeltaY, KeyboardProcessor.Mouse.dx, KeyboardProcessor.Mouse.dy) ;
-    retro_message(msg, 60, 0);
+    retro_message(60, RETRO_LOG_INFO, msg);
 
     // might not need to return this.. but we will figure out later
     if (!point_b)
@@ -553,14 +581,18 @@ bool input_mouse_via_pointer(void)
 
 void update_input(void)
 {
-   int i;
+   int i,d;
    int mouse_l;
    int mouse_r;
    int16_t mouse_x;
    int16_t mouse_y;
+   static int status_update_joymouse = 0;
+   static int status_update_mousespeed = 0;
+   char msg[50];
 
-   MXjoy0=0;
-   MXjoy1=0;
+   msg[0] = 0;
+   MXjoy0 = 0;
+   MXjoy1 = 0;
 
    if(oldi!=-1)
    {
@@ -572,6 +604,123 @@ void update_input(void)
 
    Process_key();
 
+#if 1
+   // interface functions
+   for (i = 0; i < 16; ++i)
+   {
+       // only  do these if VKBD not active
+       if (SHOWKEY == -1)
+       {
+           d = RETRO_DEVICE_ID_JOYPAD_START;// Hatari GUI
+           if (mapper_keys[i] == TOGGLE_SETTINGS)
+           {
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+                   mbt[d] = 1;
+               else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+               {
+                   mbt[d] = 0;
+                   pauseg = 1;
+               }
+           }
+           d = RETRO_DEVICE_ID_JOYPAD_SELECT;//mouse/joy toggle
+           if (mapper_keys[i] == TOGGLE_JOYMOUSE)
+           {
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+                   mbt[d] = 1;
+               else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+               {
+                   mbt[d] = 0;
+                   MOUSEMODE = -MOUSEMODE;
+                   status_update_joymouse = 60;
+               }
+           }
+           d = RETRO_DEVICE_ID_JOYPAD_L2;//mouse gui speed down
+           if (mapper_keys[i] == MOUSE_SLOWER)
+           {
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+                   mbt[d] = 1;
+               else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+               {
+                   mbt[d] = 0;
+                   PAS--; if (PAS < 1)PAS = MAXPAS;
+                   status_update_mousespeed = 60;
+               }
+           }
+           d = RETRO_DEVICE_ID_JOYPAD_R2;//mouse gui speed up
+           if (mapper_keys[i] == MOUSE_FASTER)
+           {
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+                   mbt[d] = 1;
+               else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+               {
+                   mbt[d] = 0;
+                   PAS++; if (PAS > MAXPAS)PAS = 1;
+                   status_update_mousespeed = 60;
+               }
+           }
+           d = RETRO_DEVICE_ID_JOYPAD_L;//show/hide status (either joystick)
+           if (mapper_keys[i] == TOGGLE_STATUSBAR)
+           {
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+                   mbt[d] = 1;
+               else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+               {
+                   mbt[d] = 0;
+                   STATUTON = -STATUTON;
+                   Screen_SetFullUpdate();
+               }
+           }
+       }
+       // do these only when VKBD is active.
+       else
+       {
+           d = RETRO_DEVICE_ID_JOYPAD_Y;//switch shift On/Off 
+           if (mapper_keys[i] == TOGGLE_VKBS)
+           {
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+                   mbt[d] = 1;
+               else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+               {
+                   mbt[d] = 0;
+                   SHIFTON = -SHIFTON;
+                   Screen_SetFullUpdate();
+               }
+           }
+           d = RETRO_DEVICE_ID_JOYPAD_R;//swap kbd pages
+           if (mapper_keys[i] == TOGGLE_VKBP)
+           {
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+                   mbt[d] = 1;
+               else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+               {
+                   mbt[d] = 0;
+                   if (SHOWKEY == 1)
+                   {
+                       NPAGE = -NPAGE;
+                       Screen_SetFullUpdate();
+                   }
+               }
+           }
+       }
+
+       // check always
+       d = RETRO_DEVICE_ID_JOYPAD_X;//show vkey toggle
+       if (mapper_keys[i] == TOGGLE_VKBD)
+       {
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+               mbt[d] = 1;
+           else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+           {
+               mbt[d] = 0;
+               SHOWKEY = -SHOWKEY;
+               texture_init();           //clear kbd bmp so complete keyboard is cleared
+               Screen_SetFullUpdate();
+           }
+       }
+
+   }
+
+#else   // old code before RETRO_MAPPING was added.
    i=RETRO_DEVICE_ID_JOYPAD_START;// Hatari GUI
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
@@ -599,6 +748,7 @@ void update_input(void)
    {
       mbt[i]=0;
       MOUSEMODE=-MOUSEMODE;
+      status_update_joymouse = 60;
    }
 
    i=RETRO_DEVICE_ID_JOYPAD_L2;//mouse gui speed down
@@ -608,6 +758,7 @@ void update_input(void)
    {
       mbt[i]=0;
       PAS--;if(PAS<1)PAS=MAXPAS;
+      status_update_mousespeed = 60;
    }
 
    i=RETRO_DEVICE_ID_JOYPAD_R2;//mouse gui speed up
@@ -617,6 +768,7 @@ void update_input(void)
    {
       mbt[i]=0;
       PAS++;if(PAS>MAXPAS)PAS=1;
+      status_update_mousespeed = 60;
    }
 
    i=RETRO_DEVICE_ID_JOYPAD_Y;//switch shift On/Off 
@@ -651,9 +803,9 @@ void update_input(void)
          Screen_SetFullUpdate();
       }
    }
+#endif /* 1 */
 
-   // joystick 2
-
+   // joystick 2.  Retromappings not done for joystick 2 yet. (if at all)
    if (ConfigureParams.Joysticks.Joy[0].nJoystickMode == JOYSTICK_REALSTICK) // 2 joysticks
    {
       al[0] =(input_state_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
@@ -686,7 +838,7 @@ void update_input(void)
    }
 
    // virtual keyboard (prevents other joystick 1 input and mouse)
-
+   // Guess what!?  With RETROMAPPING active.. we can actually read these JOYPAD buttonds directly!  No weird remapping to confuse the user!
    if(SHOWKEY==1)
    {
       // analog stick can work the keyboard
@@ -736,10 +888,9 @@ void update_input(void)
 
       virtual_kdb(bmp,vkx,vky);
 
-      i=RETRO_DEVICE_ID_JOYPAD_B;
-      if(input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  && vkflag[4]==0)
+      if(input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)  && vkflag[4]==0)
          vkflag[4]=1;
-      else if( !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)  && vkflag[4]==1)
+      else if( !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)  && vkflag[4]==1)
       {
          vkflag[4]=0;
          i=check_vkey2(vkx,vky);
@@ -802,82 +953,133 @@ void update_input(void)
    }
 
    // joystick 1 / mouse
-
-   if(MOUSEMODE < 0)
+   if (MOUSEMODE < 0)
    {
-      //Joy mode (joystick controls joystick, mouse controls mouse)
+       //Joy mode (joystick controls joystick, mouse controls mouse)
 
-      //emulate Joy0 with joy analog left.  User should really set this in the Controls section if they want this
-      //al[0] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
-      //al[1] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
+       //emulate Joy0 with joy analog left.  User should really set this in the Controls section if they want this
+       //al[0] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
+       //al[1] =(input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
 
-      /* Directions */
-      if (al[1] <= JOYRANGE_UP_VALUE)
-         MXjoy0 |= ATARIJOY_BITMASK_UP;
-      else if (al[1] >= JOYRANGE_DOWN_VALUE)
-         MXjoy0 |= ATARIJOY_BITMASK_DOWN;
+       /* Directions */
+       //if (al[1] <= JOYRANGE_UP_VALUE)
+       //   MXjoy0 |= ATARIJOY_BITMASK_UP;
+       //else if (al[1] >= JOYRANGE_DOWN_VALUE)
+       //   MXjoy0 |= ATARIJOY_BITMASK_DOWN;
 
-      if (al[0] <= JOYRANGE_LEFT_VALUE)
-         MXjoy0 |= ATARIJOY_BITMASK_LEFT;
-      else if (al[0] >= JOYRANGE_RIGHT_VALUE)
-         MXjoy0 |= ATARIJOY_BITMASK_RIGHT;
+       //if (al[0] <= JOYRANGE_LEFT_VALUE)
+       //   MXjoy0 |= ATARIJOY_BITMASK_LEFT;
+       //else if (al[0] >= JOYRANGE_RIGHT_VALUE)
+       //   MXjoy0 |= ATARIJOY_BITMASK_RIGHT;
 
-      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP   ) ) MXjoy0 |= ATARIJOY_BITMASK_UP;
-      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN ) ) MXjoy0 |= ATARIJOY_BITMASK_DOWN;
-      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT ) ) MXjoy0 |= ATARIJOY_BITMASK_LEFT;
-      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT) ) MXjoy0 |= ATARIJOY_BITMASK_RIGHT;
-      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)     ) MXjoy0 |= ATARIJOY_BITMASK_FIRE;
+ // new RETROMAPPER code
+#if 1 
 
-      // Joy autofire
-      if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A) )
-      {
-         MXjoy0 |= ATARIJOY_BITMASK_FIRE;
-         if ((nVBLs&0x7)<4)
-            MXjoy0 &= ~ATARIJOY_BITMASK_FIRE;
-      }
+       //Only if VKBD not active.
+       if (SHOWKEY == -1)
+       {
+           for (i = 0; i < 16; ++i)
+           {
+               d = RETRO_DEVICE_ID_JOYPAD_UP;
+               if (mapper_keys[i] == JOYSTICK_UP)
+               {
+                   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))    MXjoy0 |= ATARIJOY_BITMASK_UP;
+               }
+               d = RETRO_DEVICE_ID_JOYPAD_DOWN;
+               if (mapper_keys[i] == JOYSTICK_DOWN)
+               {
+                   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))    MXjoy0 |= ATARIJOY_BITMASK_DOWN;
+               }
+               d = RETRO_DEVICE_ID_JOYPAD_LEFT;
+               if (mapper_keys[i] == JOYSTICK_LEFT)
+               {
+                   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))    MXjoy0 |= ATARIJOY_BITMASK_LEFT;
+               }
+               d = RETRO_DEVICE_ID_JOYPAD_RIGHT;
+               if (mapper_keys[i] == JOYSTICK_RIGHT)
+               {
+                   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))    MXjoy0 |= ATARIJOY_BITMASK_RIGHT;
+               }
+               d = RETRO_DEVICE_ID_JOYPAD_B;
+               if (mapper_keys[i] == JOYSTICK_FIRE)
+               {
+                   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))    MXjoy0 |= ATARIJOY_BITMASK_FIRE;
+               }
+               d = RETRO_DEVICE_ID_JOYPAD_A;
+               if (mapper_keys[i] == JOYSTICK_TURBOFIRE)
+               {
+                   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+                   {
+                       MXjoy0 |= ATARIJOY_BITMASK_FIRE;
+                       if ((nVBLs & 0x7) < 4)
+                           MXjoy0 &= ~ATARIJOY_BITMASK_FIRE;
+                   }
+               }
+           }
+           //old code
+#else   
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN)) MXjoy0 |= ATARIJOY_BITMASK_DOWN;
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT)) MXjoy0 |= ATARIJOY_BITMASK_LEFT;
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT)) MXjoy0 |= ATARIJOY_BITMASK_RIGHT;
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)) MXjoy0 |= ATARIJOY_BITMASK_FIRE;
 
-      if (hatari_nomouse)
-      {
-         mouse_l = 0;
-         mouse_r = 0;
-      }
-      else
-      {
-         mouse_x = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
-         mouse_y = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
-         mouse_l = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
-         mouse_r = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
-         fmousex=mouse_x;
-         fmousey=mouse_y;
-      }
-
+           // Joy autofire
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A))
+           {
+               MXjoy0 |= ATARIJOY_BITMASK_FIRE;
+               if ((nVBLs & 0x7) < 4)
+                   MXjoy0 &= ~ATARIJOY_BITMASK_FIRE;
+           }
+#endif /*  1 */
+   
+            if (hatari_nomouse)
+            {
+                mouse_l = 0;
+                mouse_r = 0;
+            }
+            else
+            {
+                mouse_x = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
+                mouse_y = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
+                mouse_l = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
+                mouse_r = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
+                fmousex=mouse_x;
+                fmousey=mouse_y;
+            }
+       }
    }
    else // MOUSEMODE >= 0
    {
-       //Mouse mode (joystick controls mouse) unless touch pad pressed
-       fmousex = fmousey = 0;
+       //Mouse mode (joystick controls mouse)
+       // We won't tie this to RETROMAPPER.  Hopefully it won't confuse the user.
 
-       //emulate mouse with joy analog left
-       al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, hatari_mouse_control_stick, RETRO_DEVICE_ID_ANALOG_X));
-       al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, hatari_mouse_control_stick, RETRO_DEVICE_ID_ANALOG_Y));
-       Deadzone(al);
-       al[0] = (al[0] * PAS) / MAXPAS;
-       al[1] = (al[1] * PAS) / MAXPAS;
-       fmousex += al[0] / 1024;
-       fmousey += al[1] / 1024;
+       // Only if VKDB not active.
+       if (SHOWKEY == -1)
+       {
+           fmousex = fmousey = 0;
 
-       //emulate mouse with dpad.  May change this in future to be more userdefinable
-       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
-           fmousex += PAS * 3;
-       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
-           fmousex -= PAS * 3;
-       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
-           fmousey += PAS * 3;
-       if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
-           fmousey -= PAS * 3;
+           //emulate mouse with joy analog left
+           al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, hatari_mouse_control_stick, RETRO_DEVICE_ID_ANALOG_X));
+           al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, hatari_mouse_control_stick, RETRO_DEVICE_ID_ANALOG_Y));
+           Deadzone(al);
+           al[0] = (al[0] * PAS) / MAXPAS;
+           al[1] = (al[1] * PAS) / MAXPAS;
+           fmousex += al[0] / 1024;
+           fmousey += al[1] / 1024;
 
-       mouse_l = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
-       mouse_r = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
+           //emulate mouse with dpad.  May change this in future to be more userdefinable
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
+               fmousex += PAS * 3;
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
+               fmousex -= PAS * 3;
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
+               fmousey += PAS * 3;
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
+               fmousey -= PAS * 3;
+
+           mouse_l = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+           mouse_r = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
+       }
    }
 
    if (mbL == 0 && mouse_l)
@@ -906,16 +1108,79 @@ void update_input(void)
    //input_mouse_via_pointer();
    Main_HandleMouseMotion();
 
+   if (status_update_joymouse || status_update_mousespeed)
+   {
+       if (hatari_joymousestatus_display == 0)
+           status_update_joymouse = status_update_mousespeed = 0;
+       else if (hatari_joymousestatus_display == 2)
+       {
+           if (status_update_joymouse)
+               retro_message(1000, RETRO_LOG_INFO, (MOUSEMODE < 0) ? "Joystick Mode" : "Mouse Mode");
+           else
+               retro_message(1000, RETRO_LOG_INFO, "Mouse Speed:%d", PAS);
+
+           status_update_joymouse = status_update_mousespeed = 0;
+       }
+       else
+       {
+           char msp[8];
+
+           if (status_update_mousespeed)
+               sprintf(msp, "Speed:%d", PAS);
+           else
+               msp[0] = 0;
+
+           sprintf(msg, "%s%s%s", status_update_joymouse ? (MOUSEMODE < 0) ? "Joystick Mode" : "Mouse Mode" : "",
+                        (status_update_mousespeed && status_update_joymouse) ? " || " : "", msp );
+
+           if (status_update_joymouse > 0)
+               status_update_joymouse--;
+           if (status_update_mousespeed > 0)
+               status_update_mousespeed--;
+       }
+   }
+
+   if (hatari_led_status_display)
+   {
+       if (LEDA)
+       {
+           if (status_update_joymouse || status_update_mousespeed)
+               strcat(msg, " || A");
+           else
+               retro_status(60, "A");
+       }
+       if (LEDB)
+       {
+           if (status_update_joymouse || status_update_mousespeed)
+               strcat(msg, " || B");
+           else
+               retro_status(60, "B");
+       }
+       if (LEDC)
+       {
+           if (status_update_joymouse || status_update_mousespeed)
+               strcat(msg, " || C");
+           else
+               retro_status(60, "C");
+
+           if (STATUTON == -1)
+               LEDC = 0;
+       }
+   }
+
+   if ( msg[0] )
+       retro_status(60, msg);
+
    if(STATUTON==1)
       Print_Statut();
 }
 
 void input_gui(void)
 {
-
-   int i;
+   int i,d;
    int mouse_l;
    int mouse_r;
+   static int status_update_mousespeed = 0;
    int16_t mouse_x = 0;
    int16_t mouse_y = 0;
 
@@ -924,40 +1189,83 @@ void input_gui(void)
    if(slowdown>0)
       return;
 
+#if 1
    /* ability to adjust mouse speed in hatari GUI */
-
-   i=RETRO_DEVICE_ID_JOYPAD_L2;
-   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
-      mbt[i]=1;
-   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   for (i = 0; i < 16; ++i)
    {
-      mbt[i]=0;
-      PAS--;if(PAS<0)PAS=MAXPAS;
+       d = RETRO_DEVICE_ID_JOYPAD_L2;//mouse gui speed down
+       if (mapper_keys[i] == MOUSE_SLOWER)
+       {
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+               mbt[d] = 1;
+           else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+           {
+               mbt[d] = 0;
+               PAS--; if (PAS < 1)PAS = MAXPAS;
+               status_update_mousespeed = 60;
+           }
+       }
+       d = RETRO_DEVICE_ID_JOYPAD_R2;//mouse gui speed up
+       if (mapper_keys[i] == MOUSE_FASTER)
+       {
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+               mbt[d] = 1;
+           else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+           {
+               mbt[d] = 0;
+               PAS++; if (PAS > MAXPAS)PAS = 1;
+               status_update_mousespeed = 60;
+           }
+       }
+       d = RETRO_DEVICE_ID_JOYPAD_START;// Hatari GUI
+       if (mapper_keys[i] == TOGGLE_SETTINGS)
+       {
+           if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && mbt[d] == 0)
+               mbt[d] = 1;
+           else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d))
+           {
+               mbt[d] = 0;
+               exitgui = 1;
+               status_update_mousespeed = 0;
+           }
+       }
+   }
+#else
+   /* ability to adjust mouse speed in hatari GUI */
+   i = RETRO_DEVICE_ID_JOYPAD_L2;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i] == 0)
+       mbt[i] = 1;
+   else if (mbt[i] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i))
+   {
+       mbt[i] = 0;
+       PAS--; if (PAS < 0)PAS = MAXPAS;
+       status_update_mousespeed = 60;
    }
 
-   i=RETRO_DEVICE_ID_JOYPAD_R2;
-   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
-      mbt[i]=1;
-   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   i = RETRO_DEVICE_ID_JOYPAD_R2;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i] == 0)
+       mbt[i] = 1;
+   else if (mbt[i] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i))
    {
-      mbt[i]=0;
-      PAS++;if(PAS>MAXPAS)PAS=1;
+       mbt[i] = 0;
+       PAS++; if (PAS > MAXPAS)PAS = 1;
+       status_update_mousespeed = 60;
    }
 
    // START to exit GUI
-
-   i=RETRO_DEVICE_ID_JOYPAD_START;
-   if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
-      mbt[i]=1;
-   else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) )
+   i = RETRO_DEVICE_ID_JOYPAD_START;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i] == 0)
+       mbt[i] = 1;
+   else if (mbt[i] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i))
    {
-      mbt[i]=0;
-      exitgui=1;
+       mbt[i] = 0;
+       exitgui = 1;
+       status_update_mousespeed = 0;
    }
-
+#endif /* 1 */
    //emulate mouse with joy analog left
-   al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X));
-   al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y));
+   al[0] = (input_state_cb(0, RETRO_DEVICE_ANALOG, hatari_mouse_control_stick, RETRO_DEVICE_ID_ANALOG_X));
+   al[1] = (input_state_cb(0, RETRO_DEVICE_ANALOG, hatari_mouse_control_stick, RETRO_DEVICE_ID_ANALOG_Y));
    Deadzone(al);
    al[0] = (al[0] * PAS) / MAXPAS;
    al[1] = (al[1] * PAS) / MAXPAS;
@@ -1020,4 +1328,19 @@ void input_gui(void)
       gmy=0;
    if (gmy>retroh-1)
       gmy=retroh-1;
+
+   if (status_update_mousespeed)
+   {
+       if (hatari_joymousestatus_display == 0)
+           status_update_mousespeed = 0;
+       // bummer.. can't do here because xbox one crashes due to libco
+       //else
+       //    retro_status(60, "Speed:%d", PAS);
+
+       if (status_update_mousespeed > 0)
+           status_update_mousespeed--;
+   }
+
+   if (STATUTON == 1)
+       Print_Statut();
 }
