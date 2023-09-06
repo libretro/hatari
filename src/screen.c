@@ -658,6 +658,11 @@ static void Screen_SetResolution(void)
 		}
 	}
 
+#ifdef __LIBRETRO__
+	retrow = Width;
+	retroh = Height;
+#endif
+
 	Screen_SetSTScreenOffsets();  
 	Height += Statusbar_SetHeight(Width, Height);
 

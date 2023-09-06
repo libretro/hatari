@@ -10,6 +10,7 @@
 #include "STkeymap.h"
 #include "memorySnapShot.h"
 #include "main.h"
+#include "screen.h"
 
 #include "retro_strings.h"
 #include "retro_files.h"
@@ -54,6 +55,7 @@ int num_TOS_files = 0;
 extern void update_input(void);
 extern void texture_init(void);
 extern void texture_uninit(void);
+//extern void Screen_SetFullUpdate(void);
 extern void Emu_init();
 extern void Emu_uninit();
 
@@ -79,7 +81,7 @@ unsigned int video_config = 0;
 int CHANGE_RATE = 0, CHANGEAV_TIMING = 0;
 float FRAMERATE = 50.0, SAMPLERATE = 44100.0;
 bool closedViaEmu = false;
-
+bool libretro_runloop_active = false;
 // core option vars
 extern bool UseNonPolarizedLowPassFilter;
 bool hatari_twojoy = true;
@@ -663,13 +665,17 @@ static void update_variables(void)
    }
 
    // Input -> Start with emulated mouse active
-   var.key = "hatari_start_in_mouse_mode";
-   var.value = NULL;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   // only set when first starting
+   if (!libretro_runloop_active)
    {
-       MOUSEMODE = 1;
-       if (strcmp(var.value, "false") == 0)
-           MOUSEMODE = -1;
+       var.key = "hatari_start_in_mouse_mode";
+       var.value = NULL;
+       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+       {
+           MOUSEMODE = 1;
+           if (strcmp(var.value, "false") == 0)
+               MOUSEMODE = -1;
+       }
    }
 
    // Input -> Which stick controls the mouse
@@ -681,11 +687,15 @@ static void update_variables(void)
    }
 
    // Input -> Emulated mouse speed
-   var.key = "hatari_emulated_mouse_speed";
-   var.value = NULL;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   // only set when first starting
+   if (!libretro_runloop_active)
    {
-       PAS = string_to_unsigned(var.value);
+       var.key = "hatari_emulated_mouse_speed";
+       var.value = NULL;
+       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+       {
+           PAS = string_to_unsigned(var.value);
+       }
    }
 
    // Input -> Two joysticks connected?
@@ -723,60 +733,93 @@ static void update_variables(void)
    }
 
    // Video High resolution
-   var.key = "hatari_video_hires";
-   var.value = NULL;
-   int new_video_config = 0;
+   // Say bye bye.  All this did was create confusion.
+   //var.key = "hatari_video_hires";
+   //var.value = NULL;
+   //int new_video_config = 0;
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-       if (strcmp(var.value, "true") == 0)
-           new_video_config |= HATARI_VIDEO_HIRES;
-   }
+   //if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   //{
+   //    if (strcmp(var.value, "true") == 0)
+   //        new_video_config |= HATARI_VIDEO_HIRES;
+   //}
 
    // Video Crop Overscan
    var.key = "hatari_video_crop_overscan";
    var.value = NULL;
+   bool old_hatari_borders = hatari_borders;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
        if (strcmp(var.value, "true") == 0)
-           new_video_config |= HATARI_VIDEO_CROP;
+           hatari_borders = false;
+       //new_video_config |= HATARI_VIDEO_CROP;
+       else
+           hatari_borders = true;
+           
    }
 
-   if (new_video_config != video_config)
+   //leave here for archival purposes.  Or just in case I retract my changes.  :P
+   //if (new_video_config != video_config)
+   //{
+   //    video_config = new_video_config;
+   //    switch (video_config)
+   //    {
+   //    case HATARI_VIDEO_OV_LO:
+   //        retrow = 416;
+   //        retroh = 274;
+   //        hatari_borders = true;
+   //        break;
+   //    case HATARI_VIDEO_CR_LO:
+   //        retrow = 366;
+   //        retroh = 243;
+   //        // Strange, do not work if set to false...  double image
+   //        hatari_borders = false;
+   //        break;
+   //    case HATARI_VIDEO_OV_HI:
+   //        retrow = 832;
+   //        retroh = 548;
+   //        hatari_borders = true;
+   //        break;
+   //    case HATARI_VIDEO_CR_HI:
+   //        retrow = 732;
+   //        retroh = 486;
+   //        hatari_borders = false;
+   //        break;
+   //    }
+
+   //    retrow = 832;
+   //    retroh = 552;
+   //    log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
+
+   //     moved to retro_run()
+   //    CROP_WIDTH = retrow;
+   //    CROP_HEIGHT = (retroh - 80);
+   //    VIRTUAL_WIDTH = retrow;
+
+   //    texture_init();
+
+   //     It's alive! It's alive!
+   //    if (libretro_runloop_active)
+   //    {
+   //        ConfigureParams.Screen.bAllowOverscan = hatari_borders;
+   //        //why do all the work when the Hatari core can do the work for us?
+   //        Screen_ModeChanged();
+   //        Screen_SetFullUpdate();
+   //    }
+   //}
+
+   if (hatari_borders != old_hatari_borders && libretro_runloop_active)
    {
-       video_config = new_video_config;
-       switch (video_config)
-       {
-       case HATARI_VIDEO_OV_LO:
-           retrow = 416;
-           retroh = 274;
-           hatari_borders = true;
-           break;
-       case HATARI_VIDEO_CR_LO:
-           retrow = 366;
-           retroh = 243;
-           // Strange, do not work if set to false...
-           hatari_borders = true;
-           break;
-       case HATARI_VIDEO_OV_HI:
-           retrow = 832;
-           retroh = 548;
-           hatari_borders = true;
-           break;
-       case HATARI_VIDEO_CR_HI:
-           retrow = 732;
-           retroh = 486;
-           hatari_borders = true;
-           break;
-       }
-
+       retrow = 832;
+       retroh = 552;
        log_cb(RETRO_LOG_INFO, "Resolution %u x %u.\n", retrow, retroh);
-
-       CROP_WIDTH = retrow;
-       CROP_HEIGHT = (retroh - 80);
-       VIRTUAL_WIDTH = retrow;
        texture_init();
+
+       ConfigureParams.Screen.bAllowOverscan = hatari_borders;
+       //why do all the work when the Hatari core can do the work for us?
+       Screen_ModeChanged();
+       Screen_SetFullUpdate();
    }
 
    // Video Force Refresh
@@ -1238,6 +1281,7 @@ void retro_init(void)
 	const char *system_dir = NULL;
     unsigned dci_version = 0;
 
+    libretro_runloop_active = false;
 	dc = dc_create();
 
 	// Init log
@@ -1414,10 +1458,15 @@ void update_timing(void)
 void retro_run(void)
 {
    int x;
-   unsigned width = 640;
-   unsigned height = 400;
+   unsigned width = retrow;
+   unsigned height = retroh;
 
    bool updated = false;
+   libretro_runloop_active = true;
+
+   CROP_WIDTH = retrow;
+   CROP_HEIGHT = (retroh - 80);
+   VIRTUAL_WIDTH = retrow;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables();
@@ -1452,11 +1501,14 @@ void retro_run(void)
       }
    }
 
-   if(ConfigureParams.Screen.bAllowOverscan || SHOWKEY==1 || STATUTON==1 || pauseg==1 )
-   {
-      width  = retrow;
-      height = retroh;
-   }
+   //if(ConfigureParams.Screen.bAllowOverscan || SHOWKEY==1 || STATUTON==1 || pauseg==1 )
+   //{
+   //     width  = ???;
+   //     height = ???;
+   //}
+
+   //for debug purposes
+   //retro_status(100, "W=%i, H=%i", width, height);
    video_cb(bmp, width, height, retrow<< 1);
 
    co_switch(emuThread);
@@ -1470,7 +1522,6 @@ void retro_run(void)
        log_cb(RETRO_LOG_INFO, "EXIT EMU THD\n");
        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, 0);
    }
-       
 }
 
 #define M3U_FILE_EXT "m3u"

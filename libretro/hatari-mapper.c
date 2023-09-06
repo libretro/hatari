@@ -425,12 +425,15 @@ void Process_key(void)
       //    Key_Sate[i] |= input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ? 0x80 : 0;
       //}
 
-      // RETROMAPPER... mapper... mapper
-      for (j = 0; j < 16; ++j)
+      // RETROMAPPER... mapper... mapper.  Only check if VKBD not active.  :P
+      if (SHOWKEY == -1)
       {
-          if (mapper_keys[j] == i)
+          for (j = 0; j < 16; ++j)
           {
-              Key_Sate[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, j) ? 0x80 : 0;
+              if (mapper_keys[j] == i)
+              {
+                  Key_Sate[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, j) ? 0x80 : 0;
+              }
           }
       }
 

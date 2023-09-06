@@ -271,25 +271,26 @@ struct retro_core_option_v2_definition option_defs_us[] = {
     },
     //video
     // High res mode?
-    {
-        "hatari_video_hires",
-        "Video -> High Resolution. (Needs Restart)",
-        "High Resolution. (Needs Restart)",
-        "Enable Hi-Resolution.",
-        NULL,
-        "video",
-        {
-            { "true", "Enabled" },
-            { "false",  "Disabled" },
-            { NULL, NULL },
-        },
-        "true"
-    },
+    // Say bye bye.  All this did was create confusion.
+    //{
+    //    "hatari_video_hires",
+    //    "Video -> High Resolution. (Needs Restart)",
+    //    "High Resolution. (Needs Restart)",
+    //    "Enable Hi-Resolution.",
+    //    NULL,
+    //    "video",
+    //    {
+    //        { "true", "Enabled" },
+    //        { "false",  "Disabled" },
+    //        { NULL, NULL },
+    //    },
+    //    "true"
+    //},
     // Crop Overscan?
     {
         "hatari_video_crop_overscan",
-        "Video -> Crop Overscan. (Needs Restart)",
-        "Crop Overscan. (Needs Restart)",
+        "Video -> Crop Overscan.",
+        "Crop Overscan.",
         "Enable for games.  Disable for low/med resolution overscan demos",
         NULL,
         "video",
