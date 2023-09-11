@@ -18,9 +18,9 @@ extern bool hatari_fastfdc;
 extern bool hatari_autoloadb;
 extern bool hatari_fastboot;
 extern bool hatari_borders;
-extern char hatari_frameskips[2];
-extern char hatari_ramsize[2];
-extern char hatari_machinetype[6];
+extern char hatari_frameskips[3];
+extern char hatari_ramsize[3];
+extern char hatari_machinetype[7];
 extern char hatari_writeprotect_floppy[5];
 extern char hatari_writeprotect_hd[5];
 

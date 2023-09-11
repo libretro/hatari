@@ -100,9 +100,9 @@ int hatari_mouse_control_stick = 0;
 int hatari_boot_hd = 1;
 int hatari_joymousestatus_display = 1;
 int hatari_reset_type = 1;
-char hatari_machinetype[6];
-char hatari_ramsize[2];
-char hatari_frameskips[2];
+char hatari_machinetype[7];
+char hatari_ramsize[3];
+char hatari_frameskips[3];
 char hatari_writeprotect_floppy[5];
 char hatari_writeprotect_hd[5];
 
@@ -620,7 +620,7 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
    {
-       strncpy((char*)hatari_machinetype, var.value, 6);
+       strcpy((char*)hatari_machinetype, var.value);
    }
 
    // System -> amount of emulated RAM
@@ -629,7 +629,7 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-       strncpy((char*)hatari_ramsize, var.value, 2);
+       strcpy((char*)hatari_ramsize, var.value);
    }
 
    // System -> selected TOS image
@@ -856,7 +856,7 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-       strncpy((char*)hatari_frameskips, var.value, sizeof(hatari_frameskips));
+       strcpy((char*)hatari_frameskips, var.value);
    }
 
    // Fast Floppy
@@ -905,7 +905,7 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-       strncpy((char*)hatari_writeprotect_floppy, var.value, sizeof(hatari_writeprotect_floppy));
+       strcpy((char*)hatari_writeprotect_floppy, var.value);
    }
 
    // Write protect hard drives.
@@ -914,7 +914,7 @@ static void update_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-       strncpy((char*)hatari_writeprotect_hd, var.value, sizeof(hatari_writeprotect_hd));
+       strcpy((char*)hatari_writeprotect_hd, var.value);
    }
 
    // Audio
@@ -1658,7 +1658,7 @@ bool retro_load_game(const struct retro_game_info *info)
     }
 
     // Point the DiskImageDirectory to the retro_content_directory
-    strncpy(RETRO_FID, full_path, sizeof(RETRO_FID));
+    strcpy(RETRO_FID, full_path);
     ptr = strrchr(RETRO_FID, RETRO_PATH_SEPARATOR[0]);
 
     if (ptr)

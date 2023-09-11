@@ -23,24 +23,14 @@
 
 #define RETRO_DEVICE_ID_JOYPAD_LAST     24
 
+// not currently used... but samples of what could be done
 #define RETRO_MAPPER_VKBD               24
 #define RETRO_MAPPER_STATUSBAR          25
 #define RETRO_MAPPER_JOYPORT            26
 #define RETRO_MAPPER_RESET              27
-#define RETRO_MAPPER_ASPECT_RATIO       28
-#define RETRO_MAPPER_CROP               29
-#define RETRO_MAPPER_WARP_MODE          30
-#define RETRO_MAPPER_TURBO_FIRE         31
-#define RETRO_MAPPER_SAVE_DISK          32
+#define RETRO_MAPPER_CROP               28
 
-#define RETRO_MAPPER_DATASETTE_HOTKEYS  33
-#define RETRO_MAPPER_DATASETTE_STOP     34
-#define RETRO_MAPPER_DATASETTE_START    35
-#define RETRO_MAPPER_DATASETTE_FORWARD  36
-#define RETRO_MAPPER_DATASETTE_REWIND   37
-#define RETRO_MAPPER_DATASETTE_RESET    38
-
-#define RETRO_MAPPER_LAST               39
+#define RETRO_MAPPER_LAST               29
 
 #define TOGGLE_JOYMOUSE					-30
 #define TOGGLE_VKBD                     -31
@@ -64,34 +54,26 @@
 //#define OTHERJOY_RIGHT                  -24
 //#define OTHERJOY_FIRE                   -25
 
-#define JOYPAD_N                        0x01
-#define JOYPAD_S                        0x02
-#define JOYPAD_W                        0x04
-#define JOYPAD_E                        0x08
-#define JOYPAD_FIRE                     0x10
-#define JOYPAD_FIRE2                    0x20
-#define JOYPAD_FIRE3                    0x40
-
 /* Press durations */
 #define SHORT_PRESS 400
 #define LONG_PRESS 800
 
 extern int retro_keymap_id(const char *val);
-extern char *retro_keymap_value(const int id);
-extern char *retro_keymap_label(const int id);
-extern int16_t joypad_bits[RETRO_DEVICES];
-extern int16_t joypad_axis[RETRO_DEVICES][RETRO_AXIS_MAX];
-extern int mapper_keys[RETRO_MAPPER_LAST];
-extern void retro_poll_event();
-extern void retro_keyboard_event(bool, unsigned, uint32_t, uint16_t);
-extern unsigned retro_key_state_internal[RETROK_LAST];
+//extern char *retro_keymap_value(const int id);
+//extern char *retro_keymap_label(const int id);
+//extern int16_t joypad_bits[RETRO_DEVICES];
+//extern int16_t joypad_axis[RETRO_DEVICES][RETRO_AXIS_MAX];
+extern int mapper_keys[RETRO_DEVICE_ID_JOYPAD_LAST];
+//extern void retro_poll_event();
+//extern void retro_keyboard_event(bool, unsigned, uint32_t, uint16_t);
+//extern unsigned retro_key_state_internal[RETROK_LAST];
 
-extern unsigned int opt_retropad_options;
-extern bool opt_keyrah_keypad;
+//extern unsigned int opt_retropad_options;
+//extern bool opt_keyrah_keypad;
 
 //extern void retro_key_up(int);
 //extern void retro_key_down(int);
-extern unsigned int retro_devices[RETRO_DEVICES];
+//extern unsigned int retro_devices[RETRO_DEVICES];
 
 typedef struct
 {
