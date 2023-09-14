@@ -220,7 +220,7 @@ static retro_keymap retro_keys[RETROK_LAST] =
    {RETROK_F15,         "RETROK_F15",          "Keyboard F15"},
 /* {RETROK_NUMLOCK,     "RETROK_NUMLOCK",      "Keyboard Num Lock"}, */
    {RETROK_CAPSLOCK,    "RETROK_CAPSLOCK",     "Keyboard Caps Lock"},
-/* {RETROK_SCROLLOCK,   "RETROK_SCROLLOCK",    "Keyboard Scroll Lock"}, */
+   {RETROK_SCROLLOCK,   "RETROK_SCROLLOCK",    "Keyboard Undo"},		/* mapped to Atari ST Undo key*/
    {RETROK_LSHIFT,      "RETROK_LSHIFT",       "Keyboard Left Shift"},
    {RETROK_RSHIFT,      "RETROK_RSHIFT",       "Keyboard Right Shift"},
    {RETROK_LCTRL,       "RETROK_LCTRL",        "Keyboard Left Control"},

@@ -444,7 +444,7 @@ void Process_key(void)
 
               if (mapper_keys[j] == i)
               {
-                  if (!what)
+                  if (!what && (MOUSEMODE == -1 || j>8 || ( j>0 && j<4) ))
                   {
                       if (Key_Sate[i] == 0 && which)
                       {
@@ -749,23 +749,22 @@ void update_input(void)
            // do this for analog sticks later
            //if (i < 16)
            {
-               // duplicate work?
-               //d = RETRO_DEVICE_ID_JOYPAD_Y;//switch shift On/Off 
-               //if (mapper_keys[i] == TOGGLE_VKBS)
-               //{
-               //    if (which && mbt[d] == 0)
-               //    {
-               //        mbt[d] = 1;
-               //        selected[d] = i;
-               //    }
-               //    else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && selected[d] == i)
-               //    {
-               //        mbt[d] = 0;
-               //        selected[d] = -1;
-               //        SHIFTON = -SHIFTON;
-               //        Screen_SetFullUpdate();
-               //    }
-               //}
+               d = RETRO_DEVICE_ID_JOYPAD_Y;//switch shift On/Off 
+               if (mapper_keys[i] == TOGGLE_VKBS)
+               {
+                   if (which && mbt[d] == 0)
+                   {
+                       mbt[d] = 1;
+                       selected[d] = i;
+                   }
+                   else if (mbt[d] == 1 && !input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, d) && selected[d] == i)
+                   {
+                       mbt[d] = 0;
+                       selected[d] = -1;
+                       SHIFTON = -SHIFTON;
+                       Screen_SetFullUpdate();
+                   }
+               }
                d = RETRO_DEVICE_ID_JOYPAD_R;//swap kbd pages
                if (mapper_keys[i] == TOGGLE_VKBP)
                {
