@@ -235,7 +235,7 @@ void retro_status(unsigned int frames, const char *format, ...)
     vsprintf(msg_passed, format, ap);
     va_end(ap);
 
-    snprintf(msg_local, sizeof(msg_local), msg_passed);
+    snprintf(msg_local, sizeof(msg_local), "%s", msg_passed);
 
     msg.msg = msg_local;
     msg.frames = frames;
