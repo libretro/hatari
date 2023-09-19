@@ -211,6 +211,13 @@ void Log_Printf(LOGTYPE nType, const char *psFormat, ...)
 {
 	va_list argptr;
 
+#ifdef __LIBRETRO__
+	// we want the log file to save on each Printf just in case retroarch crashes
+	if (hLogFile)
+		hLogFile = HFile_Close(hLogFile);
+
+	hLogFile = File_Open(ConfigureParams.Log.sLogFileName, "a");
+#endif
 	if (hLogFile && nType <= TextLogLevel)
 	{
 		va_start(argptr, psFormat);
@@ -219,6 +226,11 @@ void Log_Printf(LOGTYPE nType, const char *psFormat, ...)
 		/* Add a new-line if necessary: */
 		if (psFormat[strlen(psFormat)-1] != '\n')
 			fputs("\n", hLogFile);
+#ifdef __LIBRETRO__
+		// we want the log file to save on each Printf just in case retroarch crashes
+		hLogFile = HFile_Close(hLogFile);
+		hLogFile = NULL;
+#endif
 	}
 }
 

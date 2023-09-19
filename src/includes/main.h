@@ -70,5 +70,8 @@ extern void Main_WaitOnVbl(void);
 extern void Main_WarpMouse(int x, int y);
 extern void Main_EventHandler(void);
 extern void Main_SetTitle(const char *title);
+#ifdef __LIBRETRO__
+void Main_UnInit(void);
+#endif
 
 #endif /* ifndef HATARI_MAIN_H */

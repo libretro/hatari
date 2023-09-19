@@ -2720,7 +2720,7 @@ void Ide_UnInit(void)
 		{
 			if (opaque_ide_if[i].io_buffer)
 			{
-				free(opaque_ide_if[i].io_buffer);
+				qemu_free(opaque_ide_if[i].io_buffer);
 				opaque_ide_if[i].io_buffer = NULL;
 			}
 		}

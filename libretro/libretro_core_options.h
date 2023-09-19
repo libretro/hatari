@@ -26,6 +26,7 @@
  *          (previously required RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION == 1)
  *        - Support for generation of core options v0 retro_core_option_value
  *          arrays containing options with a single value
+ *  - 1.1: Implemented Retro_mapping.  Code from Vice64 by rsn887 and sonninnos.
  */
 
 #ifdef __cplusplus
@@ -52,142 +53,760 @@ extern "C" {
 //};
 
 struct retro_core_option_v2_category option_cats_us[] = {
-   {
-      "video",
-      "Video",
-      "Enable/Disable high resolution or overscan cropping.  Set Frameskip."
-   },
-   {
-      "input",
-      "Input",
-      "Enable/Disable second joystick, system mouse or system keyboard."
-   },
+    {
+        "system",
+        "System",
+        "Set Machine Type.  Ramsize.  TOS Used.  Enable Fast Boot."
+    },
+    {
+        "input",
+        "Input",
+        "Enable/Disable second joystick, system mouse or system keyboard."
+    },
+    {
+        "video",
+        "Video",
+        "Enable/Disable high resolution or overscan cropping.  Set Frameskip."
+    },
+    {
+        "media",
+        "Media",
+        "Set Fast floppy access and Auto insert drive B."
+    },
+    {
+        "hotkey",
+        "Hotkey Mapping",
+        "Configure keyboard hotkey mapping options."
+    },
+    {
+        "retropad",
+        "RetroPad Mapping",
+        "Configure RetroPad mapping options."
+    },
    { NULL, NULL, NULL },
 };
 
 struct retro_core_option_v2_definition option_defs_us[] = {
+    // [System]
+    // Machine type
+    {
+        "hatari_machinetype",
+        "System -> Atari Computer Machine Type",
+        "Atari computer machine type",
+        "Pick emulated machine.  ST, STE, TT or Falcon (Needs Restart)",
+        NULL,
+        "system",
+        {
+                {"st","ST (1.02, 2.06)"},
+                {"ste","STE (1.62, 2.06)"},
+                {"tt","TT (3.01, 3.05, 3.06)"},
+                {"falcon","Falcon (4.00 and up)"},
+            { NULL, NULL },
+        },
+        "st"
+    },
+    // Ramsize
+    {
+        "hatari_ramsize",
+        "System -> Atari Computer Ramsize",
+        "Atari Computer Ramsize",
+        "Set amount of emulated ram.  (Needs Restart)",
+        NULL,
+        "system",
+        {
+            {"0","512 KB"},
+            {"1","1 MB"},
+            {"2","2 MB"},
+            {"4","4 MB"},
+            {"8","8 MB"},
+            {"14","14 MB"},
+            { NULL, NULL },
+        },
+        "1"
+    },
+    // Select TOS images used
+    {
+        "hatari_tosimage",
+        "System -> TOS Image Used (Needs Restart)",
+        "TOS Image Used (Needs Restart)",
+        "Select from list.\n"
+        "\nPlace TOS images in system\\hatari\\tos\\ folder.\n"
+        "Defaults to tos.img in SYSTEM folder",                    /* For backwards compatibility with old location */
+        NULL,
+        "system",
+        {
+            {"default","system\\tos.img (default)" },
+            {NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},
+            {NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},
+            {NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},
+            {NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},
+            {NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},{NULL,NULL},
+        },
+        "default"
+    },
+    // Fast boot
+    {
+        "hatari_fastboot",
+        "System -> Enable Fastboot",
+        "Enable Fastboot",
+        "Enable/Disable fast boot TOS patch.",
+        NULL,
+        "system",
+        {
+            { "true", "Enabled" },
+            { "false", "Disabled" },
+            { NULL, NULL },
+        },
+        "false"
+    },
+    // Reset type
+    {
+        "hatari_reset_type",
+        "System -> Reset Type",
+        "Reset Type",
+        "Whether to Cold Start or Warm Start on \"Restart\".",
+        NULL,
+        "system",
+        {
+            { "0", "Warm Start" },
+            { "1", "Cold Start" },
+            { NULL, NULL },
+        },
+        "1"
+    },
+    // [Input]
+    // Mouse Mode
+    {
+        "hatari_start_in_mouse_mode",
+        "Input -> Start In Mouse Mode",
+        "Start In Mouse Mode",
+        "Starts with emulated mouse active on port 1.  Otherwise joystick is active on port 1.",
+        NULL,
+        "input",
+        {
+            { "true", "Enabled" },
+            { "false", "Disabled" },
+            { NULL, NULL },
+        },
+        "true"
+    },
+    // Left/Right Analog Mouse
+    {
+        "hatari_mouse_control_stick",
+        "Input -> Analog Stick Mouse",
+        "Analog Stick Mouse",
+        "Set whether emulated mouse is controlled by left or right analog stick.",
+        NULL,
+        "input",
+        {
+            { "0", "Left Analog" },
+            { "1", "Right Analog" },
+            { NULL, NULL },
+        },
+        "0"
+    },
+    // Starting mouse speed.
+    {
+        "hatari_emulated_mouse_speed",
+        "Input -> Emulated Mouse Speed",
+        "Emulated Mouse Speed",
+        "Set the starting mouse speed from 1 to 6.  Default is 2.",
+        NULL,
+        "input",
+        {
+            { "1", NULL },
+            { "2", "2 (default)" },
+            { "3", NULL },
+            { "4", NULL },
+            { "5", NULL },
+            { "6", NULL },
+            { NULL, NULL },
+        },
+        "2"
+    },
+    // Enable 2nd joystick
+    {
+        "hatari_twojoy",
+        "Input -> Enable Second Joystick",
+        "Enable Second Joystick",
+        "Enables a second joystick on port 2, may conflict with mouse.",
+        NULL,
+        "input",
+        {
+            { "true", "Enabled" },
+            { "false", "Disabled" },
+            { NULL, NULL },
+        },
+        "true"
+    },
+    // Enable/Disable Hardware Mouse
+    {
+        "hatari_nomouse",
+        "Input -> Disable Connected Mouse",
+        "Disable Connected Mouse",
+        "Prevents input from your sytem mouse device. Gamepad mouse mode (select) is not disabled.",
+        NULL,
+        "input",
+        {
+            { "false", "disabled" },
+            { "true", "enabled" },
+            { NULL, NULL },
+        },
+        "false"
+    },
+    // Enable/Disable Hardware Keyboard
+    {
+        "hatari_nokeys",
+        "Input -> Disable Connected Keyboard",
+        "Disable Connected Keyboard",
+        "Prevents input from your system keyboard. Virtual keyboard is not disabled.",
+        NULL,
+        "input",
+        {
+            { "false", "Disabled" },
+            { "true", "Enabled" },
+            { NULL, NULL },
+        },
+        "false"
+    },
     //video
-   {
-      "hatari_video_hires",
-      "High resolution. (Needs Restart)",
-      NULL,
-      "Enable Hi-Resolution.",
-      NULL,
-      "video",
-      {
-         { "true", "enabled" },
-         { "false",  "disabled" },
-         { NULL, NULL },
-      },
-      "true"
-   },
-   {
-      "hatari_video_crop_overscan",
-      "Crop overscan. (Needs Restart)",
-      NULL,
-      "Enable for games.  Disable for low/med resolution overscan demos",
-      NULL,
-      "video",
-      {
-         { "true", "enabled" },
-         { "false",  "disabled" },
-         { NULL, NULL },
-      },
-      "true"
-   },
-   {
-      "hatari_frameskips",
-      "Set frameskip.  (Needs Restart)",
-      NULL,
-      "Set emulated systems internal resolution.\n \nDisabled, 1-4, Auto (Max 5), Auto (Max 10).",
-      NULL,
-      "video",
-      {
-         { "0", "disabled" },
-         { "1", NULL },
-         { "2", NULL },
-         { "3", NULL },
-         { "4", NULL },
-         { "5", "Auto (Max 5)" },
-         { "10", "Auto (Max 10)" },
-         { NULL, NULL },
-      },
-      "0"
-   },
-    //input
-   {
-      "hatari_twojoy",
-      "Enable second joystick",
-      NULL,
-      "Enables a second joystick on port 2, may conflict with mouse.",
-      NULL,
-      "input",
-      {
-         { "true", "enabled" },
-         { "false", "disabled" },
-         { NULL, NULL },
-      },
-      "true"
-   },
-   {
-      "hatari_nomouse",
-      "Disable mouse",
-      NULL,
-      "Prevents input from your sytem mouse device. Gamepad mouse mode (select) is not disabled.",
-      NULL,
-      "input",
-      {
-         { "false", "disabled" },
-         { "true", "enabled" },
-         { NULL, NULL },
-      },
-      "false"
-   },
-   {
-      "hatari_nokeys",
-      "Disable keyboard",
-      NULL,
-      "Prevents input from your system keyboard. Virtual keyboard is not disabled.",
-      NULL,
-      "input",
-      {
-          { "false", "disabled" },
-          { "true", "enabled" },
-          { NULL, NULL },
-      },
-      "false"
-   },
-   // Floppy speed
-   {
-      "hatari_fastfdc",
-      "Fast floppy access",
-      NULL,
-      "Decreases the time spent loading from disk.",
-      NULL,
-      NULL,
-      {
-           { "true", "enabled" },
-           { "false", "disabled" },
-           { NULL, NULL },
-      },
-      "true"
-   },
-   // Audio
-   {
-      "hatari_polarized_filter",
-      "Polarized audio filter",
-      NULL,
-      "Uses hatari's polarized lowpass filters on audio to simulate distortion.",
-      NULL,
-      NULL,
-      {
-           { "false", "disabled" },
-           { "true", "enabled" },
-           { NULL, NULL },
-      },
-      "false"
-   },
-   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
+    // High res mode?
+    // Say bye bye.  All this did was create confusion.
+    //{
+    //    "hatari_video_hires",
+    //    "Video -> High Resolution. (Needs Restart)",
+    //    "High Resolution. (Needs Restart)",
+    //    "Enable Hi-Resolution.",
+    //    NULL,
+    //    "video",
+    //    {
+    //        { "true", "Enabled" },
+    //        { "false",  "Disabled" },
+    //        { NULL, NULL },
+    //    },
+    //    "true"
+    //},
+    // Crop Overscan?
+    {
+        "hatari_video_crop_overscan",
+        "Video -> Crop Overscan.",
+        "Crop Overscan.",
+        "Enable for games.  Disable for low/med resolution overscan demos",
+        NULL,
+        "video",
+        {
+            { "true", "Enabled" },
+            { "false",  "Disabled" },
+            { NULL, NULL },
+        },
+        "true"
+    },
+    // Force refresh rate.
+    {
+        "hatari_forcerefresh",
+        "Video -> Force Refresh Rate.",
+        "Force Refresh Rate.",
+        "Force refresh rate to Auto, NTSC 60hz or PAL 50hz.  Auto uses selected TOS rate.",
+        NULL,
+        "video",
+        {
+            { "auto", "Auto" },
+            { "1",  "NTSC 60hz" },
+            { "2",  "PAL 50hz" },
+            { NULL, NULL },
+        },
+        "auto"
+    },
+    // Set frameskip
+    {
+        "hatari_frameskips",
+        "Video -> Set Frameskip.  (Needs Restart)",
+        "Set Frameskip.  (Needs Restart)",
+        "Set emulated systems internal resolution.\n"
+        "Disabled, 1-4, Auto (Max 5), Auto (Max 10).",
+        NULL,
+        "video",
+        {
+            { "0", "Disabled" },
+            { "1", NULL },
+            { "2", NULL },
+            { "3", NULL },
+            { "4", NULL },
+            { "5", "Auto (Max 5)" },
+            { "10", "Auto (Max 10)" },
+            { NULL, NULL },
+        },
+        "0"
+    },
+    // Status display Joy/Mouse toggle
+    {
+        "hatari_joymousestatus_display",
+        "Video -> Joy/Mouse Toggle/Speed Msg Location",
+        "Joy/Mouse Toggle/Speed Msg Location",
+        "Where to display Joystick/Mouse toggle and speed change information",
+        NULL,
+        "video",
+        {
+            { "0", "Off" },
+            { "1",  "Status" },
+            { "2",  "OSD" },
+            { NULL, NULL },
+        },
+        "1"
+    },
+    // Show drive activity in status info
+    {
+        "hatari_led_status_display",
+        "Video -> Show Drive Activity In Status Info",
+        "Show Drive Activity In Status Info",
+        "Enable to show activity in Retroarch status display",
+        NULL,
+        "video",
+        {
+            { "true", "Enabled" },
+            { "false",  "Disabled" },
+            { NULL, NULL },
+        },
+        "true"
+    },
+    // Floppy speed
+    {
+        "hatari_fastfdc",
+        "Media -> Fast Floppy Access",
+        "Fast Floppy Access",
+        "Decreases the time spent loading from disk.",
+        NULL,
+        "media",
+        {
+            { "true", "Enabled" },
+            { "false", "Disabled" },
+            { NULL, NULL },
+        },
+        "true"
+    },
+    // Autoload Drive B
+    {
+        "hatari_autoloadb",
+        "Media -> Auto Insert Drive B",
+        "Auto Insert Drive B",
+        "Auto inserts disk in Drive B if detected.\n"
+        "Use only for content that can use two drives.\n"     //eg.  Game b.st
+        "M3U loads 2nd entry.  Otherwise looks for \"b\" as last letter before extension.",
+        NULL,
+        "media",
+        {
+            { "true", "Enabled" },
+            { "false", "Disabled" },
+            { NULL, NULL },
+        },
+        "false"
+    },
+    //// Boot from hard disk.  (not sticking?)
+    //{
+    //    "hatari_boot_hd",
+    //    "Media -> Boot from hard disk.",
+    //    "Boot from hard disk.",
+    //    "Enable to execute the AUTO folder on the hard disk.",
+    //    NULL,
+    //    "media",
+    //    {
+    //        { "true", "enabled" },
+    //        { "false", "disabled" },
+    //        { NULL, NULL },
+    //    },
+    //    "true"
+    //},
+    // Write Protect Floopy
+    {
+        "hatari_writeprotect_floppy",
+        "Media -> Write Protect Floppy Disks",
+        "Write Protect Floppy Disks",
+        "Enable/Disable write protection for floppy disks.",
+        NULL,
+        "media",
+        {
+            { "on", "On" },
+            { "off", "Off" },
+            { "auto", "Auto" },
+            { NULL, NULL },
+        },
+        "off"
+    },
+    // Write Protect HD
+    {
+        "hatari_writeprotect_hd",
+        "Media -> Write Protect Hard Drives",
+        "Write Protect Hard Drives",
+        "Enable/Disable write protection for hard drives.",
+        NULL,
+        "media",
+        {
+            { "on", "On" },
+            { "off", "Off" },
+            { "auto", "Auto" },
+            { NULL, NULL },
+        },
+        "off"
+    },
+    // Audio
+    {
+        "hatari_polarized_filter",
+        "Polarized Audio Filter",
+        NULL,
+        "Uses hatari's polarized lowpass filters on audio to simulate distortion.",
+        NULL,
+        NULL,
+        {
+            { "false", "Disabled" },
+            { "true", "Enabled" },
+            { NULL, NULL },
+        },
+        "false"
+    },
+    // Hatari
+    {
+        "hatari_autoload_config",
+        "Autoload hatari.cfg.",
+        NULL,
+        "Loads SYSTEM\\hatari\\hatari.cfg on content start.  Warning.  Overrides everything except for selected TOS image.",
+        NULL,
+        NULL,
+        {
+            { "false", "Disabled" },
+            { "true", "Enabled" },
+            { NULL, NULL },
+        },
+        "false"
+    },
+    ///* Hotkeys */
+    //{
+    //    "hatari_mapper_joymouse",
+    //    "Hotkey > Toggle Joystick/Mouse",
+    //    "Toggle Joystick/Mouse",
+    //    "Press the mapped key to toggle between Joystick/Mouse.",
+    //    NULL,
+    //    "hotkey",
+    //    {{ NULL, NULL }},
+    //    "---"
+    //},
+    //{
+    //    "hatari_mapper_mouse_speed_down",
+    //    "Hotkey > Decrease Mouse Speed",
+    //    "Decrease Mouse Speed",
+    //    "Press the mapped key to decrease mouse speed.",
+    //    NULL,
+    //    "hotkey",
+    //    {{ NULL, NULL }},
+    //    "---"
+    //},
+    //{
+    //    "hatari_mapper_mouse_speed_up",
+    //    "Hotkey > Increase Mouse Speed",
+    //    "Increase Mouse Speed",
+    //    "Press the mapped key to increase mouse speed.",
+    //    NULL,
+    //    "hotkey",
+    //    {{ NULL, NULL }},
+    //    "---"
+    //},
+    //{
+    //    "hatari_mapper_vkbd_toggle",
+    //    "Hotkey > Toggle Virtual Keyboard",
+    //    "Toggle Virtual Keyboard",
+    //    "Press the mapped key to toggle virtual keyboard.",
+    //    NULL,
+    //    "hotkey",
+    //    {{ NULL, NULL }},
+    //    "---"
+    //},
+    //{
+    //    "hatari_mapper_vkbd_page_toggle",
+    //    "Hotkey > Toggle Virtual Keyboard Page",
+    //    "Toggle Virtual Keyboard Page",
+    //    "Press the mapped key to switch virtual keyboard page.",
+    //    NULL,
+    //    "hotkey",
+    //    {{ NULL, NULL }},
+    //    "---"
+    //},
+    //{
+    //    "hatari_mapper_keyboard_shift_toggle",
+    //    "Hotkey > Toggle VKBD Shift Key",
+    //    "Toggle VKBD Shift Key",
+    //    "Press the mapped key to toggle the VKBD shift key.",
+    //    NULL,
+    //    "hotkey",
+    //    {{ NULL, NULL }},
+    //    "---"
+    //},
+    //{
+    //    "hatari_mapper_hatari_settings",
+    //    "Hotkey > Enter/Exit Hatari Settings",
+    //    "Enter/Exit Hatari Settings",
+    //    "Press the mapped key to Enter/Exit the Hatari Settings.",
+    //    NULL,
+    //    "hotkey",
+    //    {{ NULL, NULL }},
+    //    "---"
+    //},
+    //{
+    //    "hatari_mapper_statusbar",
+    //    "Hotkey > Toggle Status display",
+    //    "Toggle Status display",
+    //    "Press the mapped key to toggle the Status display.",
+    //    NULL,
+    //    "hotkey",
+    //    {{ NULL, NULL }},
+    //    "---"
+    //},
+    /* Button mappings */
+    {
+        "hatari_mapper_up",
+        "RetroPad > Joystick Up",
+        "Joystick Up",
+        "Unmapped defaults to joystick up.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "JOYSTICK_UP"
+    },
+    {
+        "hatari_mapper_down",
+        "RetroPad > Joystick Down",
+        "Joystick Down",
+        "Unmapped defaults to joystick down.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "JOYSTICK_DOWN"
+    },
+    {
+        "hatari_mapper_left",
+        "RetroPad > Joystick Left",
+        "Joystick Left",
+        "Unmapped defaults to joystick left.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "JOYSTICK_LEFT"
+    },
+    {
+        "hatari_mapper_right",
+        "RetroPad > Joystick Right",
+        "Joystick Right",
+        "Unmapped defaults to joystick right.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "JOYSTICK_RIGHT"
+    },
+    {
+        "hatari_mapper_a",
+        "RetroPad > A",
+        "A",
+        "Unmapped defaults to turbo fire/Mouse button 2.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "JOYSTICK_TURBOFIRE"
+    },
+    {
+        "hatari_mapper_b",
+        "RetroPad > B",
+        "B",
+        "Unmapped defaults to fire/mouse button 1.\nVKBD: Press selected key.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "JOYSTICK_FIRE"
+    },
+    {
+        "hatari_mapper_x",
+        "RetroPad > X",
+        "X",
+        "VKBD: Toggle.  Remapping overrides VKBD toggle.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "TOGGLE_VKBD"
+    },
+    {
+        "hatari_mapper_y",
+        "RetroPad > Y",
+        "Y",
+        "VKBD: Toggle 'ShiftLock'. Remapping overrides VKBD function!",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "TOGGLE_VKBS"
+    },
+    {
+        "hatari_mapper_select",
+        "RetroPad > Select",
+        "Select",
+        "Unmapped defaults to Joystick/Mouse mode toggle.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "TOGGLE_JOYMOUSE"
+    },
+    {
+        "hatari_mapper_start",
+        "RetroPad > Start",
+        "Start",
+        "Unmapped defaults to Enter/Exit the Hatari Settings.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "TOGGLE_SETTINGS"
+    },
+    {
+        "hatari_mapper_l",
+        "RetroPad > L",
+        "L",
+        "Unmapped defaults to toggle the Status display.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "TOGGLE_STATUSBAR"
+    },
+    {
+        "hatari_mapper_r",
+        "RetroPad > R",
+        "R",
+        "Unmapped defaults to switch virtual keyboard page.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "TOGGLE_VKBP"
+    },
+    {
+        "hatari_mapper_l2",
+        "RetroPad > L2",
+        "L2",
+        "Unmapped defaults to decrease mouse speed.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "MOUSE_SLOWER"
+    },
+    {
+        "hatari_mapper_r2",
+        "RetroPad > R2",
+        "R2",
+        "Unmapped defaults to increase mouse speed.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "MOUSE_FASTER"
+    },
+    {
+        "hatari_mapper_l3",
+        "RetroPad > L3",
+        "L3",
+        "",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    {
+        "hatari_mapper_r3",
+        "RetroPad > R3",
+        "R3",
+        "Unmapped defaults to space.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "RETROK_SPACE"
+    },
+    /* Left Stick */
+    {
+        "hatari_mapper_lu",
+        "RetroPad > Left Analog > Up",
+        "Left Analog > Up",
+        "Mouse mode must be off or on right analog.\n"
+        "Ignored if assigned to VKBD.\n",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    {
+        "hatari_mapper_ld",
+        "RetroPad > Left Analog > Down",
+        "Left Analog > Down",
+        "Mouse mode must be off or on right analog.\n"
+        "Ignored if assigned to VKBD.\n",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    {
+        "hatari_mapper_ll",
+        "RetroPad > Left Analog > Left",
+        "Left Analog > Left",
+        "Mouse mode must be off or on right analog.\n"
+        "Ignored if assigned to VKBD.\n",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    {
+        "hatari_mapper_lr",
+        "RetroPad > Left Analog > Right",
+        "Left Analog > Right",
+        "Mouse mode must be off or on right analog.\n"
+        "Ignored if assigned to VKBD.\n",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    /* Right Stick */
+    {
+        "hatari_mapper_ru",
+        "RetroPad > Right Analog > Up",
+        "Right Analog > Up",
+        "Mouse mode must be off or on left analog.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    {
+        "hatari_mapper_rd",
+        "RetroPad > Right Analog > Down",
+        "Right Analog > Down",
+        "Mouse mode must be off or on left analog.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    {
+        "hatari_mapper_rl",
+        "RetroPad > Right Analog > Left",
+        "Right Analog > Left",
+        "Mouse mode must be off or on left analog.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    {
+        "hatari_mapper_rr",
+        "RetroPad > Right Analog > Right",
+        "Right Analog > Right",
+        "Mouse mode must be off or on left analog.",
+        NULL,
+        "retropad",
+        {{ NULL, NULL }},
+        "---"
+    },
+    { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
 };
 
 struct retro_core_options_v2 options_us = {
@@ -235,6 +854,17 @@ struct retro_core_options_v2 *options_intl[RETRO_LANGUAGE_LAST] = {
  * Functions
  ********************************
 */
+
+/* Handle Dynamically created core options*/
+
+static struct retro_core_option_v2_definition *libretro_get_core_option_def(const char *key)
+{
+    for (struct retro_core_option_v2_definition *d = option_defs_us; d->key != NULL; ++d)
+    {
+        if (!strcmp(d->key, key)) return d;
+    }
+    return NULL;
+}
 
 /* Handles configuration/setting of core options.
  * Should be called as early as possible - ideally inside

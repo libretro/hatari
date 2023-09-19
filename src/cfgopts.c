@@ -296,7 +296,13 @@ int update_config(const char *filename, const struct Config_Tag configs[], const
 		return count;
 	}
 
+#ifdef __LIBRETRO__
+	// workaround for crashes on Xbox One ( UWP? ) and possibly other platforms.  Is this libco related?
+	tempfile = NULL;
+#else
 	tempfile = tmpfile();                        /* Open a temporary file for output */
+#endif /* __LIBRETRO__ */
+
  	if (tempfile == NULL)
  	{
 		/* tmpfile() failed, let's try a normal open */

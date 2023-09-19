@@ -22,7 +22,6 @@ const char HDC_fileid[] = "Hatari hdc.c : " __DATE__ " " __TIME__;
 #include "tos.h"
 #include "statusbar.h"
 
-
 /*
   ACSI emulation: 
   ACSI commands are six byte-packets sent to the

@@ -31,12 +31,11 @@ extern Uint32 STRamEnd;
 #if ENABLE_SMALL_MEM
 # define STRAM_ADDR(Var) \
 	(((Var)>= 0xe00000) \
-		 ? ((unsigned long)RomMem+((Uint32)(Var) & 0x00ffffff)) \
-		 : ((unsigned long)STRam+((Uint32)(Var) & 0x00ffffff)))
+		 ? ((void*)RomMem+((Uint32)(Var) & 0x00ffffff)) \
+		 : ((void*)STRam+((Uint32)(Var) & 0x00ffffff)))
 #else
-# define STRAM_ADDR(Var)  ((unsigned long)STRam+((Uint32)(Var) & 0x00ffffff))
+# define STRAM_ADDR(Var)  ((void*)STRam+((Uint32)(Var) & 0x00ffffff))
 #endif
-
 
 /**
  * Check whether given memory address and size are within
