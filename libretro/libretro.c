@@ -132,6 +132,8 @@ static struct retro_input_descriptor input_descriptors[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "Set in RetroPad Mapping" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Set in RetroPad Mapping" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Set in RetroPad Mapping" },
+   { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Set in RetroPad Mapping" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Joystick Up" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Joystick Down" },
    { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Joystick Left" },
@@ -1006,6 +1008,7 @@ void retro_shutdown_hatari(void)
 //*****************************************************************************
 // Disk control
 extern bool Floppy_EjectDiskFromDrive(int Drive);
+extern const char* Floppy_SetDiskFileNameNone(int Drive);
 extern const char* Floppy_SetDiskFileName(int Drive, const char *pszFileName, const char *pszZipPath);
 extern bool Floppy_InsertDiskIntoDrive(int Drive);
 
@@ -1030,6 +1033,13 @@ static void disk_insert_image()
 {
     if (dc->unit == DC_IMAGE_TYPE_FLOPPY)
     {
+        // check if in Drive B ( mount to A will fail if so ).  If it is.. eject from drive B first
+        if (strcmp(dc->files[dc->index], ConfigureParams.DiskImage.szDiskFileName[1]) == 0)
+        {
+            Floppy_EjectDiskFromDrive(1);
+            Floppy_SetDiskFileNameNone(1);
+        }
+
         if (Floppy_SetDiskFileName(0, dc->files[dc->index], NULL) == NULL)
         {
             retro_message(3000, RETRO_LOG_ERROR, "[disk_insert_image] mount in Drive A failed.\n", dc->files[dc->index]);
@@ -1216,6 +1226,34 @@ static bool disk_get_image_label(unsigned index, char* label, size_t len)
     }
 
     return false;
+}
+
+void disk_rotate_images()
+{
+    char *p = 0;
+
+    //nothing to see here..move along!
+    if (dc->count < 2)
+        return;
+
+    // eject current disk
+    disk_set_eject_state(true);
+
+    // rotate
+    dc->index++;
+    if (dc->index >= dc->count)
+        dc->index = 0;
+
+    // insert next disk in line
+    disk_set_eject_state(false);
+
+    //let the user know
+    p = strrchr(dc->files[dc->index], RETRO_PATH_SEPARATOR[0]);
+
+    if (p)
+        retro_message(3000, RETRO_LOG_INFO, "Rotate to disk %s in drive A.", p+1 );
+    else
+        retro_message(3000, RETRO_LOG_INFO, "Rotate to disk %s in drive A.", dc->files[dc->index]);
 }
 
 static struct retro_disk_control_callback disk_interface = {

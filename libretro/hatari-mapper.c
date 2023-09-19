@@ -13,6 +13,7 @@
 //RETRO LIB
 extern void retro_message(unsigned int frames, int level, const char* format, ...);
 extern void retro_status(unsigned int frames, const char* format, ...);
+extern void disk_rotate_images();
 
 //CORE VAR
 extern const char *retro_save_directory;
@@ -740,6 +741,21 @@ void update_input(void)
                     selected[d] = -1;
                     STATUTON = -STATUTON;
                     Screen_SetFullUpdate();
+                }
+            }
+            d = RETRO_DEVICE_ID_JOYPAD_L3;//not mapped
+            if (mapper_keys[i] == ROTATE_DISKS)
+            {
+                if (which && mbt[d] == 0)
+                {
+                    mbt[d] = 1;
+                    selected[d] = i;
+                }
+                else if (mbt[d] == 1 && !which && selected[d] == i)
+                {
+                    mbt[d] = 0;
+                    selected[d] = -1;
+                    disk_rotate_images();
                 }
             }
        }

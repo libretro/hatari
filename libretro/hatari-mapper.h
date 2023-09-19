@@ -38,7 +38,8 @@
 #define TOGGLE_VKBS                     -33
 #define TOGGLE_STATUSBAR                -34
 #define TOGGLE_SETTINGS					-35
-//#define SWITCH_JOYPORT                -36
+#define ROTATE_DISKS					-36
+//#define SWITCH_JOYPORT                -37
 #define MOUSE_SLOWER                    -5
 #define MOUSE_FASTER                    -6
 #define JOYSTICK_UP                     -11
@@ -93,6 +94,7 @@ static retro_keymap retro_keys[RETROK_LAST] =
    {TOGGLE_VKBS,        "TOGGLE_VKBS",         "Toggle VKBD Shift"},
    {TOGGLE_SETTINGS,    "TOGGLE_SETTINGS",     "Hatari Settings"},
    {TOGGLE_STATUSBAR,   "TOGGLE_STATUSBAR",    "Toggle Status Display"},
+   {ROTATE_DISKS,       "ROTATE_DISKS",        "Rotate Disks"},
 /* {SWITCH_JOYPORT,     "SWITCH_JOYPORT",      "Switch Joyport"}, */
    {JOYSTICK_UP,        "JOYSTICK_UP",         "Joystick Up"},
    {JOYSTICK_DOWN,      "JOYSTICK_DOWN",       "Joystick Down"},

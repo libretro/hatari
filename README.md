@@ -50,6 +50,8 @@ When launched with a valid disk image the emulator will automatically launch the
 
 There are also options to write protect floppy disks as well as an option to enable/disable fast floppy access.
 
+There is an option in the RetroMapper where you can assign a button to "Auto Rotate" the disks (M3U).  Be cautious about what button you assign it to ( You've been warned ).
+
 ## M3U Support and Disk control
 When you have a multi disk game, you can use a m3u file to specify each disk of the game and change them from the RetroArch Disk control interface.
 
