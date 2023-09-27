@@ -105,7 +105,7 @@
 
 /* Define to 1 if you have the 'ftello' function. */
 //#define HAVE_FTELLO 1
-#if defined(WIIU) || defined(VITA) || defined(GEKKO)
+#if defined(WIIU) || defined(VITA)
 #define utime(file,time) 0
 #endif
 
