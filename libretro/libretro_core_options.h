@@ -322,7 +322,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
         "hatari_frameskips",
         "Video -> Set Frameskip.  (Needs Restart)",
         "Set Frameskip.  (Needs Restart)",
-        "Set emulated systems internal resolution.\n"
         "Disabled, 1-4, Auto (Max 5), Auto (Max 10).",
         NULL,
         "video",

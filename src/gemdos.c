@@ -529,6 +529,20 @@ void GemDOS_Reset(void)
 	pDTA = NULL;
 }
 
+#if defined(GEKKO)
+static int wii_access( const char *pathname, int mode)
+{
+	struct stat st;
+	
+	if ( stat(pathname,&st) < 0 )
+		return -1;
+	
+	return 0; //With Wii the file/directory is considered always accessible if it exists
+}
+
+#define access wii_access
+#endif
+
 /*-----------------------------------------------------------------------*/
 /**
  * Routine to check the Host OS HDD path for a Drive letter sub folder
