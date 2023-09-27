@@ -52,7 +52,7 @@
 //#define HAVE_UNIX_DOMAIN_SOCKETS 1
 
 #ifdef __LIBRETRO__
-#if defined(AND) || defined(__PS3__) || defined(WIIU) || defined(VITA)
+#if defined(AND) || defined(__PS3__) || defined(WIIU) || defined(VITA) || defined(GEKKO)
 #undef HAVE_POSIX_MEMALIGN
 #else
 #define HAVE_POSIX_MEMALIGN 1
@@ -78,12 +78,12 @@
 
 /* Define to 1 if you have the 'alphasort' function. */
 #ifndef WIN32PORT
-#if !defined(WIIU) && !defined(VITA) && !defined(__PS3__)
+#if !defined(WIIU) && !defined(VITA) && !defined(__PS3__) && !defined(GEKKO)
 #define HAVE_ALPHASORT 1
 #endif
 #endif
 /* Define to 1 if you have the 'scandir' function. */
-#if !defined(WIIU) && !defined(VITA) && !defined(__PS3__)
+#if !defined(WIIU) && !defined(VITA) && !defined(__PS3__) && !defined(GEKKO)
 #define HAVE_SCANDIR 1
 #endif
 
@@ -105,7 +105,7 @@
 
 /* Define to 1 if you have the 'ftello' function. */
 //#define HAVE_FTELLO 1
-#if defined(WIIU) || defined(VITA)
+#if defined(WIIU) || defined(VITA) || defined(GEKKO)
 #define utime(file,time) 0
 #endif
 
@@ -119,7 +119,9 @@
 //#define ENABLE_WINUAE_CPU 1
 
 /* Define to 1 to use less memory - at the expense of emulation speed */
-//#define ENABLE_SMALL_MEM 1
+#if defined(GEKKO)
+#define ENABLE_SMALL_MEM 1
+#endif
 
 /* Define to 1 to enable trace logs - undefine to slightly increase speed */
 //#define ENABLE_TRACING 1

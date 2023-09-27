@@ -147,12 +147,12 @@ else ifeq ($(platform), tvos-arm64)
 	CFLAGS += -DIOS -marm -DHAVE_POSIX_MEMALIGN=1 -w
 
 else ifeq ($(platform), wii)
-	TARGET := $(TARGET_NAME)_libretro_wii.a
+   TARGET := $(TARGET_NAME)_libretro_wii.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)   
    CFLAGS += -DSDL_BYTEORDER=SDL_BIG_ENDIAN -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN  -DBYTE_ORDER=BIG_ENDIAN \
-	-DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) -I$(DEVKITPRO)/libogc/include \
+	-D_FILE_OFFSET_BITS=64 -DHAVE_MEMALIGN -DHAVE_ASPRINTF -I$(ZLIB_DIR) -I$(DEVKITPRO)/libogc/include \
 	-D__powerpc__ -D__POWERPC__ -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -D__ppc__
    SHARED :=   -lm -lpthread -lc
    PLATFLAGS :=  -DALIGN_DWORD
