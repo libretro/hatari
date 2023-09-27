@@ -39,7 +39,7 @@ const char Gemdos_fileid[] = "Hatari gemdos.c : " __DATE__ " " __TIME__;
 #include <psp2/types.h>
 #include <psp2/io/dirent.h>
 #include <psp2/kernel/threadmgr.h>
-#else
+#elif !defined(GEKKO)
 #include <utime.h>
 #define HAVE_UTIME
 #endif
