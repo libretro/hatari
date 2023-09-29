@@ -61,8 +61,8 @@ include:
     file: '/vita-static.yml'
 
   # Nintendo Wii
-  #- project: 'libretro-infrastructure/ci-templates'
-  #  file: '/wii-static.yml'
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/wii-static.yml'
 
   # Nintendo WiiU
   - project: 'libretro-infrastructure/ci-templates'
@@ -166,10 +166,10 @@ libretro-build-vita:
     - .core-defs
 
 # Nintendo Wii
-#libretro-build-wii:
-#  extends:
-#    - .libretro-wii-static-retroarch-master
-#    - .core-defs
+libretro-build-wii:
+  extends:
+    - .libretro-wii-static-retroarch-master
+    - .core-defs
     
 # Nintendo WiiU
 libretro-build-wiiu:
