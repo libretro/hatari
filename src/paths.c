@@ -207,8 +207,8 @@ static void Paths_InitHomeDirs(void)
 {
 	char *psHome;
 #ifdef WIIU
-	strcpy(sUserHomeDir, "sd:/retroarch/cores/system");
-	strcpy(sHatariHomeDir, "sd:/retroarch/cores/system/hatari");
+	strcpy(sUserHomeDir, RETRO_DIR);
+        snprintf(sHatariHomeDir, sizeof(sHatariHomeDir), "%s%c%s", RETRO_DIR, PATHSEP, HATARI_HOME_DIR);
 	if (!File_DirExists(sHatariHomeDir))
 	{
 		if (mkdir(sHatariHomeDir, 0755) != 0)
@@ -309,12 +309,7 @@ void Paths_Init(const char* argv0)
 	char* psExecDir;  /* Path string where the hatari executable can be found */
 
 #ifdef __LIBRETRO__
-#ifdef WIIU
-	strcpy(sWorkingDir, "sd:/retroarch/cores");
-	strcpy(sDataDir, "sd:/retroarch/cores/system");
-	Paths_InitHomeDirs();
-	return;
-#elif defined(VITA)
+#if defined(VITA)
 	strcpy(sWorkingDir, "ux0:/data/retroarch/system");
 	strcpy(sDataDir, "ux0:/data/retroarch/system");
 	Paths_InitHomeDirs();

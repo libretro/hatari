@@ -40,8 +40,6 @@ FILE* FAKEtmpfile()
 {
 	return fopen(tmpCfg, "w+");
 }
-#elif defined(WIIU)
-#define CONFDIR "sd:/retroarch/cores/system"
 #elif defined(GEKKO)
 #define CONFDIR "sd:/HOMEBREW/ST"
 #elif defined(VITA)
