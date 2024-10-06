@@ -122,9 +122,9 @@ else ifneq (,$(findstring ios,$(platform)))
    ifeq ($(platform),ios-arm64)
      CC = cc -arch arm64 -isysroot $(IOSSDK)      
    else
-	  CC = cc -arch armv7 -isysroot $(IOSSDK)
+	  CC = cc -marm -arch armv7 -isysroot $(IOSSDK)
    endif
-   CFLAGS += -DIOS -marm -DHAVE_POSIX_MEMALIGN=1 -w
+   CFLAGS += -DIOS -DHAVE_POSIX_MEMALIGN=1 -w
 
 ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
 	CC += -miphoneos-version-min=8.0
