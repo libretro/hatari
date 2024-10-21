@@ -145,6 +145,8 @@ else ifeq ($(platform), tvos-arm64)
 	CC = clang -arch arm64 -isysroot $(IOSSDK)
 	CXX = clang++ -arch arm64 -isysroot $(IOSSDK)
 	CFLAGS += -DIOS -DHAVE_POSIX_MEMALIGN=1 -w
+	CC += -mappletvos-version-min=11.0
+	CFLAGS += -mappletvos-version-min=11.0
 
 else ifeq ($(platform), wii)
    TARGET := $(TARGET_NAME)_libretro_wii.a
