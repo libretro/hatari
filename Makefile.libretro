@@ -41,7 +41,17 @@ else ifeq ($(platform), android)
    fpic := -fPIC
    SHARED :=  -Wl,--fix-cortex-a8 -llog -lz -shared -Wl,--version-script=$(LIBRETRO_DIR)/link.T -Wl,--no-undefined
    PLATFLAGS := -DAND -DLSB_FIRST -DALIGN_DWORD
-   
+else ifeq ($(platform), emscripten)
+   pthread=0
+   TARGET := $(TARGET_NAME)_libretro_$(platform).bc
+   EXTERNAL_ZLIB=1
+   STATIC_LINKING=1
+   STATIC_LINKING_LINK=1
+   ifneq ($(pthread),0)
+   SHARED := -lpthread
+   CFLAGS += -pthread
+   endif
+
 # Classic Platforms ####################
 # Platform affix = classic_<ISA>_<µARCH>
 # Help at https://modmyclassic.com/comp
