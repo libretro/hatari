@@ -39,8 +39,10 @@ static bool   vkbd_page      = false;
 static int    vkey_pos_x     = 0;
 static int    vkey_pos_y     = 0;
 
-static int    vkey_pressed   = -1;
-static int    last_vkey_pressed = -1;
+static int    vkey_pressed      = -1;
+static int    last_vkey_pressed  = -1;
+static int    vkey_pressed_hold  = 0;
+#define VKEY_PRESS_FRAMES  4   /* hold key for 4 frames ~80ms */
 static bool   vkey_sticky    = false;
 static int    vkey_sticky1   = -1;
 static int    vkey_sticky2   = -1;
@@ -333,9 +335,9 @@ void input_vkbd(void)
       }
       else if (val > 0)
       {
-         /* Handle modifier stickying */
-         if (vkey_sticky && (val == SK_LSHIFT || val == SK_RSHIFT ||
-                              val == SK_CTRL   || val == SK_ALT))
+         /* Modifier keys are always sticky (toggle on/off) */
+         if (val == SK_LSHIFT || val == SK_RSHIFT ||
+             val == SK_CTRL   || val == SK_ALT    || val == SK_CAPS)
          {
             if (vkey_sticky1 == val)
             {
@@ -356,35 +358,36 @@ void input_vkbd(void)
                st_key_down(val);
             }
          }
-         else if (val == SK_CAPS)
-         {
-            retro_capslock = !retro_capslock;
-            st_key_down(val);
-            st_key_up(val);
-         }
          else
          {
-            /* Normal key: press down now, release on next call */
-            /* Release sticky modifiers after normal key */
+            /* Normal key: press down now, release after VKEY_PRESS_FRAMES */
             st_key_down(val);
-            last_vkey_pressed = val;
-            vkey_pressed = val;
+            last_vkey_pressed  = val;
+            vkey_pressed       = val;
+            vkey_pressed_hold  = VKEY_PRESS_FRAMES;
          }
       }
 
       vkey_sticky = false;
    }
 
-   /* Release normal key on next frame */
+   /* Release normal key after hold frames */
    if (vkey_pressed != -1 && !vkflag[4])
    {
-      st_key_up(vkey_pressed);
+      if (vkey_pressed_hold > 0)
+      {
+         vkey_pressed_hold--;
+      }
+      else
+      {
+         st_key_up(vkey_pressed);
 
-      /* Release sticky modifiers */
-      if (vkey_sticky1 > 0) { st_key_up(vkey_sticky1); vkey_sticky1_release = true; }
-      if (vkey_sticky2 > 0) { st_key_up(vkey_sticky2); vkey_sticky2_release = true; }
+         /* Release sticky modifiers */
+         if (vkey_sticky1 > 0) { st_key_up(vkey_sticky1); vkey_sticky1_release = true; }
+         if (vkey_sticky2 > 0) { st_key_up(vkey_sticky2); vkey_sticky2_release = true; }
 
-      vkey_pressed = -1;
+         vkey_pressed = -1;
+      }
    }
 
    if (vkey_sticky1_release) { vkey_sticky1 = -1; vkey_sticky1_release = false; }
