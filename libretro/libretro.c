@@ -15,6 +15,7 @@
 #include "retro_strings.h"
 #include "retro_files.h"
 #include "retro_disk_control.h"
+#include "floppy_sound.h"
 
 static dc_storage* dc;
 
@@ -33,6 +34,7 @@ int retroh=248;
 
 extern unsigned short int bmp[1024*1024];
 extern int STATUTON, SHOWKEY, SHIFTON, MOUSEMODE, PAS, SND;
+extern int LEDA, LEDB, LEDC;
 extern int pauseg, snd_sampler;
 extern short signed int SNDBUF[1024*2];
 extern char RPATH[RETRO_PATH_MAX];
@@ -838,6 +840,17 @@ static void update_variables(void)
            hatari_led_status_display = true;
    }
 
+   // Floppy Sound
+   var.key = "hatari_floppy_sound";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+       floppy_sound_set_enabled(strcmp(var.value, "true") == 0);
+
+   var.key = "hatari_floppy_sound_volume";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+       floppy_sound_set_volume(atoi(var.value) * 256 / 100);
+
    // Set frameskip
    var.key = "hatari_frameskips";
    var.value = NULL;
@@ -1350,6 +1363,8 @@ void retro_init(void)
     log_cb(RETRO_LOG_INFO, "Retro SAVE_DIRECTORY %s\n",retro_save_directory);
     log_cb(RETRO_LOG_INFO, "Retro CONTENT_DIRECTORY %s\n",retro_content_directory);
 
+    floppy_sound_init(retro_system_directory);
+
     enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
     if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
     {
@@ -1383,6 +1398,7 @@ void retro_init(void)
 
 void retro_deinit(void)
 {	 
+   floppy_sound_free();
    Emu_uninit(); 
 
    if(emuThread)
@@ -1520,6 +1536,9 @@ void retro_run(void)
       if(SND==1)
       {
          int16_t *p=(int16_t*)SNDBUF;
+
+         floppy_sound_update_leds(LEDA, LEDB);
+         floppy_sound_mix(p, snd_sampler);
 
          for(x = 0; x < snd_sampler; x++)
             audio_cb(*p++,*p++);
