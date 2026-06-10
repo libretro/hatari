@@ -414,6 +414,22 @@ struct retro_core_option_v2_definition option_defs_us[] = {
         },
         "true"
     },
+    // CPU speed
+    {
+        "hatari_cpu_freq",
+        "System -> CPU Speed",
+        "CPU Speed",
+        "Set 68000 CPU clock speed. 8 MHz is authentic ST hardware speed. "
+        "16 MHz doubles speed for faster loading and gameplay.",
+        NULL,
+        "system",
+        {
+            { "8",  "8 MHz (Authentic)" },
+            { "16", "16 MHz (Fast)"     },
+            { NULL, NULL },
+        },
+        "8"
+    },
     // Autoload Drive B
     {
         "hatari_autoloadb",
@@ -1592,6 +1608,22 @@ struct retro_core_option_v2_definition option_defs_us[] = {
             { NULL, NULL },
         },
         "true"
+    },
+    // CPU speed
+    {
+        "hatari_cpu_freq",
+        "System -> CPU Speed",
+        "CPU Speed",
+        "Set 68000 CPU clock speed. 8 MHz is authentic ST hardware speed. "
+        "16 MHz doubles speed for faster loading and gameplay.",
+        NULL,
+        "system",
+        {
+            { "8",  "8 MHz (Authentic)" },
+            { "16", "16 MHz (Fast)"     },
+            { NULL, NULL },
+        },
+        "8"
     },
     // Autoload Drive B
     {
