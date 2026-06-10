@@ -11,6 +11,7 @@
 #include "memorySnapShot.h"
 #include "main.h"
 #include "screen.h"
+#include "m68000.h"
 
 #include "retro_strings.h"
 #include "retro_files.h"
@@ -874,6 +875,19 @@ static void update_variables(void)
    {
       hatari_fastfdc = new_hatari_fastfdc;
       ConfigureParams.DiskImage.FastFloppy = hatari_fastfdc;
+   }
+
+   // CPU Speed
+   var.key = "hatari_cpu_freq";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      int new_freq = atoi(var.value);
+      if (new_freq != ConfigureParams.System.nCpuFreq)
+      {
+         ConfigureParams.System.nCpuFreq = new_freq;
+         M68000_CheckCpuSettings();
+      }
    }
    
    // Auto Insert Disk B
