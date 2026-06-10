@@ -26,7 +26,7 @@ static uint32_t *linesurf32 = NULL;
 static int linesurf32_w     = 0;
 static int linesurf32_h     = 0;
 
-int RGBc(int r, int g, int b) { return RGB565(r, g, b); }
+int RGBc(int r, int g, int b) { return (((r>>3)<<11)|((g>>2)<<5)|(b>>3)); }
 
 #define BLEND_ALPHA25(fg, bg, out)                                   \
 {                                                                    \
