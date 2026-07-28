@@ -2,6 +2,7 @@ LOCAL_PATH := $(call my-dir)
 
 CORE_DIR     := $(LOCAL_PATH)/../..
 LIBRETRO_DIR := $(CORE_DIR)/libretro
+ZLIB_DIR     := $(LIBRETRO_DIR)/utils/zlib
 EMU          := $(CORE_DIR)/src
 CPU          := $(EMU)/uae-cpu
 FALCON       := $(EMU)/falcon
