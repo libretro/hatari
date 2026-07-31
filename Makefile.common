@@ -152,6 +152,7 @@ SOURCES_C += $(CPU_PREGEN)/cpudefs.c \
 				 $(LIBRETRO_DIR)/graph.c \
 				 $(LIBRETRO_DIR)/libretro-graph.c \
 				 $(LIBRETRO_DIR)/bmp.c \
+				 $(LIBRETRO_DIR)/floppy_sound.c \
 				 $(LIBRETRO_DIR)/retro_strings.c \
 				 $(LIBRETRO_DIR)/retro_utils.c \
 				 $(LIBRETRO_DIR)/retro_disk_control.c \

@@ -1156,30 +1156,56 @@ void update_input(void)
 
    if (hatari_led_status_display)
    {
+       /* Draw Atari STFM-style amber LED rectangle directly into framebuffer.
+          Thin horizontal bar, warm amber colour (RGB565 0xFEC0 ~ #FFD800).
+          Position: top-right, just below the RetroArch FPS counter line.
+          FPS text sits at roughly y=0..14; we place the LED at y=18.
+          LEDs stacked right-to-left from the right edge, 20px apart. */
+       #define LED_COLOR  0xFEC0   /* warm amber, matches real STFM hardware */
+       #define LED_W      6        /* half-width  -> full bar = 15px */
+       #define LED_H      2        /* half-height -> full bar =  5px */
+       #define LED_CY     8       /* just below FPS text */
+
+       extern int retrow;
+
        if (LEDA)
        {
+           int cx = retrow - 12, x, y;
+           for (y = LED_CY - LED_H; y <= LED_CY + LED_H; y++)
+               for (x = cx - LED_W; x <= cx + LED_W; x++)
+                   bmp[y * retrow + x] = LED_COLOR;
+
            if (status_update_joymouse || status_update_mousespeed)
                strcat(msg, " || A");
-           else
-               retro_status(60, "A");
        }
        if (LEDB)
        {
+           int cx = retrow - 24, x, y;
+           for (y = LED_CY - LED_H; y <= LED_CY + LED_H; y++)
+               for (x = cx - LED_W; x <= cx + LED_W; x++)
+                   bmp[y * retrow + x] = LED_COLOR;
+
            if (status_update_joymouse || status_update_mousespeed)
                strcat(msg, " || B");
-           else
-               retro_status(60, "B");
        }
        if (LEDC)
        {
+           int cx = retrow - 36, x, y;
+           for (y = LED_CY - LED_H; y <= LED_CY + LED_H; y++)
+               for (x = cx - LED_W; x <= cx + LED_W; x++)
+                   bmp[y * retrow + x] = LED_COLOR;
+
            if (status_update_joymouse || status_update_mousespeed)
                strcat(msg, " || C");
-           else
-               retro_status(60, "C");
 
            if (STATUTON == -1)
                LEDC = 0;
        }
+
+       #undef LED_COLOR
+       #undef LED_W
+       #undef LED_H
+       #undef LED_CY
    }
 
    if ( msg[0] )

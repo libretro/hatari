@@ -367,6 +367,38 @@ struct retro_core_option_v2_definition option_defs_us[] = {
         },
         "true"
     },
+    // Floppy drive sound
+    {
+        "hatari_floppy_sound",
+        "Media -> Floppy Drive Sound",
+        "Floppy Drive Sound",
+        "Play mechanical floppy drive sounds on disk access. "
+        "Place floppy.raw (s16le stereo 44100Hz) in RetroArch system dir for custom sound.",
+        NULL,
+        "media",
+        {
+            { "true",  "Enabled"  },
+            { "false", "Disabled" },
+            { NULL, NULL },
+        },
+        "true"
+    },
+    {
+        "hatari_floppy_sound_volume",
+        "Media -> Floppy Sound Volume",
+        "Floppy Sound Volume",
+        "Volume of the floppy drive sound effect.",
+        NULL,
+        "media",
+        {
+            { "25",  "25%"  },
+            { "50",  "50%"  },
+            { "75",  "75%"  },
+            { "100", "100%" },
+            { NULL, NULL },
+        },
+        "75"
+    },
     // Floppy speed
     {
         "hatari_fastfdc",
@@ -381,6 +413,22 @@ struct retro_core_option_v2_definition option_defs_us[] = {
             { NULL, NULL },
         },
         "true"
+    },
+    // CPU speed
+    {
+        "hatari_cpu_freq",
+        "System -> CPU Speed",
+        "CPU Speed",
+        "Set 68000 CPU clock speed. 8 MHz is authentic ST hardware speed. "
+        "16 MHz doubles speed for faster loading and gameplay.",
+        NULL,
+        "system",
+        {
+            { "8",  "8 MHz (Authentic)" },
+            { "16", "16 MHz (Fast)"     },
+            { NULL, NULL },
+        },
+        "8"
     },
     // Autoload Drive B
     {
@@ -1514,6 +1562,38 @@ struct retro_core_option_v2_definition option_defs_us[] = {
         },
         "true"
     },
+    // Floppy drive sound
+    {
+        "hatari_floppy_sound",
+        "Media -> Floppy Drive Sound",
+        "Floppy Drive Sound",
+        "Play mechanical floppy drive sounds on disk access. "
+        "Place floppy.raw (s16le stereo 44100Hz) in RetroArch system dir for custom sound.",
+        NULL,
+        "media",
+        {
+            { "true",  "Enabled"  },
+            { "false", "Disabled" },
+            { NULL, NULL },
+        },
+        "true"
+    },
+    {
+        "hatari_floppy_sound_volume",
+        "Media -> Floppy Sound Volume",
+        "Floppy Sound Volume",
+        "Volume of the floppy drive sound effect.",
+        NULL,
+        "media",
+        {
+            { "25",  "25%"  },
+            { "50",  "50%"  },
+            { "75",  "75%"  },
+            { "100", "100%" },
+            { NULL, NULL },
+        },
+        "75"
+    },
     // Floppy speed
     {
         "hatari_fastfdc",
@@ -1528,6 +1608,22 @@ struct retro_core_option_v2_definition option_defs_us[] = {
             { NULL, NULL },
         },
         "true"
+    },
+    // CPU speed
+    {
+        "hatari_cpu_freq",
+        "System -> CPU Speed",
+        "CPU Speed",
+        "Set 68000 CPU clock speed. 8 MHz is authentic ST hardware speed. "
+        "16 MHz doubles speed for faster loading and gameplay.",
+        NULL,
+        "system",
+        {
+            { "8",  "8 MHz (Authentic)" },
+            { "16", "16 MHz (Fast)"     },
+            { NULL, NULL },
+        },
+        "8"
     },
     // Autoload Drive B
     {
