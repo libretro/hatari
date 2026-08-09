@@ -29,6 +29,9 @@ bool file_exists(const char *path)
    if (!path || !*path)
       return false;
 
+   if (is_retro_vfs_available())
+      return retro_vfs_file_exists(path);
+
    dummy = fopen(path, "rb");
 
    if (!dummy)

@@ -43,6 +43,10 @@ const char Options_fileid[] = "Hatari options.c : " __DATE__ " " __TIME__;
 #include "68kDisass.h"
 #include "xbios.h"
 
+#ifdef __LIBRETRO__
+#include "retro_vfs.h"
+#endif
+
 bool bLoadAutoSave;        /* Load autosave memory snapshot at startup */
 bool bLoadMemorySave;      /* Load memory snapshot provided via option at startup */
 bool AviRecordOnStartup;   /* Start avi recording at startup */
@@ -816,31 +820,50 @@ static bool Opt_HandleArgument(const char *path)
 {
 	char *dir = NULL;
 	Uint8 test[2];
+#ifdef __LIBRETRO__
+	RFILE *fp;
+#else
 	FILE *fp;
+#endif
 
 	/* Atari program? */
-	if (File_Exists(path) && (fp = fopen(path, "rb"))) {
-
-		/* file starts with GEMDOS magic? */
-		if (fread(test, 1, 2, fp) == 2 &&
-		    test[0] == 0x60 && test[1] == 0x1A) {
-
-			const char *prgname = strrchr(path, PATHSEP);
-			if (prgname) {
-				dir = strdup(path);
-				dir[prgname-path] = '\0';
-				prgname++;
-			} else {
-				dir = strdup(Paths_GetWorkingDir());
-				prgname = path;
+	if (File_Exists(path)) {
+#ifdef __LIBRETRO__
+		fp = retro_vfs_fopen(path, RETRO_VFS_FILE_ACCESS_READ, 0);
+#else
+		fp = fopen(path, "rb");
+#endif
+		if (fp)
+		{
+			/* file starts with GEMDOS magic? */
+#ifdef __LIBRETRO__
+			if (retro_vfs_fread(fp, test, 2) == 2 &&
+				test[0] == 0x60 && test[1] == 0x1A) {
+#else
+			if (fread(test, 1, 2, fp) == 2 &&
+				test[0] == 0x60 && test[1] == 0x1A) {
+#endif
+				const char *prgname = strrchr(path, PATHSEP);
+				if (prgname) {
+					dir = strdup(path);
+					dir[prgname-path] = '\0';
+					prgname++;
+				} else {
+					dir = strdup(Paths_GetWorkingDir());
+					prgname = path;
+				}
+				/* after above, dir should point to valid dir,
+				* then make sure that given program from that
+				* dir will be started.
+				*/
+				TOS_AutoStart(prgname);
 			}
-			/* after above, dir should point to valid dir,
-			 * then make sure that given program from that
-			 * dir will be started.
-			 */
-			TOS_AutoStart(prgname);
 		}
+#ifdef __LIBRETRO__
+		retro_vfs_fclose(fp);
+#else
 		fclose(fp);
+#endif
 	}
 	if (dir) {
 		path = dir;

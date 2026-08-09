@@ -18,6 +18,8 @@
 #include "retro_disk_control.h"
 #include "floppy_sound.h"
 
+#include "retro_vfs.h"
+
 static dc_storage* dc;
 
 // LOG
@@ -371,7 +373,7 @@ void retro_set_environment(retro_environment_t cb)
 {
     bool option_cats_supported;
 
-    DIR *dir;
+    RDIR *dir;
     struct dirent *de;
     struct stat s;
     const char* system_dir = NULL;
@@ -379,6 +381,8 @@ void retro_set_environment(retro_environment_t cb)
 
     num_TOS_files = 0;
     environ_cb = cb;
+
+    retro_vfs_init(cb);
 
     if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) && system_dir)
     {
@@ -389,28 +393,23 @@ void retro_set_environment(retro_environment_t cb)
     // compile list of available TOS images
     sprintf(filepath, "%s%stos.img", retro_system_directory, RETRO_PATH_SEPARATOR );
 
-    if (!stat(filepath, &s) && !(s.st_mode & S_IFDIR))
+    if (retro_vfs_file_exists(filepath))
         strcpy(&TOS_Filenames[num_TOS_files++][0], "tos.img");
 
     sprintf(filepath, "%s%shatari%stos%s", retro_system_directory, RETRO_PATH_SEPARATOR, RETRO_PATH_SEPARATOR, RETRO_PATH_SEPARATOR);
 
-    dir = opendir(filepath);
+    dir = retro_vfs_opendir(filepath, false);
 
     if (dir)
     {
-        while ((de = readdir(dir)))
+        while (retro_vfs_readdir(dir) && num_TOS_files < MAX_TOS_IMAGES)
         {
-            sprintf(filepath, "%s%shatari%stos%s%s", retro_system_directory, RETRO_PATH_SEPARATOR, RETRO_PATH_SEPARATOR, RETRO_PATH_SEPARATOR, de->d_name);
+            const char *name = retro_vfs_dirent_get_name(dir);
 
-            if (!stat(filepath, &s))
-            {
-                if (!(s.st_mode & S_IFDIR))
-                    strcpy(&TOS_Filenames[num_TOS_files++][0], de->d_name);
-                else
-                    strcpy(&TOS_Filenames[num_TOS_files++][0], de->d_name);
-            }
+            if (name && strcmp(name, ".") != 0 && strcmp(name, "..") != 0)
+                strncpy(&TOS_Filenames[num_TOS_files++][0], name, RETRO_PATH_MAX - 1);
         }
-        closedir(dir);
+        retro_vfs_closedir(dir);
     }
 
     //sprintf(msg, "%i TOS files found in %s.", num_TOS_files, filepath);

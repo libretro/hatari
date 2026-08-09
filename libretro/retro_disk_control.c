@@ -35,6 +35,8 @@
 #include <stdlib.h>
 #include <unistd.h>*/
 
+#include "retro_vfs.h"
+
 static void fallback_log(enum retro_log_level level, const char* fmt, ...);
 static retro_log_printf_t log_cb = fallback_log;
 
@@ -330,10 +332,11 @@ void dc_parse_m3u(dc_storage* dc, const char* m3u_file)
 	if (m3u_file == NULL)
 		return;
 
-	FILE* fp = NULL;
+	RFILE* fp = NULL;
 
 	// Try to open the file
-	if ((fp = fopen(m3u_file, "r")) == NULL)
+	if ((fp = retro_vfs_fopen(m3u_file, RETRO_VFS_FILE_ACCESS_READ,
+	                           RETRO_VFS_FILE_ACCESS_HINT_NONE)) == NULL)
 		return;
 
 	// Reset
@@ -347,7 +350,7 @@ void dc_parse_m3u(dc_storage* dc, const char* m3u_file)
 
 	// Read the lines while there is line to read and we have enough space
 	char buffer[2048];
-	while ((dc->count <= DC_MAX_SIZE) && (fgets(buffer, sizeof(buffer), fp) != NULL))
+	while ((dc->count <= DC_MAX_SIZE) && (retro_vfs_fgets(fp, buffer, sizeof(buffer)) != NULL))
 	{
 		char* string = trimwhitespace(buffer);
 
@@ -362,7 +365,6 @@ void dc_parse_m3u(dc_storage* dc, const char* m3u_file)
 			char* filename;
 			if ((filename = m3u_search_file(basedir, string)) != NULL)
 			{
-
 				char tmp[512];
 				tmp[0] = '\0';
 
@@ -373,7 +375,6 @@ void dc_parse_m3u(dc_storage* dc, const char* m3u_file)
 				dc_add_file_int(dc, filename, image_name);
 				image_name = NULL;
 			}
-
 		}
 	}
 
@@ -382,7 +383,7 @@ void dc_parse_m3u(dc_storage* dc, const char* m3u_file)
 		free(basedir);
 
 	// Close the file
-	fclose(fp);
+	retro_vfs_fclose(fp);
 
 	if (dc->count != 0)
 	{
