@@ -24,89 +24,52 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <errno.h>
 
 #include <sys/stat.h>
+
+/* MinGW's <sys/stat.h> defines stat (and in some configs mkdir) as
+ * function-like macros that map to _stat64/_stati64/_mkdir.  This must
+ * be undone BEFORE including libretro.h below: otherwise the macro
+ * rewrites the struct member name in the retro_vfs_interface definition
+ * (retro_vfs_stat_t stat -> _stat64), and then the use sites
+ * vfs_iface->stat / vfs_iface->mkdir no longer match it, breaking the
+ * Windows build.  The POSIX functions are still reachable via their
+ * real names where this TU needs them (it doesn't call stat()/mkdir()
+ * directly; all I/O goes through the VFS *_impl callbacks). */
+#ifdef stat
+#undef stat
+#endif
+#ifdef mkdir
+#undef mkdir
+#endif
 
 #include <boolean.h>
 #include <file/file_path.h>
-#include <retro_assert.h>
-#include <string/stdstring.h>
+#include <compat/strl.h>
+#include <compat/posix_string.h>
+#include <retro_miscellaneous.h>
 #define VFS_FRONTEND
 #include <vfs/vfs_implementation.h>
 
-/* TODO: There are probably some unnecessary things on this huge include list now but I'm too afraid to touch it */
-#ifdef __APPLE__
-#include <CoreFoundation/CoreFoundation.h>
-#endif
-#ifdef __HAIKU__
-#include <kernel/image.h>
-#endif
-#ifndef __MACH__
-#include <compat/strl.h>
-#include <compat/posix_string.h>
-#endif
-#include <compat/strcasestr.h>
-#include <retro_miscellaneous.h>
-#include <encodings/utf.h>
-
-#if defined(_WIN32)
-#ifdef _MSC_VER
-#define setmode _setmode
-#endif
-#include <sys/stat.h>
-#ifdef _XBOX
-#include <xtl.h>
-#define INVALID_FILE_ATTRIBUTES -1
-#else
-#include <io.h>
-#include <fcntl.h>
+#ifdef _WIN32
 #include <direct.h>
-#include <windows.h>
-#if defined(_MSC_VER) && _MSC_VER <= 1200
-#define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
-#endif
-#endif
-#elif defined(VITA)
-#define SCE_ERROR_ERRNO_EEXIST 0x80010011
-#include <psp2/io/fcntl.h>
-#include <psp2/io/dirent.h>
-#include <psp2/io/stat.h>
 #else
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
-
-#if defined(PSP)
-#include <pspkernel.h>
-#endif
-
-#if defined(VITA)
-#define FIO_S_ISDIR SCE_S_ISDIR
-#endif
-
-#if defined(__QNX__) || defined(PSP) || defined(PS2)
 #include <unistd.h> /* stat() is defined here */
 #endif
 
-#if !defined(RARCH_CONSOLE) && defined(RARCH_INTERNAL)
-#ifdef __WINRT__
-#include <uwp/uwp_func.h>
+/* <direct.h> (MinGW, included just above) can re-establish the mkdir
+ * macro after the earlier #undef, so drop it again here before the use
+ * site below.  Same rationale for stat, defensively. */
+#ifdef stat
+#undef stat
 #endif
-#endif
-
-/* Assume W-functions do not work below Win2K and Xbox platforms */
-#if defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0500 || defined(_XBOX)
-
-#ifndef LEGACY_WIN32
-#define LEGACY_WIN32
-#endif
-
+#ifdef mkdir
+#undef mkdir
 #endif
 
 /* TODO/FIXME - globals */
-static retro_vfs_stat_t path_stat_cb   = retro_vfs_stat_impl;
+static retro_vfs_stat_t path_stat32_cb = retro_vfs_stat_impl;
+static retro_vfs_stat_64_t path_stat64_cb = retro_vfs_stat_64_impl;
 static retro_vfs_mkdir_t path_mkdir_cb = retro_vfs_mkdir_impl;
 
 void path_vfs_init(const struct retro_vfs_interface_info* vfs_info)
@@ -114,19 +77,26 @@ void path_vfs_init(const struct retro_vfs_interface_info* vfs_info)
    const struct retro_vfs_interface* 
       vfs_iface           = vfs_info->iface;
 
-   path_stat_cb           = retro_vfs_stat_impl;
+   path_stat32_cb         = retro_vfs_stat_impl;
+   path_stat64_cb         = retro_vfs_stat_64_impl;
    path_mkdir_cb          = retro_vfs_mkdir_impl;
 
    if (vfs_info->required_interface_version < PATH_REQUIRED_VFS_VERSION || !vfs_iface)
       return;
 
-   path_stat_cb           = vfs_iface->stat;
+   path_stat32_cb         = vfs_iface->stat;
    path_mkdir_cb          = vfs_iface->mkdir;
+
+   if (vfs_info->required_interface_version >= STAT64_REQUIRED_VFS_VERSION)
+      path_stat64_cb = vfs_iface->stat_64;
+   else
+      path_stat64_cb = NULL;
 }
 
 int path_stat(const char *path)
 {
-   return path_stat_cb(path, NULL);
+   /* Use 64‑bit stat if available, else fallback */
+   return path_stat64_cb ? path_stat64_cb(path, NULL) : path_stat32_cb(path, NULL);
 }
 
 /**
@@ -135,28 +105,40 @@ int path_stat(const char *path)
  *
  * Checks if path is a directory.
  *
- * Returns: true (1) if path is a directory, otherwise false (0).
+ * @return true if path is a directory, otherwise false.
  */
 bool path_is_directory(const char *path)
 {
-   return (path_stat_cb(path, NULL) & RETRO_VFS_STAT_IS_DIRECTORY) != 0;
+   if (path_stat64_cb)
+      return (path_stat64_cb(path, NULL) & RETRO_VFS_STAT_IS_DIRECTORY) != 0;
+   return (path_stat32_cb(path, NULL) & RETRO_VFS_STAT_IS_DIRECTORY) != 0;
 }
 
 bool path_is_character_special(const char *path)
 {
-   return (path_stat_cb(path, NULL) & RETRO_VFS_STAT_IS_CHARACTER_SPECIAL) != 0;
+   if (path_stat64_cb)
+      return (path_stat64_cb(path, NULL) & RETRO_VFS_STAT_IS_CHARACTER_SPECIAL) != 0;
+   return (path_stat32_cb(path, NULL) & RETRO_VFS_STAT_IS_CHARACTER_SPECIAL) != 0;
 }
 
 bool path_is_valid(const char *path)
 {
-   return (path_stat_cb(path, NULL) & RETRO_VFS_STAT_IS_VALID) != 0;
+   if (path_stat64_cb)
+      return (path_stat64_cb(path, NULL) & RETRO_VFS_STAT_IS_VALID) != 0;
+   return (path_stat32_cb(path, NULL) & RETRO_VFS_STAT_IS_VALID) != 0;
 }
 
-int32_t path_get_size(const char *path)
+int64_t path_get_size(const char *path)
 {
-   int32_t filesize = 0;
-   if (path_stat_cb(path, &filesize) != 0)
+   int64_t filesize = 0;
+   int32_t filesize32 = 0;
+
+   if (path_stat64_cb && path_stat64_cb(path, &filesize) != 0)
       return filesize;
+
+   /* Fallback: 32-bit stat */
+   if (path_stat32_cb && path_stat32_cb(path, &filesize32) != 0)
+      return (int64_t)filesize32;
 
    return -1;
 }
@@ -166,26 +148,47 @@ int32_t path_get_size(const char *path)
  * @dir                : directory
  *
  * Create directory on filesystem.
+ * 
+ * Recursive function.
  *
- * Returns: true (1) if directory could be created, otherwise false (0).
+ * @return true if directory could be created, otherwise false.
  **/
 bool path_mkdir(const char *dir)
 {
-   bool         sret  = false;
    bool norecurse     = false;
    char     *basedir  = NULL;
 
    if (!(dir && *dir))
       return false;
 
+   /* Nothing to do if it is already there.
+    *
+    * Without this the common case - which for archive extraction is
+    * every member after the first in a given directory - still costs
+    * a strdup, a path_parent_dir, a strcmp, a stat of the parent, a
+    * mkdir that is guaranteed to fail with EEXIST, and then a stat of
+    * the leaf to interpret that failure.  Two directory probes and a
+    * doomed syscall to answer a question one probe answers.  On Win32
+    * each of those probes is a UTF-16 conversion allocation plus both
+    * GetFileAttributesW and _wstat64, so the saving there is larger
+    * than the syscall count suggests.
+    *
+    * This is not a shortcut around the slow path's result: the slow
+    * path already returns true for an existing directory, by way of
+    * the mkdir -> -2 -> path_is_directory sequence at the bottom.  The
+    * one behavioural difference is at a filesystem root ("/", "C:\"),
+    * where path_parent_dir empties the string and the !*basedir guard
+    * below returns false today; such a directory does exist, so
+    * reporting true for it is the correction, not a regression. */
+   if (path_is_directory(dir))
+      return true;
+
    /* Use heap. Real chance of stack 
     * overflow if we recurse too hard. */
-   basedir            = strdup(dir);
+   if (!(basedir = strdup(dir)))
+      return false;
 
-   if (!basedir)
-	   return false;
-
-   path_parent_dir(basedir);
+   path_parent_dir(basedir, strlen(basedir));
 
    if (!*basedir || !strcmp(basedir, dir))
    {
@@ -193,15 +196,9 @@ bool path_mkdir(const char *dir)
       return false;
    }
 
-   if (path_is_directory(basedir))
+   if (     path_is_directory(basedir)
+         || path_mkdir(basedir))
       norecurse = true;
-   else
-   {
-      sret      = path_mkdir(basedir);
-
-      if (sret)
-         norecurse = true;
-   }
 
    free(basedir);
 
@@ -212,9 +209,8 @@ bool path_mkdir(const char *dir)
       /* Don't treat this as an error. */
       if (ret == -2 && path_is_directory(dir))
          return true;
-
-      return (ret == 0);
+      else if (ret == 0)
+         return true;
    }
-
-   return sret;
+   return false;
 }
