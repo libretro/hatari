@@ -48,6 +48,8 @@
    #include "file/file_path.h"
 #endif
 
+#include "retro_vfs.h"
+
 extern uint8_t* pbGPBuffer;
 
 // Verify file extension
@@ -92,6 +94,8 @@ bool file_check_flag(const char *filename, const size_t filename_size, const cha
 // Verify if file exists
 bool file_exists(const char *filename)
 {
+   if (is_retro_vfs_available())
+      return retro_vfs_file_exists(filename);
 #ifdef VITA
    if (path_is_valid(filename) && !path_is_directory(filename))
 #else

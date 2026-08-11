@@ -43,6 +43,10 @@ const char File_fileid[] = "Hatari file.c : " __DATE__ " " __TIME__;
 #include "SDL.h"
 #endif
 
+#ifdef __LIBRETRO__
+#include "retro_vfs.h"
+#endif
+
 #define fseek fseeko
 #define ftell ftello
 
@@ -251,6 +255,25 @@ Uint8 *HFile_Read(const char *pszFileName, long *pFileSize, const char * const p
 	else          /* It is a normal file */
 #endif  /* HAVE_LIBZ */
 	{
+#ifdef __LIBRETRO__
+		RFILE *hDiskFile;
+
+		hDiskFile = retro_vfs_fopen(filepath,
+			RETRO_VFS_FILE_ACCESS_READ, 0);
+
+		if (hDiskFile != NULL)
+		{
+			retro_vfs_fseek(hDiskFile, 0, SEEK_END);
+			FileSize = retro_vfs_ftell(hDiskFile);
+			retro_vfs_fseek(hDiskFile, 0, SEEK_SET);
+
+			pFile = malloc(FileSize);
+			if (pFile)
+				FileSize = retro_vfs_fread(hDiskFile, pFile, FileSize);
+
+			retro_vfs_fclose(hDiskFile);
+		}
+#else
 		FILE *hDiskFile;
 		/* Open and read normal file */
 		hDiskFile = fopen(filepath, "rb");
@@ -267,6 +290,7 @@ Uint8 *HFile_Read(const char *pszFileName, long *pFileSize, const char * const p
 
 			fclose(hDiskFile);
 		}
+#endif
 	}
 	free(filepath);
 
@@ -313,6 +337,18 @@ bool File_Save(const char *pszFileName, const Uint8 *pAddress, size_t Size, bool
 	else
 #endif  /* HAVE_LIBZ */
 	{
+#ifdef __LIBRETRO__
+		RFILE *hDiskFile;
+
+		hDiskFile = retro_vfs_fopen(pszFileName, RETRO_VFS_FILE_ACCESS_WRITE, 0);
+		if (hDiskFile != NULL)
+		{
+			if (retro_vfs_fwrite(hDiskFile, pAddress, Size) == (int64_t)Size)
+				bRet = true;
+
+			retro_vfs_fclose(hDiskFile);
+		}
+#else
 		FILE *hDiskFile;
 		/* Create a normal file: */
 		hDiskFile = fopen(pszFileName, "wb");
@@ -324,6 +360,7 @@ bool File_Save(const char *pszFileName, const Uint8 *pAddress, size_t Size, bool
 
 			fclose(hDiskFile);
 		}
+#endif
 	}
 
 	return bRet;
@@ -336,6 +373,19 @@ bool File_Save(const char *pszFileName, const Uint8 *pAddress, size_t Size, bool
  */
 off_t File_Length(const char *pszFileName)
 {
+#ifdef __LIBRETRO__
+	RFILE *hDiskFile;
+	int64_t FileSize;
+
+	hDiskFile = retro_vfs_fopen(pszFileName, RETRO_VFS_FILE_ACCESS_READ, 0);
+	if (hDiskFile != NULL)
+	{
+		retro_vfs_fseek(hDiskFile, 0, SEEK_END);
+		FileSize = retro_vfs_ftell(hDiskFile);
+		retro_vfs_fclose(hDiskFile);
+		return (off_t)FileSize;
+	}
+#else
 	FILE *hDiskFile;
 	off_t FileSize;
 
@@ -348,7 +398,7 @@ off_t File_Length(const char *pszFileName)
 		fclose(hDiskFile);
 		return FileSize;
 	}
-
+#endif
 	return -1;
 }
 
@@ -360,7 +410,9 @@ off_t File_Length(const char *pszFileName)
  */
 bool File_Exists(const char *filename)
 {
-#if defined(WIIU) || defined(VITA)
+#ifdef __LIBRETRO__
+	return retro_vfs_file_exists(filename);
+#elif defined(WIIU) || defined(VITA)
     FILE * file = fopen(filename, "r");
     if (file) {
         fclose(file);
@@ -386,7 +438,9 @@ bool File_Exists(const char *filename)
  */
 bool File_DirExists(const char *path)
 {
-#if defined(WIIU) || defined(VITA)
+#ifdef __LIBRETRO__
+	return retro_vfs_dir_exists(path);
+#elif defined(WIIU) || defined(VITA)
 	DIR* dir = opendir(path);
 	if (dir)
 	{
@@ -871,7 +925,11 @@ void File_MakeValidPathName(char *pPathName)
 	do
 	{
 		/* Check for a valid path */
+#ifdef __LIBRETRO__
+		if (retro_vfs_dir_exists(pPathName))
+#else
 		if (stat(pPathName, &dirstat) == 0 && S_ISDIR(dirstat.st_mode))
+#endif
 		{
 			break;
 		}
