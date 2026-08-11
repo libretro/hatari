@@ -78,7 +78,7 @@ int64_t retro_vfs_file_size(const char *path)
    if (!path || !*path)
       return -1;
 
-   if (file_cb && file_cb->stat)
+   if (file_cb && file_cb->stat_64)
    {
       int64_t size  = 0;
       int flags = file_cb->stat_64(path, &size);
