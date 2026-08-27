@@ -141,6 +141,16 @@ add_library(CoreHmsa OBJECT ${SOURCES_HMSA})
 if(ENABLE_LIBRETRO)
 	set_target_properties(Core PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 	set_target_properties(CoreHmsa PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
+	# Separate object files compiled with -DLIBRETRO so that
+	# file.c has access to src/retro/vfs.c.
+	add_library(CoreRetro OBJECT ${SOURCES})
+	add_library(CoreHmsaRetro OBJECT ${SOURCES_HMSA})
+	target_compile_definitions(CoreRetro PRIVATE LIBRETRO)
+	target_compile_definitions(CoreHmsaRetro PRIVATE LIBRETRO)
+	set_target_properties(CoreRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+	set_target_properties(CoreHmsaRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
 	add_subdirectory(retro)
 endif(ENABLE_LIBRETRO)
 
@@ -294,13 +304,16 @@ if(SDL2_OTHER_CFLAGS)
 endif(SDL2_OTHER_CFLAGS)
 
 if(ENABLE_LIBRETRO)
-	add_library(retro-hatari MODULE
-			$<TARGET_OBJECTS:Core>
-			$<TARGET_OBJECTS:CoreHmsa>
+	add_library(hatari_libretro MODULE
+			$<TARGET_OBJECTS:CoreRetro>
+			$<TARGET_OBJECTS:CoreHmsaRetro>
 			$<TARGET_OBJECTS:Falcon>
 			$<TARGET_OBJECTS:UaeCpu>
 			$<TARGET_OBJECTS:Debug>
 			$<TARGET_OBJECTS:UiRetro>)
+	set_target_properties(hatari_libretro PROPERTIES
+		PREFIX ""
+	)
 endif(ENABLE_LIBRETRO)
 
 target_link_libraries(${APP_NAME} ${SDL2_LIBRARIES})
@@ -312,28 +325,28 @@ endif()
 if(Readline_FOUND)
 	target_link_libraries(${APP_NAME} ${READLINE_LIBRARY})
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari ${READLINE_LIBRARY})
+		target_link_libraries(hatari_libretro ${READLINE_LIBRARY})
 	endif(ENABLE_LIBRETRO)
 endif(Readline_FOUND)
 
 if(ZLIB_FOUND)
 	target_link_libraries(${APP_NAME} ${ZLIB_LIBRARY})
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari ${ZLIB_LIBRARY})
+		target_link_libraries(hatari_libretro ${ZLIB_LIBRARY})
 	endif(ENABLE_LIBRETRO)
 endif(ZLIB_FOUND)
 
 if(LibArchive_FOUND)
 	target_link_libraries(${APP_NAME} ${LibArchive_LIBRARIES})
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari ${LibArchive_LIBRARIES})
+		target_link_libraries(hatari_libretro ${LibArchive_LIBRARIES})
 	endif(ENABLE_LIBRETRO)
 endif(LibArchive_FOUND)
 
 if(PNG_FOUND)
 	target_link_libraries(${APP_NAME} ${PNG_LIBRARY})
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari ${PNG_LIBRARY})
+		target_link_libraries(hatari_libretro ${PNG_LIBRARY})
 	endif(ENABLE_LIBRETRO)
 endif(PNG_FOUND)
 
@@ -344,35 +357,35 @@ endif(X11_FOUND)
 if(PortMidi_FOUND)
 	target_link_libraries(${APP_NAME} ${PORTMIDI_LIBRARY})
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari ${PORTMIDI_LIBRARY})
+		target_link_libraries(hatari_libretro ${PORTMIDI_LIBRARY})
 	endif(ENABLE_LIBRETRO)
 endif(PortMidi_FOUND)
 
 if(CapsImage_FOUND)
 	target_link_libraries(${APP_NAME} ${CAPSIMAGE_LIBRARY})
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari ${CAPSIMAGE_LIBRARY})
+		target_link_libraries(hatari_libretro ${CAPSIMAGE_LIBRARY})
 	endif(ENABLE_LIBRETRO)
 endif(CapsImage_FOUND)
 
 if(Udev_FOUND)
 	target_link_libraries(${APP_NAME} ${UDEV_LIBRARY})
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari ${UDEV_LIBRARY})
+		target_link_libraries(hatari_libretro ${UDEV_LIBRARY})
 	endif(ENABLE_LIBRETRO)
 endif(Udev_FOUND)
 
 if(Capstone_FOUND)
 	target_link_libraries(${APP_NAME} ${CAPSTONE_LIBRARY})
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari ${CAPSTONE_LIBRARY})
+		target_link_libraries(hatari_libretro ${CAPSTONE_LIBRARY})
 	endif(ENABLE_LIBRETRO)
 endif(Capstone_FOUND)
 
 if(APPLE)
 	target_link_libraries(${APP_NAME} "-framework Cocoa")
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari "-framework Cocoa")
+		target_link_libraries(hatari_libretro "-framework Cocoa")
 	endif(ENABLE_LIBRETRO)
 endif()
 

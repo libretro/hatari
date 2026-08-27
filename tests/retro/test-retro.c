@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 
 	if (argc != 2 || argv[1][0] == '-')
 	{
-		printf("Usage: %s <path-to-libretro-hatari.so>\n", argv[0]);
+		printf("Usage: %s <path-to-hatari_libretro.so>\n", argv[0]);
 		return 0;
 	}
 
