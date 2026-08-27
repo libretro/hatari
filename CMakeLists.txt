@@ -56,16 +56,19 @@ set(ENABLE_DSP_EMU 1
 set(ENABLE_TRACING 1
     CACHE BOOL "Enable tracing messages for debugging")
 
-find_path(LIBRETRO_INCLUDE_DIR libretro.h
-          PATH_SUFFIXES libretro libretro-common)
+option(ENABLE_LIBRETRO "Build a core for libretro (experimental)" OFF)
 
-if (LIBRETRO_INCLUDE_DIR)
-	set(ENABLE_LIBRETRO 1
-	    CACHE BOOL "Build a core for libretro (experimental)")
-else()
-	set(ENABLE_LIBRETRO 0
-	    CACHE BOOL "Build a core for libretro (experimental)")
-endif(LIBRETRO_INCLUDE_DIR)
+if(ENABLE_LIBRETRO)
+    set(LIBRETRO_INCLUDE_DIR
+        "${CMAKE_SOURCE_DIR}/src/retro/libretro-common/include"
+    )
+
+    if(NOT EXISTS "${LIBRETRO_INCLUDE_DIR}/libretro.h")
+        message(FATAL_ERROR
+            "ENABLE_LIBRETRO is enabled but ${LIBRETRO_INCLUDE_DIR}/libretro.h was not found"
+        )
+    endif()
+endif()
 
 # Configure Hatari with AddressSanitizer:
 #   cd build; make clean; cmake -D ENABLE_ASAN:BOOL=1 -D ..
