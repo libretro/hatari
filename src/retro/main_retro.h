@@ -5,6 +5,14 @@
   or at your option any later version. Read the file gpl.txt for details.
 */
 
+#include "libretro.h"
+
+#ifdef _WIN32
+#define RETRO_PATH_SEPARATOR   		"\\"
+#else
+#define RETRO_PATH_SEPARATOR   		"/"
+#endif
+
 extern retro_environment_t environment_cb;
 extern retro_video_refresh_t video_refresh_cb;
 extern retro_input_state_t input_state_cb;
