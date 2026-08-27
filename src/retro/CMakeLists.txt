@@ -1,5 +1,5 @@
 
-include_directories(. ../.. ../includes ../debug ../falcon)
+include_directories(. ../.. ../includes ../debug ../falcon libretro-common/include)
 
 add_library(UiRetro OBJECT audio.c joy_ui.c gui_event.c keymap.c main_retro.c
                     microphone.c screen.c statusbar.c timing.c)
