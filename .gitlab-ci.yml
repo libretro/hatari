@@ -9,7 +9,7 @@
   variables:
     JNI_PATH: libretro
     MAKEFILE: Makefile.libretro
-    CORENAME: hatari
+    CORENAME: hatari2014
 
 # Inclusion templates, required for the build to work
 include:
