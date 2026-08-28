@@ -1463,7 +1463,7 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
-   info->library_name     = "Hatari";
+   info->library_name     = "Hatari2014";
 #ifndef GIT_VERSION
 #define GIT_VERSION ""
 #endif
