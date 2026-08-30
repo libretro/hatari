@@ -37,6 +37,10 @@ const char File_fileid[] = "Hatari file.c";
 #include <sys/disk.h>
 #endif
 
+#ifdef LIBRETRO
+#include "retro/vfs.h"
+#endif
+
 /*-----------------------------------------------------------------------*/
 /**
  * Remove any '/'s from end of filenames, but keeps / intact
@@ -236,6 +240,24 @@ uint8_t *File_ReadAsIs(const char *pszFileName, long *pFileSize)
 {
 	uint8_t *pFile = NULL;
 	long FileSize = 0;
+
+#ifdef LIBRETRO
+	VFS_FILE hVfsFile;
+
+	hVfsFile = VFS_fopen(pszFileName, "rb");
+	if (hVfsFile != NULL)
+	{
+		int64_t Size64 = VFS_fsize(hVfsFile);
+		if (Size64 > 0)
+		{
+			FileSize = (long)Size64;
+			pFile = malloc(FileSize);
+			if (pFile)
+				FileSize = (long)VFS_fread(pFile, 1, FileSize, hVfsFile);
+		}
+		VFS_fclose(hVfsFile);
+	}
+#else
 	FILE *hDiskFile;
 
 	/* Open and read normal file */
@@ -256,6 +278,7 @@ uint8_t *File_ReadAsIs(const char *pszFileName, long *pFileSize)
 		}
 		fclose(hDiskFile);
 	}
+#endif
 
 	/* Store size of file we read in (or 0 if failed) */
 	if (pFileSize)
@@ -352,6 +375,18 @@ bool File_Save(const char *pszFileName, const uint8_t *pAddress, size_t Size, bo
 	else
 #endif  /* HAVE_LIBZ */
 	{
+#ifdef LIBRETRO
+		VFS_FILE hVfsFile;
+		hVfsFile = VFS_fopen(pszFileName, "wb");
+		if (hVfsFile != NULL)
+		{
+			/* Write data, set success flag */
+			if (VFS_fwrite(pAddress, 1, Size, hVfsFile) == Size)
+				bRet = true;
+
+			VFS_fclose(hVfsFile);
+		}
+#else
 		FILE *hDiskFile;
 		/* Create a normal file: */
 		hDiskFile = fopen(pszFileName, "wb");
@@ -363,6 +398,7 @@ bool File_Save(const char *pszFileName, const uint8_t *pAddress, size_t Size, bo
 
 			fclose(hDiskFile);
 		}
+#endif
 	}
 
 	return bRet;
@@ -375,6 +411,10 @@ bool File_Save(const char *pszFileName, const uint8_t *pAddress, size_t Size, bo
  */
 off_t File_Length(const char *pszFileName)
 {
+#ifdef LIBRETRO
+	int64_t len = VFS_FileLength(pszFileName);
+	return (len >= 0) ? (off_t)len : (off_t)-1;
+#else
 	FILE *hDiskFile;
 	off_t FileSize;
 
@@ -413,6 +453,7 @@ off_t File_Length(const char *pszFileName)
 	}
 
 	return -1;
+#endif
 }
 
 
@@ -423,6 +464,9 @@ off_t File_Length(const char *pszFileName)
  */
 bool File_Exists(const char *filename)
 {
+#ifdef LIBRETRO
+	return VFS_FileExists(filename);
+#else
 	struct stat buf;
 	if (stat(filename, &buf) == 0 &&
 	    (buf.st_mode & (S_IRUSR|S_IWUSR)) && !S_ISDIR(buf.st_mode))
@@ -431,6 +475,7 @@ bool File_Exists(const char *filename)
 		return true;
 	}
 	return false;
+#endif
 }
 
 
@@ -440,8 +485,12 @@ bool File_Exists(const char *filename)
  */
 bool File_DirExists(const char *path)
 {
+#ifdef LIBRETRO
+	return VFS_DirExists(path);
+#else
 	struct stat buf;
 	return (stat(path, &buf) == 0 && S_ISDIR(buf.st_mode));
+#endif
 }
 
 
