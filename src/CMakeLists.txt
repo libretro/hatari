@@ -309,7 +309,7 @@ if(ENABLE_LIBRETRO)
 			$<TARGET_OBJECTS:CoreHmsaRetro>
 			$<TARGET_OBJECTS:Falcon>
 			$<TARGET_OBJECTS:UaeCpu>
-			$<TARGET_OBJECTS:Debug>
+			$<TARGET_OBJECTS:DebugRetro>
 			$<TARGET_OBJECTS:UiRetro>)
 	set_target_properties(hatari_libretro PROPERTIES
 		PREFIX ""

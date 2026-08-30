@@ -33,9 +33,23 @@ retro_environment_t environment_cb;
 retro_video_refresh_t video_refresh_cb;
 retro_input_poll_t input_poll_cb;
 retro_input_state_t input_state_cb;
+static retro_log_printf_t log_cb = NULL;
 
 #define SAVESTATE_TMP_NAME "hatari_savestate.tmp"
 static char scratch_path[FILENAME_MAX];
+
+static enum retro_log_level Retro_LogLevel(int nType)
+{
+	switch (nType)
+	{
+		case LOG_DEBUG: return RETRO_LOG_DEBUG;
+		case LOG_INFO: return RETRO_LOG_INFO;
+		case LOG_WARN: return RETRO_LOG_WARN;
+		case LOG_ERROR: return RETRO_LOG_ERROR;
+		default:
+			return RETRO_LOG_INFO;
+	}
+}
 
 static void Retro_SetInputDescriptors(void)
 {
@@ -111,6 +125,13 @@ RETRO_API void retro_init(void)
 	char *argv[4];
 	const char *save_dir = NULL;
 	const char *system_dir = NULL;
+	struct retro_log_callback logging;
+
+	/* Register log call back */
+	if (environment_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &logging))
+		log_cb = logging.log;
+	else
+		Log_Printf(LOG_WARN, "GET_LOG_INTERFACE failed.\n");
 
 	/* Register disk control  */
 	DiskControl_Init();
@@ -454,4 +475,10 @@ void Core_RefreshRateChanged(void)
 	environment_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
 
 	Log_Printf(LOG_INFO, "Screen refresh updated to: %dHz\n", nScreenRefreshRate);
+}
+
+void Retro_Log(int nType, const char *msg)
+{
+	if (log_cb)
+		log_cb(Retro_LogLevel(nType), "%s", msg);
 }

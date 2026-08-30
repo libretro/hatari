@@ -32,6 +32,10 @@ const char Log_fileid[] = "Hatari log.c";
 #include "options.h"
 #include "str.h"
 
+#ifdef LIBRETRO
+extern void Retro_Log(int nType, const char *msg);
+#endif
+
 int ExceptionDebugMask;
 
 typedef struct {
@@ -437,7 +441,17 @@ void Log_Printf(LOGTYPE nType, const char *psFormat, ...)
 		/* output directly */
 		fprintf(hLogFile, "%s: ", prefixes[nType]);
 		va_start(argptr, psFormat);
-		fprintf(hLogFile, psFormat, argptr);
+#ifdef LIBRETRO
+		{
+			char logbuf[512];
+			va_list argptr2;
+			va_copy(argptr2, argptr);
+			vsnprintf(logbuf, sizeof(logbuf), psFormat, argptr2);
+			va_end(argptr2);
+			Retro_Log(nType, logbuf);
+		}
+#endif
+		vfprintf(hLogFile, psFormat, argptr);
 		va_end(argptr);
 		if (!endsInNewline(psFormat))
 		    fputs("\n", hLogFile);
@@ -473,6 +487,9 @@ void Log_Printf(LOGTYPE nType, const char *psFormat, ...)
 
 	/* buffer / output with newline */
 	addMissingNewline(msg + count - 1);
+#ifdef LIBRETRO
+	Retro_Log(nType, MsgState.current);
+#endif
 	addMsgRepeat(hLogFile);
 }
 
