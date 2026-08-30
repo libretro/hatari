@@ -467,6 +467,10 @@ const char Video_fileid[] = "Hatari video.c";
 #include "clocks_timings.h"
 #include "utils.h"
 
+#ifdef LIBRETRO
+extern void Core_RefreshRateChanged(void);
+#endif
+
 
 /* The border's mask allows to keep track of all the border tricks		*/
 /* applied to one video line. The masks for all lines are stored in the array	*/
@@ -4599,7 +4603,12 @@ static void Video_ResetShifterTimings(void)
 
 	/* Update refresh rate in status bar if necessary */
 	if ( RefreshRate_prev != nScreenRefreshRate )
+	{
 		Statusbar_UpdateInfo ();
+#ifdef LIBRETRO
+		Core_RefreshRateChanged();
+#endif
+	}
 }
 
 

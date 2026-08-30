@@ -18,3 +18,4 @@ extern const char *retro_system_directory;
 extern retro_environment_t environment_cb;
 extern retro_video_refresh_t video_refresh_cb;
 extern retro_input_state_t input_state_cb;
+extern void Core_RefreshRateChanged(void);

@@ -23,6 +23,7 @@
 #include "tos.h"
 #include "vdi.h"
 #include "version.h"
+#include "video.h"
 
 bool has_cpu_config_changed = true;
 const char *retro_save_directory;
@@ -171,7 +172,7 @@ RETRO_API void retro_get_system_av_info(struct retro_system_av_info *info)
 	info->geometry.max_width = MAX_VDI_WIDTH;
 	info->geometry.max_height = MAX_VDI_HEIGHT;
 	info->geometry.aspect_ratio = (float)width / (float)height;
-	info->timing.fps = 50.0f;
+	info->timing.fps = (float)nScreenRefreshRate;   /* 50 / 60 / 71 */
 
 	info->timing.sample_rate = nAudioFrequency;
 }
@@ -440,4 +441,17 @@ int Dialog_MainDlg(bool *bReset, bool *bLoadedSnapshot)
 char* DlgFloppy_ShortCutSel(const char *path_and_name, char **zip_path)
 {
 	return NULL;
+}
+
+void Core_RefreshRateChanged(void)
+{
+	struct retro_system_av_info av_info;
+
+	if (!environment_cb)
+		return;
+
+	retro_get_system_av_info(&av_info);
+	environment_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
+
+	Log_Printf(LOG_INFO, "Screen refresh updated to: %dHz\n", nScreenRefreshRate);
 }
