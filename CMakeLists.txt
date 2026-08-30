@@ -115,14 +115,14 @@ else()
 	set(ENABLE_MAN_PAGES 0 CACHE BOOL "Built and install man pages")
 endif()
 
-if(APPLE)
+if(APPLE AND NOT (ENABLE_LIBRETRO AND NOT ENABLE_HATARI))
 	set(ENABLE_OSX_BUNDLE 1
 	    CACHE BOOL "Built Hatari as macOS application bundle")
 	set(CMAKE_XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@loader_path/../Frameworks")
 else()
 	set(ENABLE_OSX_BUNDLE 0
 	    CACHE BOOL "Built Hatari as macOS application bundle")
-endif(APPLE)
+endif(APPLE AND NOT (ENABLE_LIBRETRO AND NOT ENABLE_HATARI))
 
 if(ENABLE_OSX_BUNDLE)
 	set(APP_NAME "Hatari")

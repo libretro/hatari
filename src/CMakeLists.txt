@@ -379,6 +379,12 @@ if(ENABLE_LIBRETRO)
 		PREFIX ""
 	)
 
+	if(APPLE)
+		set_target_properties(hatari_libretro PROPERTIES
+    		SUFFIX ".dylib"
+		)
+	endif(APPLE)
+
 	if(ZLIB_FOUND)
 		target_link_libraries(hatari_libretro ${ZLIB_LIBRARY})
 	endif(ZLIB_FOUND)

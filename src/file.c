@@ -33,7 +33,7 @@ const char File_fileid[] = "Hatari file.c";
 #ifdef HAVE_FLOCK
 # include <sys/file.h>
 #endif
-#if defined(__APPLE__)
+#if defined(__APPLE__) && !defined(LIBRETRO)
 #include <sys/disk.h>
 #endif
 

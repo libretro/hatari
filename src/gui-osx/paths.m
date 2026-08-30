@@ -9,6 +9,8 @@
 
  */
 
+#ifndef LIBRETRO
+
 #import <Foundation/Foundation.h>
 
 #include "main.h"
@@ -49,3 +51,12 @@ char *Paths_GetMacScreenShotDir(void)
 
 	return psPath;
 }
+
+#else
+
+char *Paths_GetMacScreenShotDir(void)
+{
+	// no-op on libretro
+}
+
+#endif
