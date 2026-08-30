@@ -19,7 +19,7 @@ if(ENABLE_LIBRETRO)
 	set_target_properties(Debug PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 	# Separate object files compiled with -DLIBRETRO for log.c
-	add_library(DebugRetro OBJECT log.c)
+	add_library(DebugRetro OBJECT ${DEBUG_SOURCES})
 	target_compile_definitions(DebugRetro PRIVATE LIBRETRO)
 	set_target_properties(DebugRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 endif(ENABLE_LIBRETRO)

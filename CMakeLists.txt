@@ -56,6 +56,7 @@ set(ENABLE_DSP_EMU 1
 set(ENABLE_TRACING 1
     CACHE BOOL "Enable tracing messages for debugging")
 
+option(ENABLE_HATARI "Build the Hatari executable" ON)
 option(ENABLE_LIBRETRO "Build a core for libretro (experimental)" OFF)
 
 if(ENABLE_LIBRETRO)
@@ -144,9 +145,9 @@ if(SDL3_FOUND)
 	set(ENABLE_SDL3 1 CACHE BOOL "Use SDL3 instead of SDL2")
 else()
 	find_package(SDL2)
-	if(NOT SDL2_FOUND)
+	if(NOT SDL2_FOUND AND ENABLE_HATARI)
 		message(FATAL_ERROR "SDL library not found!")
-	endif(NOT SDL2_FOUND)
+	endif(NOT SDL2_FOUND AND ENABLE_HATARI)
 	set(ENABLE_SDL3 0 CACHE BOOL "Use SDL3 instead of SDL2")
 endif()
 
@@ -435,9 +436,9 @@ add_subdirectory(src)
 add_subdirectory(doc)
 add_subdirectory(tools)
 
-if(NOT CMAKE_CROSSCOMPILING)
+if(ENABLE_HATARI AND NOT CMAKE_CROSSCOMPILING)
 	add_subdirectory(tests)
-endif(NOT CMAKE_CROSSCOMPILING)
+endif(ENABLE_HATARI AND NOT CMAKE_CROSSCOMPILING)
 
 include(FindPython)
 if(Python_Interpreter_FOUND AND Python_VERSION_MAJOR LESS 3)
