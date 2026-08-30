@@ -69,6 +69,8 @@ if(ENABLE_LIBRETRO)
             "ENABLE_LIBRETRO is enabled but ${LIBRETRO_INCLUDE_DIR}/libretro.h was not found"
         )
     endif()
+
+    include(cmake/BuildDependencies.cmake)
 endif()
 
 # Configure Hatari with AddressSanitizer:
@@ -466,7 +468,7 @@ if(UNIX AND NOT ENABLE_OSX_BUNDLE)
 	add_subdirectory(share)
 endif()
 
-add_custom_target(uninstall
+add_custom_target(hatari-uninstall
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/Uninstall.cmake)
 
 
