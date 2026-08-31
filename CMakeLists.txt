@@ -232,8 +232,13 @@ if(NOT ENABLE_HATARI AND ENABLE_LIBRETRO)
 	endif(LIBRETRO_STATIC)
 endif(NOT ENABLE_HATARI AND ENABLE_LIBRETRO)
 
-# Check if Large File Support is available with the standard POSIX flags
-set (HATARI_LFS_FLAGS "-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64")
+if(ANDROID AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+	# 32-bit android does not have ftello etc.
+	set(HATARI_LFS_FLAGS "")
+else()
+	# Check if Large File Support is available with the standard POSIX flags
+	set(HATARI_LFS_FLAGS "-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64")
+endif()
 check_large_file()
 
 
