@@ -18,7 +18,9 @@ if(LibArchive_FOUND)
 	target_link_libraries(hmsa ${LibArchive_LIBRARIES})
 endif(LibArchive_FOUND)
 
-install(TARGETS hmsa RUNTIME DESTINATION ${BINDIR})
+install(TARGETS hmsa
+	RUNTIME DESTINATION ${BINDIR}
+	BUNDLE DESTINATION ${BINDIR})
 
 if(ENABLE_MAN_PAGES)
 	add_custom_target(hmsa_manpage ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/hmsa.1.gz)

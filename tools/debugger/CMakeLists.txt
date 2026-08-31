@@ -3,7 +3,9 @@ include_directories(${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src/cpu)
 
 add_executable(gst2ascii gst2ascii.c)
 
-install(TARGETS gst2ascii RUNTIME DESTINATION ${BINDIR})
+install(TARGETS gst2ascii
+	RUNTIME DESTINATION ${BINDIR}
+	BUNDLE DESTINATION ${BINDIR})
 
 install(PROGRAMS hatari_profile.py DESTINATION ${BINDIR} RENAME hatari_profile)
 

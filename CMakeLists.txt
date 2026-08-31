@@ -57,6 +57,7 @@ set(ENABLE_TRACING 1
     CACHE BOOL "Enable tracing messages for debugging")
 
 option(ENABLE_HATARI "Build the Hatari executable" ON)
+option(ENABLE_TOOLS "Build the Hatari tools" ON)
 option(ENABLE_LIBRETRO "Build a core for libretro (experimental)" OFF)
 
 if(ENABLE_LIBRETRO)
@@ -436,7 +437,10 @@ configure_file(${CMAKE_SOURCE_DIR}/cmake/config-cmake.h
 
 add_subdirectory(src)
 add_subdirectory(doc)
-add_subdirectory(tools)
+
+if(ENABLE_TOOLS)
+	add_subdirectory(tools)
+endif()
 
 if(ENABLE_HATARI AND NOT CMAKE_CROSSCOMPILING)
 	add_subdirectory(tests)
