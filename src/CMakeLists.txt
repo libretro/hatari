@@ -368,13 +368,24 @@ if(ENABLE_HATARI)
 endif()
 
 if(ENABLE_LIBRETRO)
-	add_library(hatari_libretro MODULE
-			$<TARGET_OBJECTS:CoreRetro>
-			$<TARGET_OBJECTS:CoreHmsaRetro>
-			$<TARGET_OBJECTS:Falcon>
-			$<TARGET_OBJECTS:UaeCpu>
-			$<TARGET_OBJECTS:DebugRetro>
-			$<TARGET_OBJECTS:UiRetro>)
+	if(LIBRETRO_STATIC)
+		add_library(hatari_libretro STATIC
+				$<TARGET_OBJECTS:CoreRetro>
+				$<TARGET_OBJECTS:CoreHmsaRetro>
+				$<TARGET_OBJECTS:Falcon>
+				$<TARGET_OBJECTS:UaeCpu>
+				$<TARGET_OBJECTS:DebugRetro>
+				$<TARGET_OBJECTS:UiRetro>)
+	else()
+		add_library(hatari_libretro MODULE
+				$<TARGET_OBJECTS:CoreRetro>
+				$<TARGET_OBJECTS:CoreHmsaRetro>
+				$<TARGET_OBJECTS:Falcon>
+				$<TARGET_OBJECTS:UaeCpu>
+				$<TARGET_OBJECTS:DebugRetro>
+				$<TARGET_OBJECTS:UiRetro>)
+	endif(LIBRETRO_STATIC)
+
 	set_target_properties(hatari_libretro PROPERTIES
 		PREFIX ""
 	)
@@ -384,6 +395,12 @@ if(ENABLE_LIBRETRO)
     		SUFFIX ".dylib"
 		)
 	endif(APPLE)
+
+	if(LIBRETRO_SUFFIX)
+		set_target_properties(hatari_libretro PROPERTIES
+			OUTPUT_NAME "hatari_libretro${LIBRETRO_SUFFIX}"
+		)
+	endif()
 
 	if(ZLIB_FOUND)
 		target_link_libraries(hatari_libretro ${ZLIB_LIBRARY})

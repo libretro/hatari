@@ -58,7 +58,10 @@ set(ENABLE_TRACING 1
 
 option(ENABLE_HATARI "Build the Hatari executable" ON)
 option(ENABLE_TOOLS "Build the Hatari tools" ON)
+
 option(ENABLE_LIBRETRO "Build a core for libretro (experimental)" OFF)
+option(LIBRETRO_STATIC "Set STATIC mode for compiling libretro core" OFF)
+option(LIBRETRO_SUFFIX "Libretro core suffix" OFF)
 
 if(ENABLE_LIBRETRO)
     set(LIBRETRO_INCLUDE_DIR
