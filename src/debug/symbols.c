@@ -20,6 +20,7 @@
 const char Symbols_fileid[] = "Hatari symbols.c";
 
 #include <ctype.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -54,6 +55,11 @@ const char Symbols_fileid[] = "Hatari symbols.c";
  */
 #define MAX_SYM_SIZE 1024
 #define MAX_SYM_SIZE_S "1024"
+
+// Undeclared in psvita
+#ifndef PATH_MAX
+#define PATH_MAX FILENAME_MAX
+#endif
 
 /* TODO: add symbol name/address file names to configuration? */
 static symbol_list_t *CpuSymbolsList;

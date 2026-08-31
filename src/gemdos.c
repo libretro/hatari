@@ -238,9 +238,11 @@ static bool GemDOS_GetFileInformation(int Handle, DATETIME *DateTime)
 static bool GemDOS_SetFileInformation(int Handle, DATETIME *DateTime)
 {
 	const char *filename;
+#if HAVE_UTIME_H || HAVE_SYS_UTIME_H
 	struct utimbuf timebuf;
 	struct stat filestat;
 	struct tm timespec;
+#endif
 
 	/* make sure Hatari itself doesn't need to write/modify
 	 * the file after it's modification time is changed.
@@ -253,6 +255,7 @@ static bool GemDOS_SetFileInformation(int Handle, DATETIME *DateTime)
 
 	filename = FileHandles[Handle].szActualName;
 	
+#if HAVE_UTIME_H || HAVE_SYS_UTIME_H
 	/* Bits: 0-4 = secs/2, 5-10 = mins, 11-15 = hours (24-hour format) */
 	timespec.tm_sec  = (DateTime->timeword & 0x1F) << 1;
 	timespec.tm_min  = (DateTime->timeword & 0x7E0) >> 5;
@@ -276,6 +279,11 @@ static bool GemDOS_SetFileInformation(int Handle, DATETIME *DateTime)
 		return false;
 	// fprintf(stderr, "set date '%s' for %s\n", asctime(&timespec), name);
 	return true;
+#else
+	/* No utime()/utimbuf on this platform */
+	(void)filename;
+	return true;
+#endif
 }
 
 
