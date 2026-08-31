@@ -212,6 +212,23 @@ if(Capstone_FOUND)
 	endif()
 endif(Capstone_FOUND)
 
+# Disable as unused and generates dependency requirements
+if(NOT ENABLE_HATARI AND ENABLE_LIBRETRO)
+	set(LibArchive_FOUND FALSE)
+	set(PNG_FOUND FALSE)
+	set(Readline_FOUND FALSE)
+	set(HAVE_LIBREADLINE 0)
+	set(HAVE_LIBPNG 0)
+	set(HAVE_LIBARCHIVE 0)
+
+	# remove from static platforms
+	if(LIBRETRO_STATIC)
+		set(ZLIB_FOUND FALSE)
+		set(HAVE_LIBZ 0)
+		set(HAVE_ZLIB_H 0)
+	endif(LIBRETRO_STATIC)
+endif(NOT ENABLE_HATARI AND ENABLE_LIBRETRO)
+
 # Check if Large File Support is available with the standard POSIX flags
 set (HATARI_LFS_FLAGS "-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64")
 check_large_file()
