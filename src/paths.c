@@ -17,6 +17,10 @@ const char Paths_fileid[] = "Hatari paths.c";
 #include "paths.h"
 #include "str.h"
 
+#ifdef LIBRETRO
+extern const char *retro_save_directory;
+#endif
+
 #if defined(WIN32) && !defined(mkdir)
 #define mkdir(name,mode) mkdir(name)
 #endif  /* WIN32 */
@@ -227,6 +231,22 @@ static void Paths_InitHomeDirs(void)
 			if (psHome)
 				strcat(sUserHomeDir, psHome);
 		}
+	}
+#endif
+#if defined(LIBRETRO)
+	if (retro_save_directory && retro_save_directory[0])
+	{
+		sUserHomeDir = Str_Dup(retro_save_directory);
+		sHatariHomeDir = Str_Dup(retro_save_directory);
+
+		if (!File_DirExists(sHatariHomeDir))
+		{
+			if (mkdir(sHatariHomeDir, 0750) != 0)
+			{
+				perror("Failed to create libretro save directory");
+			}
+		}
+		return;
 	}
 #endif
 	if (!sUserHomeDir)
