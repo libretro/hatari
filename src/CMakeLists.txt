@@ -139,8 +139,10 @@ add_library(Core OBJECT ${SOURCES})
 add_library(CoreHmsa OBJECT ${SOURCES_HMSA})
 
 if(ENABLE_LIBRETRO)
-	set_target_properties(Core PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-	set_target_properties(CoreHmsa PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+	if(NOT LIBRETRO_STATIC)
+		set_target_properties(Core PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+		set_target_properties(CoreHmsa PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+	endif(NOT LIBRETRO_STATIC)
 
 	# Separate object files compiled with -DLIBRETRO so that
 	# file.c has access to src/retro/vfs.c.
@@ -148,9 +150,10 @@ if(ENABLE_LIBRETRO)
 	add_library(CoreHmsaRetro OBJECT ${SOURCES_HMSA})
 	target_compile_definitions(CoreRetro PRIVATE LIBRETRO)
 	target_compile_definitions(CoreHmsaRetro PRIVATE LIBRETRO)
-	set_target_properties(CoreRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-	set_target_properties(CoreHmsaRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-
+	if(NOT LIBRETRO_STATIC)
+		set_target_properties(CoreRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+		set_target_properties(CoreHmsaRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+	endif(NOT LIBRETRO_STATIC)
 	add_subdirectory(retro)
 endif(ENABLE_LIBRETRO)
 

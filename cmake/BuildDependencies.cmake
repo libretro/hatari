@@ -65,9 +65,11 @@ if(ENABLE_STATIC_ZLIB)
 
 		set(ZLIB_LIBRARY zlibstatic)
 
-		set_target_properties(zlibstatic PROPERTIES
-			POSITION_INDEPENDENT_CODE TRUE
-		)
+		if(NOT LIBRETRO_STATIC)
+			set_target_properties(zlibstatic PROPERTIES
+				POSITION_INDEPENDENT_CODE TRUE
+			)
+		endif()
 
 		if(NOT TARGET ZLIB::ZLIB)
 			add_library(ZLIB::ZLIB ALIAS zlibstatic)
@@ -137,8 +139,13 @@ if(ENABLE_STATIC_CAPSIMAGE)
 
 	set_target_properties(capsimage PROPERTIES
 		LINKER_LANGUAGE CXX
-		POSITION_INDEPENDENT_CODE TRUE
 	)
+
+	if(NOT LIBRETRO_STATIC)
+		set_target_properties(capsimage PROPERTIES
+			POSITION_INDEPENDENT_CODE TRUE
+		)
+	endif()
 
 	set(CAPSIMAGE_GENERATED_INCLUDE_DIR
 		${CMAKE_CURRENT_BINARY_DIR}/capsimage/include

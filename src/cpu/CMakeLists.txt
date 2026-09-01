@@ -99,6 +99,6 @@ endif()
 add_library(UaeCpu OBJECT ${CPUEMU_SRCS} ${WINUAE_SRCS} custom.c events.c
 			  memory.c hatari-glue.c)
 
-if(ENABLE_LIBRETRO)
+if(ENABLE_LIBRETRO AND NOT LIBRETRO_STATIC)
 	set_target_properties(UaeCpu PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-endif(ENABLE_LIBRETRO)
+endif(ENABLE_LIBRETRO AND NOT LIBRETRO_STATIC)
