@@ -84,13 +84,12 @@ void Screen_GetDimension(uint32_t **pixels, int *width, int *height, int *pitch)
 	if (pixels)
 		*pixels = framebuffer;
 	if (width)
-		*width = screen_width;
+		*width = screen_width ? screen_width : MIN_VDI_WIDTH;
 	if (height)
-		*height = screen_height;
+		*height = screen_height ? screen_height : MIN_VDI_HEIGHT;
 	if (pitch)
-		*pitch = screen_width * 4;
+		*pitch = (screen_width ? screen_width : MIN_VDI_WIDTH) * 4;
 }
-
 
 int Screen_GetUISocket(void)
 {
