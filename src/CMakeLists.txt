@@ -135,15 +135,12 @@ if(Capstone_FOUND)
 	include_directories(${CAPSTONE_INCLUDE_DIR})
 endif(Capstone_FOUND)
 
-add_library(Core OBJECT ${SOURCES})
-add_library(CoreHmsa OBJECT ${SOURCES_HMSA})
+if(ENABLE_HATARI)
+	add_library(Core OBJECT ${SOURCES})
+	add_library(CoreHmsa OBJECT ${SOURCES_HMSA})
+endif(ENABLE_HATARI)
 
 if(ENABLE_LIBRETRO)
-	if(NOT LIBRETRO_STATIC)
-		set_target_properties(Core PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-		set_target_properties(CoreHmsa PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-	endif(NOT LIBRETRO_STATIC)
-
 	# Separate object files compiled with -DLIBRETRO so that
 	# file.c has access to src/retro/vfs.c.
 	add_library(CoreRetro OBJECT ${SOURCES})
@@ -160,10 +157,11 @@ endif(ENABLE_LIBRETRO)
 add_subdirectory(cpu)
 add_subdirectory(debug)
 add_subdirectory(falcon)
-add_subdirectory(gui-sdl)
-add_subdirectory(sdl)
 
 if(ENABLE_HATARI)
+	add_subdirectory(gui-sdl)
+	add_subdirectory(sdl)
+
 	set(APP_TARGET_OBJECTS
 			$<TARGET_OBJECTS:Core>
 			$<TARGET_OBJECTS:CoreHmsa>
