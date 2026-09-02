@@ -1,0 +1,47 @@
+name: Build Hatari (libretro) for Windows (MinGW on Ubuntu)
+
+on: [push, pull_request]
+
+env:
+  core_id: hatari_libretro
+
+jobs:
+  build-windows-mingw:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git cmake pkg-config \
+          mingw-w64 libz-mingw-w64-dev
+
+    - name: Checkout Hatari (libretro) repo
+      uses: actions/checkout@v7
+      with:
+        path: ${{ env.core_id }}
+        submodules: recursive
+
+    - name: Configure (MinGW cross-compile)
+      run: |
+        cd ${{ env.core_id }}
+        export PKG_CONFIG_LIBDIR=/usr/x86_64-w64-mingw32/lib/pkgconfig
+        export PKG_CONFIG_PATH=/usr/x86_64-w64-mingw32/share/pkgconfig
+        export PKG_CONFIG_SYSROOT_DIR=/usr/x86_64-w64-mingw32
+        mkdir -p build && cd build
+        cmake .. \
+          -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=ON -DENABLE_STATIC_CAPSIMAGE=OFF \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_SYSTEM_NAME=Windows \
+          -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
+          -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
+          -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ \
+          -DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres \
+          -DCMAKE_FIND_ROOT_PATH=/usr/x86_64-w64-mingw32 \
+          -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+          -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+          -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+
+    - name: Build
+      run: |
+        cd ${{ env.core_id }}/build
+        make -j$(nproc)

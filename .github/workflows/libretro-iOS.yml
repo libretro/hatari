@@ -1,0 +1,42 @@
+name: Build Hatari (libretro) on iOS
+
+on: [push, pull_request]
+
+env:
+  core_id: hatari_libretro
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - name: Install dependencies
+      run: |
+        brew update
+        brew install cmake mbedtls sdl2
+
+    - name: Checkout Hatari (libretro) repo
+      uses: actions/checkout@v7
+      with:
+        path: ${{ env.core_id }}
+        submodules: recursive
+
+    - name: Configure (iOS arm64)
+      run: |
+        cd ${{ env.core_id }}
+        cmake \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_FLAGS="" \
+          -DCMAKE_CXX_FLAGS="" \
+          -DIOS=ON \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+          -DCMAKE_SYSTEM_NAME=iOS \
+          -DCMAKE_SYSTEM_PROCESSOR=arm64 \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=ON -DENABLE_STATIC_CAPSIMAGE=ON \
+          . -Bbuild/ios-arm64
+
+    - name: Build
+      run: |
+        cd ${{ env.core_id }}/build/ios-arm64
+        make -j$(sysctl -n hw.ncpu)

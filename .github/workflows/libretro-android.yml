@@ -1,0 +1,39 @@
+name: Build Hatari (libretro) on Android
+
+on: [push, pull_request]
+
+env:
+  core_id: hatari
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openjdk-25-jdk wget unzip cmake libsdl2-dev zlib1g-dev
+        wget https://dl.google.com/android/repository/android-ndk-r29-linux.zip
+        unzip -q android-ndk-r29-linux.zip
+        echo "ANDROID_NDK_HOME=$PWD/android-ndk-r29" >> $GITHUB_ENV
+
+    - name: Checkout Hatari (libretro) repo
+      uses: actions/checkout@v7
+      with:
+        path: ${{ env.core_id }}
+        submodules: recursive
+
+    - name: Configure
+      run: |
+        cd ${{ env.core_id }}
+        cmake -B build/android-arm64-v8a \
+          -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=ON -DENABLE_STATIC_CAPSIMAGE=ON \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DANDROID_ABI=arm64-v8a \
+          -DANDROID_PLATFORM=android-26 \
+          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake
+
+    - name: Build
+      run: |
+        cd ${{ env.core_id }}
+        cmake --build build/android-arm64-v8a --parallel
