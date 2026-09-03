@@ -193,12 +193,17 @@ libretro-build-vita:
 #  extends:
 #    - .libretro-wii-static-cmake-retroarch-master
 #    - .core-defs
-    
+#  image: $CI_SERVER_HOST:5050/libretro-infrastructure/libretro-build-devkitpro:20260903
+#  variables:
+#    CORE_ARGS: -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=OFF -DENABLE_STATIC_CAPSIMAGE=OFF
+
 # Nintendo WiiU
-#libretro-build-wiiu:
-#  extends:
-#    - .libretro-wiiu-static-cmake-retroarch-master
-#    - .core-defs
+libretro-build-wiiu:
+  extends:
+    - .libretro-wiiu-static-cmake-retroarch-master
+    - .core-defs
+  variables:
+    CORE_ARGS: -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=OFF -DENABLE_STATIC_CAPSIMAGE=OFF
 
 #################################### MISC ####################################
 # webOS 32-bit
