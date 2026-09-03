@@ -26,6 +26,7 @@
 #include "vfs.h"
 #include "video.h"
 
+static bool have_bios = false;
 static bool game_loaded = false;
 bool has_cpu_config_changed = true;
 const char *retro_save_directory;
@@ -79,6 +80,37 @@ static void Retro_SetInputDescriptors(void)
 	};
 
 	environment_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
+}
+
+static void Retro_LogFrontend(const char *msg, int level)
+{
+    unsigned msg_interface_version = 0;
+    environment_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION,
+                   &msg_interface_version);
+
+    if (msg_interface_version >= 1)
+    {
+        struct retro_message_ext message = {
+            msg,
+            10000,
+            3,
+            level,
+            RETRO_MESSAGE_TARGET_ALL,
+            RETRO_MESSAGE_TYPE_NOTIFICATION,
+            -1
+        };
+
+        environment_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &message);
+    }
+    else
+    {
+        struct retro_message message = {
+            msg,
+            180
+        };
+
+        environment_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
+    }
 }
 
 RETRO_API void retro_set_environment(retro_environment_t cb)
@@ -151,6 +183,11 @@ RETRO_API void retro_init(void)
 		snprintf(tos_path, sizeof(tos_path), "%s%s%s",
 		         system_dir, RETRO_PATH_SEPARATOR, "tos.img");
 
+		if(File_Exists(tos_path))
+			have_bios = true;
+		else
+			Retro_LogFrontend("System BIOS (tos.img) is missing from your system folder.", RETRO_LOG_ERROR);
+
 		argv[0] = name;
 		argv[1] = tos_arg;
 		argv[2] = tos_path;
@@ -214,6 +251,15 @@ RETRO_API void retro_reset(void)
 RETRO_API void retro_run(void)
 {
 	bool options_updated = false;
+	int width, height, pitch;
+	uint32_t *pixels;
+
+	if (!have_bios)
+	{
+		Screen_GetDimension(&pixels, &width, &height, &pitch);
+		video_refresh_cb(pixels, width, height, pitch);
+		return;
+	}
 
 	if (environment_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &options_updated) &&
 	    options_updated)
@@ -235,9 +281,6 @@ RETRO_API void retro_run(void)
 		quit_program = 0;
 		m68k_run();
 	}
-
-	int width, height, pitch;
-	uint32_t *pixels;
 
 	Screen_GetDimension(&pixels, &width, &height, &pitch);
 	video_refresh_cb(pixels, width, height, pitch);
