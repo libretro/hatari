@@ -11,7 +11,6 @@
 #include "fdc.h"
 #include "main_retro.h"
 #include "options.h"
-#include "reset.h"
 #include "video.h"
 
 /* ------------------------------------------------------------------- */
@@ -718,9 +717,15 @@ static const char *Core_VarStr(const char *key, const char *defval)
 }
 
 /**
- * Apply boot options.
+ * Put the boot options into ConfigureParams.
+ *
+ * Called from Main_Init() once the configuration file and the command line
+ * have been read, and before anything is built from them: the machine, its
+ * memory and its I/O map are then all set up for what stands here, so none of
+ * these options ever has to be applied to a running machine. Anything that can
+ * change while the core runs belongs in Core_ApplyRuntimeOptions() instead.
  */
-void Core_ApplyBootOptions(void)
+void Core_SetBootOptions(void)
 {
 	const char *str;
  
@@ -786,10 +791,6 @@ void Core_ApplyBootOptions(void)
 	ConfigureParams.Memory.STRamSize_KB = Core_VarInt("hatari_memory_size", 1024);
 	ConfigureParams.Memory.TTRamSize_KB = Core_VarInt("hatari_ttram_size", 0) * 1024;
  
-	/* Reconfigure and reboot so machine/CPU/memory/ROM changes take effect */
-	Configuration_Apply(true);
-	Reset_Cold();
-	has_cpu_config_changed = true;
 }
  
 /**

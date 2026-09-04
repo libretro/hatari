@@ -202,8 +202,8 @@ RETRO_API void retro_init(void)
 		Main_Init(1, (char **)argv);
 	}
 
-	/* Apply core options on top of defaults/loaded config */
-	Core_ApplyBootOptions();
+	/* Boot options were applied from inside Main_Init(), before the machine
+	 * was built; the rest can be applied to it now that it is running. */
 	Core_ApplyRuntimeOptions();
 }
 

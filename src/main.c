@@ -63,6 +63,10 @@ const char Main_fileid[] = "Hatari main.c";
 #include "falcon/dsp.h"
 #include "falcon/videl.h"
 
+#ifdef LIBRETRO
+#include "retro/options.h"
+#endif
+
 #ifdef WIN32
 #include "gui-win/opencon.h"
 #endif
@@ -320,6 +324,13 @@ void Main_Init(int argc, char *argv[])
 		Control_RemoveFifo();
 		Main_ErrorExit(NULL, NULL, exitval);
 	}
+
+#ifdef LIBRETRO
+	/* The frontend's core options have the last word on the configuration,
+	 * and land here so the machine is built for them below rather than
+	 * rebuilt for them afterwards. */
+	Core_SetBootOptions();
+#endif
 
 	/* monitor type option might require "reset" -> true */
 	Configuration_Apply(true);

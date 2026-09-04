@@ -147,6 +147,8 @@ if(ENABLE_LIBRETRO)
 	add_library(CoreHmsaRetro OBJECT ${SOURCES_HMSA})
 	target_compile_definitions(CoreRetro PRIVATE LIBRETRO)
 	target_compile_definitions(CoreHmsaRetro PRIVATE LIBRETRO)
+	# main.c reaches src/retro/options.h, which needs libretro.h
+	target_include_directories(CoreRetro PRIVATE ${LIBRETRO_INCLUDE_DIR})
 	if(NOT LIBRETRO_STATIC)
 		set_target_properties(CoreRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 		set_target_properties(CoreHmsaRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)

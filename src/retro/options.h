@@ -11,7 +11,7 @@
 #include <libretro.h>
 
 void libretro_set_core_options(retro_environment_t environ_cb, bool *categories_supported);
-void Core_ApplyBootOptions(void);
+void Core_SetBootOptions(void);
 void Core_ApplyRuntimeOptions(void);
 
 #endif /* ifndef HATARI_RETRO_OPTIONS_H */
