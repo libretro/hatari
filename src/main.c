@@ -67,6 +67,10 @@ const char Main_fileid[] = "Hatari main.c";
 #include "gui-win/opencon.h"
 #endif
 
+#ifdef LIBRETRO
+extern void Core_ApplyBootOptions(void);
+#endif
+
 bool bQuitProgram = false;                /* Flag to quit program cleanly */
 bool bEmulationActive = true;             /* Run emulation when started */
 
@@ -320,6 +324,10 @@ void Main_Init(int argc, char *argv[])
 		Control_RemoveFifo();
 		Main_ErrorExit(NULL, NULL, exitval);
 	}
+
+#ifdef LIBRETRO
+	Core_ApplyBootOptions();
+#endif
 
 	/* monitor type option might require "reset" -> true */
 	Configuration_Apply(true);
