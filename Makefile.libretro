@@ -237,6 +237,9 @@ endif
 CAPS_LIB =
 ifeq ($(capsimg), 1)
 PLATFLAGS += -DHAVE_CAPSIMAGE -DCAPSIMAGE_VERSION=5 -I$(capssrc)/LibIPF/ -I$(capssrc)/Core/
+# The SDK headers spell every entry point __cdecl, which only MSVC knows;
+# the library's own build defines it away and consumers have to do the same.
+PLATFLAGS += -D__cdecl=
 capslibname ?= capsimage
 CAPS_LIB := $(if $(capslib),-L$(capslib) ,)-l$(capslibname)
 endif
