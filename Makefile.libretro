@@ -225,8 +225,20 @@ ifneq ($(EXTERNAL_ZLIB), 1)
 ZLIB = -lz
 endif
 
+# IPF/CTR floppy images, through the SPS capsimage library. Off by default,
+# since neither the headers nor the library are in this tree:
+#
+#   make -f Makefile.libretro capsimg=1 \
+#        capssrc=/path/to/capsimg capslib=/path/to/capsimg/.libs
+#
+# capssrc is the capsimage SDK source tree (the one with Core/ and LibIPF/),
+# capslib the directory holding the built library; capslibname overrides its
+# name, which differs between SPS builds (capsimage, CAPSImg, CAPSImg_x64).
+CAPS_LIB =
 ifeq ($(capsimg), 1)
 PLATFLAGS += -DHAVE_CAPSIMAGE -DCAPSIMAGE_VERSION=5 -I$(capssrc)/LibIPF/ -I$(capssrc)/Core/
+capslibname ?= capsimage
+CAPS_LIB := $(if $(capslib),-L$(capslib) ,)-l$(capslibname)
 endif
 
 ifeq ($(DEBUG), 1)
@@ -259,7 +271,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING_LINK),1)
 	$(AR) rcs $@ $(OBJECTS) 
 else
-	$(CC) $(CFLAGS) $(INCFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ -lm $(ZLIB) $(SHARED)
+	$(CC) $(CFLAGS) $(INCFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ -lm $(ZLIB) $(CAPS_LIB) $(SHARED)
 endif
 
 %.o: %.c
