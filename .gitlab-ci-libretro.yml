@@ -189,13 +189,13 @@ libretro-build-vita:
     CORE_ARGS: -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=OFF -DENABLE_STATIC_CAPSIMAGE=OFF
 
 # Nintendo Wii
-#libretro-build-wii:
-#  extends:
-#    - .libretro-wii-static-cmake-retroarch-master
-#    - .core-defs
-#  image: $CI_SERVER_HOST:5050/libretro-infrastructure/libretro-build-devkitpro:20260903
-#  variables:
-#    CORE_ARGS: -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=OFF -DENABLE_STATIC_CAPSIMAGE=OFF
+libretro-build-wii:
+  extends:
+    - .libretro-wii-static-cmake-retroarch-master
+    - .core-defs
+  image: $CI_SERVER_HOST:5050/libretro-infrastructure/libretro-build-devkitpro:20260903
+  variables:
+    CORE_ARGS: -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=OFF -DENABLE_STATIC_CAPSIMAGE=OFF -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
 
 # Nintendo WiiU
 libretro-build-wiiu:
