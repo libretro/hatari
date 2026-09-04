@@ -11,6 +11,8 @@
 #include "fdc.h"
 #include "main_retro.h"
 #include "options.h"
+#include "reset.h"
+#include "screen.h"
 #include "video.h"
 
 /* ------------------------------------------------------------------- */
@@ -859,6 +861,12 @@ void Core_ApplyRuntimeOptions(void)
 	/* Reflect the (possibly changed) monitor type in the running config,
 	 * without forcing a full CPU/memory reset */
 	Configuration_Apply(true);
+
+	/* Configuration_Apply() does not touch the screen conversion, so a
+	 * changed border/monitor/aspect setting would otherwise sit unused until
+	 * the emulated program happened to switch resolution by itself. Resize
+	 * now; ConvST/ConvGen skip the work when the size comes out the same. */
+	Screen_ModeChanged(false);
  
 	/* --- Devices --- */
 	{

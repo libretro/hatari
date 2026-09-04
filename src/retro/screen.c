@@ -161,9 +161,22 @@ void Screen_Init(void)
 {
 	/* Zooming will be done by libretro - so disable it here for now */
 	ConfigureParams.Screen.nZoomFactor = 1.0;
-	ConfigureParams.Screen.nMaxWidth = 320;
-	ConfigureParams.Screen.nMaxHeight = 200;
-	ConfigureParams.Screen.bAllowOverscan = false;
+
+	/* These limits are not just a cap: ConvST_SetSTResolution() sizes the
+	 * overscan borders from whatever is left of them once the 320x200 ST
+	 * screen has been taken out, so at 320x200 nothing was left over and
+	 * bAllowOverscan (the hatari_borders core option) had no visible effect
+	 * at all. The whole ST screen including its borders is
+	 * NUM_VISIBLE_LINE_PIXELS x NUM_VISIBLE_LINES (416x276) at 1x, which is
+	 * what we ask for here. Upstream's defaults are twice that; staying
+	 * below 640x400 keeps low res from being doubled to 640x400 as well,
+	 * which is the frontend's job and not ours.
+	 *
+	 * Med/high res are already 640x400 and so do not fit borders within
+	 * these limits - they keep being drawn without them.
+	 */
+	ConfigureParams.Screen.nMaxWidth = NUM_VISIBLE_LINE_PIXELS;
+	ConfigureParams.Screen.nMaxHeight = NUM_VISIBLE_LINES;
 
 	/* We want to render each frame with libretro, so disable frameskip */
 	ConfigureParams.Screen.nFrameSkips = 0;
