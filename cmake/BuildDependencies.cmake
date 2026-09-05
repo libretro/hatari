@@ -165,8 +165,21 @@ if(ENABLE_STATIC_CAPSIMAGE)
 
 	file(COPY
 		${CAPSIMAGE_LIBIPF_HEADERS}
-		${capsimg_SOURCE_DIR}/Core/CommonTypes.h
 		DESTINATION ${CAPSIMAGE_CAPS_INCLUDE_DIR}
+	)
+
+	file(READ ${capsimg_SOURCE_DIR}/Core/CommonTypes.h CAPSIMAGE_COMMONTYPES)
+	string(REPLACE
+		"typedef int8_t BYTE;"
+		"#ifndef _WIN32\ntypedef int8_t BYTE;"
+		CAPSIMAGE_COMMONTYPES "${CAPSIMAGE_COMMONTYPES}")
+	string(REPLACE
+		"typedef int32_t DWORD;"
+		"typedef int32_t DWORD;\n#endif"
+		CAPSIMAGE_COMMONTYPES "${CAPSIMAGE_COMMONTYPES}")
+	file(WRITE
+		${CAPSIMAGE_CAPS_INCLUDE_DIR}/CommonTypes.h
+		"#include <stdint.h>\n${CAPSIMAGE_COMMONTYPES}"
 	)
 
 	target_include_directories(capsimage
@@ -179,13 +192,22 @@ if(ENABLE_STATIC_CAPSIMAGE)
 			${capsimg_SOURCE_DIR}/CAPSImg
 	)
 
-#	may clash with mingw headers:
-#	if(WIN32)
-#		target_include_directories(capsimage
-#			PUBLIC
-#				${capsimg_SOURCE_DIR}/Compatibility
-#		)
-#	endif()
+	if(WIN32)
+		set(CAPSIMAGE_CONFIG_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/capsimage/config)
+		file(MAKE_DIRECTORY ${CAPSIMAGE_CONFIG_INCLUDE_DIR})
+
+		file(READ ${capsimg_SOURCE_DIR}/CAPSImg/config.h CAPSIMAGE_CONFIG)
+		string(REPLACE
+			"#define HAVE_STRUCT_DIRENT_D_TYPE 1"
+			"/* #undef HAVE_STRUCT_DIRENT_D_TYPE */ /* mingw's dirent has no d_type */"
+			CAPSIMAGE_CONFIG "${CAPSIMAGE_CONFIG}")
+		file(WRITE ${CAPSIMAGE_CONFIG_INCLUDE_DIR}/config.h "${CAPSIMAGE_CONFIG}")
+
+		target_include_directories(capsimage BEFORE
+			PRIVATE
+				${CAPSIMAGE_CONFIG_INCLUDE_DIR}
+		)
+	endif()
 
 	set(CAPSIMAGE_LIBRARY capsimage)
 	set(CAPSIMAGE_INCLUDE_DIR
