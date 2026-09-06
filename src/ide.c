@@ -24,7 +24,7 @@
 #include "stMemory.h"
 #include "sysdeps.h"
 
-#if defined(HAVE_MALLOC_H) || defined(HAVE_MEMALIGN)
+#if defined(HAVE_MALLOC_H)
 # include <malloc.h>
 #endif
 

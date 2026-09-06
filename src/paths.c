@@ -19,6 +19,7 @@ const char Paths_fileid[] = "Hatari paths.c : " __DATE__ " " __TIME__;
 #if defined(VITA)
 #include <psp2/types.h>
 #include <psp2/io/dirent.h>
+#include <psp2/io/stat.h>
 #include <psp2/kernel/threadmgr.h>
 #define mkdir(name,mode) sceIoMkdir(name, 0777)
 #endif
