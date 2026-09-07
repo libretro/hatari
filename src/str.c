@@ -430,7 +430,14 @@ void Str_Init(void)
 		mapUnicodeToAtari[mapAtariToUnicode[i] & 511] = i;
 	}
 
-#if defined(WIN32) || defined(USE_LOCALE_CHARSET)
+#if defined(LIBRETRO) && (defined(WIN32) || defined(USE_LOCALE_CHARSET))
+	/* Use LC_CTYPE instead of LC_ALL so character handling follows the
+	 * user's locale without changing numeric formatting, preventing
+	 * locale-specific decimal separators (e.g. 1,0000) in RetroArch
+	 * configuration files.
+	 */
+	setlocale(LC_CTYPE, "");
+#elif defined(WIN32) || defined(USE_LOCALE_CHARSET)
 	/* Change libc from default "C" locale to one
 	 * specified by the program environment. Needed
 	 * only for Windows, as Unix based OSes (are
