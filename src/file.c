@@ -149,6 +149,23 @@ static bool File_IsRootFileName(const char *pszFileName)
 		return true;
 #endif
 
+#ifdef LIBRETRO
+	/* The console ports name their devices rather than rooting everything at
+	 * '/': the frontend hands the core "ux0:/data/retroarch/system" on the
+	 * Vita, "sdmc:/" on the 3DS and the Switch, "ms0:/" on the PSP. Those are
+	 * absolute names. Taken for relative ones they get the working directory
+	 * pasted in front of them, which is how a tos.img that is there and
+	 * readable ends up as "Can not load TOS file".
+	 */
+	{
+		const char *colon = strchr(pszFileName, ':');
+		const char *sep = strchr(pszFileName, PATHSEP);
+
+		if (colon && colon != pszFileName && (!sep || colon < sep))
+			return true;
+	}
+#endif
+
 	return false;
 }
 
