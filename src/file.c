@@ -150,12 +150,9 @@ static bool File_IsRootFileName(const char *pszFileName)
 #endif
 
 #ifdef LIBRETRO
-	/* The console ports name their devices rather than rooting everything at
-	 * '/': the frontend hands the core "ux0:/data/retroarch/system" on the
-	 * Vita, "sdmc:/" on the 3DS and the Switch, "ms0:/" on the PSP. Those are
-	 * absolute names. Taken for relative ones they get the working directory
-	 * pasted in front of them, which is how a tos.img that is there and
-	 * readable ends up as "Can not load TOS file".
+	/* Console(s) may include the name of the devices rather than everything being
+	 * at '/': thus the frontend hands the core something like
+	 * "ux0:/data/retroarch/system"
 	 */
 	{
 		const char *colon = strchr(pszFileName, ':');
@@ -938,10 +935,8 @@ void File_MakeAbsoluteName(char *pFileName)
 			free(pTempName);
 			return;
 		}
-		/* File_AddSlashToEndFileName() writes two bytes past the end of what
-		 * it is given, so leave it room rather than trusting the length of
-		 * whatever the platform's getcwd() returned.
-		 */
+		/* File_AddSlashToEndFileName() writes two bytes past the end of
+		 * the string */
 		if (strlen(pTempName) >= FILENAME_MAX - 2)
 		{
 			free(pTempName);
@@ -951,10 +946,7 @@ void File_MakeAbsoluteName(char *pFileName)
 		outpos = strlen(pTempName);
 	}
 
-	/* Now filter out the relative paths "./" and "../".
-	 * The bound leaves room for the terminator written after the loop, which
-	 * at outpos == FILENAME_MAX would have been one byte past the buffer.
-	 */
+	/* Now filter out the relative paths "./" and "../". */
 	while (pFileName[inpos] != 0 && outpos < FILENAME_MAX - 1)
 	{
 		if (pFileName[inpos] == '.' && pFileName[inpos+1] == PATHSEP)
