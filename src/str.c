@@ -430,7 +430,7 @@ void Str_Init(void)
 		mapUnicodeToAtari[mapAtariToUnicode[i] & 511] = i;
 	}
 
-#if defined(WIN32) || defined(USE_LOCALE_CHARSET)
+#if !defined(LIBRETRO) && (defined(WIN32) || defined(USE_LOCALE_CHARSET))
 	/* Change libc from default "C" locale to one
 	 * specified by the program environment. Needed
 	 * only for Windows, as Unix based OSes (are
