@@ -149,6 +149,23 @@ static bool File_IsRootFileName(const char *pszFileName)
 		return true;
 #endif
 
+#ifdef LIBRETRO
+	/* The console ports name their devices rather than rooting everything at
+	 * '/': the frontend hands the core "ux0:/data/retroarch/system" on the
+	 * Vita, "sdmc:/" on the 3DS and the Switch, "ms0:/" on the PSP. Those are
+	 * absolute names. Taken for relative ones they get the working directory
+	 * pasted in front of them, which is how a tos.img that is there and
+	 * readable ends up as "Can not load TOS file".
+	 */
+	{
+		const char *colon = strchr(pszFileName, ':');
+		const char *sep = strchr(pszFileName, PATHSEP);
+
+		if (colon && colon != pszFileName && (!sep || colon < sep))
+			return true;
+	}
+#endif
+
 	return false;
 }
 
@@ -921,12 +938,24 @@ void File_MakeAbsoluteName(char *pFileName)
 			free(pTempName);
 			return;
 		}
+		/* File_AddSlashToEndFileName() writes two bytes past the end of what
+		 * it is given, so leave it room rather than trusting the length of
+		 * whatever the platform's getcwd() returned.
+		 */
+		if (strlen(pTempName) >= FILENAME_MAX - 2)
+		{
+			free(pTempName);
+			return;
+		}
 		File_AddSlashToEndFileName(pTempName);
 		outpos = strlen(pTempName);
 	}
 
-	/* Now filter out the relative paths "./" and "../" */
-	while (pFileName[inpos] != 0 && outpos < FILENAME_MAX)
+	/* Now filter out the relative paths "./" and "../".
+	 * The bound leaves room for the terminator written after the loop, which
+	 * at outpos == FILENAME_MAX would have been one byte past the buffer.
+	 */
+	while (pFileName[inpos] != 0 && outpos < FILENAME_MAX - 1)
 	{
 		if (pFileName[inpos] == '.' && pFileName[inpos+1] == PATHSEP)
 		{
@@ -975,7 +1004,7 @@ void File_MakeAbsoluteName(char *pFileName)
 		else
 		{
 			/* Copy until next slash or end of input string */
-			while (pFileName[inpos] != 0 && outpos < FILENAME_MAX)
+			while (pFileName[inpos] != 0 && outpos < FILENAME_MAX - 1)
 			{
 				pTempName[outpos++] = pFileName[inpos++];
 				if (pFileName[inpos - 1] == PATHSEP)
