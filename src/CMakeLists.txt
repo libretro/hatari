@@ -410,4 +410,8 @@ if(ENABLE_LIBRETRO)
 	if(CapsImage_FOUND)
 		target_link_libraries(hatari_libretro ${CAPSIMAGE_LIBRARY})
 	endif(CapsImage_FOUND)
+
+	if(Readline_FOUND)
+		target_link_libraries(hatari_libretro ${READLINE_LIBRARY})
+	endif(Readline_FOUND)
 endif(ENABLE_LIBRETRO)
