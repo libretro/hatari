@@ -72,6 +72,10 @@ include:
   - project: 'libretro-infrastructure/ci-templates'
     file: '/wiiu-static-cmake.yml'
 
+  # Nintendo Switch
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/libnx-static-cmake.yml'
+
   #################################### MISC ##################################
   # webOS 32-bit (LGTV)
   - project: 'libretro-infrastructure/ci-templates'
@@ -201,6 +205,14 @@ libretro-build-wii:
 libretro-build-wiiu:
   extends:
     - .libretro-wiiu-static-cmake-retroarch-master
+    - .core-defs
+  variables:
+    CORE_ARGS: -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=OFF -DENABLE_STATIC_CAPSIMAGE=OFF
+
+# Nintendo Switch
+libretro-build-libnx:
+  extends:
+    - .libretro-libnx-static-cmake-retroarch-master
     - .core-defs
   variables:
     CORE_ARGS: -DENABLE_LIBRETRO=ON -DENABLE_HATARI=OFF -DENABLE_TOOLS=OFF -DENABLE_STATIC_ZLIB=OFF -DENABLE_STATIC_CAPSIMAGE=OFF
