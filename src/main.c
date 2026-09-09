@@ -743,6 +743,15 @@ static void Main_Init(void)
 		fprintf(stderr, "Failed to load TOS image!\n");
 		SDL_Quit();
 #ifdef __LIBRETRO__
+	{
+		/* stderr goes nowhere on most of the platforms this core is built
+		 * for, so say it where the user can actually read it back. */
+		char sRetroMsg[FILENAME_MAX + 64];
+		extern void retro_log_error(const char *msg);
+		snprintf(sRetroMsg, sizeof(sRetroMsg), "Failed to load TOS image '%s'",
+		         ConfigureParams.Rom.szTosImageFileName);
+		retro_log_error(sRetroMsg);
+	}
 retro_shutdown_hatari();
 #endif 
 		exit(-2);
