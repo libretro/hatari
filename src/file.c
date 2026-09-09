@@ -158,6 +158,20 @@ static bool File_IsRootFileName(const char *pszFileName)
 		return true;
 #endif
 
+#ifdef __LIBRETRO__
+	/* Console(s) may include the name of the devices rather than everything being
+	 * at '/': thus the frontend hands the core something like
+	 * "ux0:/data/retroarch/system"
+	 */
+	{
+		const char *colon = strchr(pszFileName, ':');
+		const char *sep = strchr(pszFileName, PATHSEP);
+
+		if (colon && colon != pszFileName && (!sep || colon < sep))
+			return true;
+	}
+#endif
+
 	return false;
 }
 
