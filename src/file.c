@@ -158,6 +158,20 @@ static bool File_IsRootFileName(const char *pszFileName)
 		return true;
 #endif
 
+#ifdef __LIBRETRO__
+	/* Console(s) may include the name of the devices rather than everything being
+	 * at '/': thus the frontend hands the core something like
+	 * "ux0:/data/retroarch/system"
+	 */
+	{
+		const char *colon = strchr(pszFileName, ':');
+		const char *sep = strchr(pszFileName, PATHSEP);
+
+		if (colon && colon != pszFileName && (!sep || colon < sep))
+			return true;
+	}
+#endif
+
 	return false;
 }
 
@@ -840,12 +854,24 @@ void File_MakeAbsoluteName(char *pFileName)
 			free(pTempName);
 			return;
 		}
+		/* File_AddSlashToEndFileName() writes two bytes past the end of what
+		 * it is given, so leave it room rather than trusting the length of
+		 * whatever the platform's getcwd() returned.
+		 */
+		if (strlen(pTempName) >= FILENAME_MAX - 2)
+		{
+			free(pTempName);
+			return;
+		}
 		File_AddSlashToEndFileName(pTempName);
 		outpos = strlen(pTempName);
 	}
 
-	/* Now filter out the relative paths "./" and "../" */
-	while (pFileName[inpos] != 0 && outpos < FILENAME_MAX)
+	/* Now filter out the relative paths "./" and "../".
+	 * The bound leaves room for the terminator written after the loop, which
+	 * at outpos == FILENAME_MAX would have been one byte past the buffer.
+	 */
+	while (pFileName[inpos] != 0 && outpos < FILENAME_MAX - 1)
 	{
 		if (pFileName[inpos] == '.' && pFileName[inpos+1] == PATHSEP)
 		{
@@ -894,7 +920,7 @@ void File_MakeAbsoluteName(char *pFileName)
 		else
 		{
 			/* Copy until next slash or end of input string */
-			while (pFileName[inpos] != 0 && outpos < FILENAME_MAX)
+			while (pFileName[inpos] != 0 && outpos < FILENAME_MAX - 1)
 			{
 				pTempName[outpos++] = pFileName[inpos++];
 				if (pFileName[inpos - 1] == PATHSEP)

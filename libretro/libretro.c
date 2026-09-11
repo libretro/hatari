@@ -1009,6 +1009,16 @@ void Emu_uninit()
        Main_UnInit();
 }
 
+// Errors raised on the emulator thread used to reach stderr and nowhere else,
+// which on a console means nowhere at all: a core that gave up during start-up
+// looked to the user like the frontend quitting for no reason. Give that code
+// the frontend's log.
+void retro_log_error(const char *msg)
+{
+   if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "%s\n", msg);
+}
+
 void retro_shutdown_hatari(void)
 {
    log_cb(RETRO_LOG_INFO, "SHUTDOWN\n");
