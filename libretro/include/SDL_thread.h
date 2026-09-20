@@ -1637,7 +1637,7 @@ SDL_RunThread(void *data)
     /* Run the function */
     *statusloc = userfunc(userdata);
 }
-typedef unsigned long (__cdecl *pfnSDL_CurrentBeginThread) (void *, unsigned,
+typedef uintptr_t (__cdecl *pfnSDL_CurrentBeginThread) (void *, unsigned,
         unsigned (__stdcall *func)(void *), void *arg, 
         unsigned, unsigned *threadID);
 typedef void (__cdecl *pfnSDL_CurrentEndThread)(unsigned code);
