@@ -26,6 +26,7 @@
 #include "vdi.h"
 #include "version.h"
 #include "vfs.h"
+#include "vkbd.h"
 #include "video.h"
 
 static bool have_bios = false;
@@ -252,7 +253,7 @@ RETRO_API void retro_reset(void)
 }
 
 /**
- * The frame with the drive leds drawn over it, in a
+ * The frame with the virtual keyboard and the drive leds drawn over it, in a
  * copy: the emulator's own buffer is not drawn anew every frame where the
  * picture stays the same.
  */
@@ -262,7 +263,7 @@ static uint32_t *Core_DrawOverlays(uint32_t *pixels, int width, int height, int 
 	static size_t overlay_size;
 	size_t size = (size_t)pitch * height;
 
-	if (!pixels || !Statusbar_LedsVisible())
+	if (!pixels || (!Vkbd_IsActive() && !Statusbar_LedsVisible()))
 		return pixels;
 
 	if (size > overlay_size)
@@ -275,6 +276,7 @@ static uint32_t *Core_DrawOverlays(uint32_t *pixels, int width, int height, int 
 	}
 	memcpy(overlay, pixels, size);
 
+	Vkbd_Draw(overlay, width, height, pitch);
 	Statusbar_DrawLeds(overlay, width, height, pitch);
 	return overlay;
 }
@@ -298,6 +300,8 @@ RETRO_API void retro_run(void)
 		/* re-apply updatable options */
 		Core_ApplyRuntimeOptions();
 	}
+
+	Vkbd_Update();
 
 	M68000_UnsetSpecial(SPCFLAG_BRK);
 
