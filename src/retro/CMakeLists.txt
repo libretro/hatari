@@ -16,7 +16,8 @@ add_library(UiRetro OBJECT
 		screen.c
 		statusbar.c
 		timing.c
-		vfs.c)
+		vfs.c
+		vkbd.c)
 
 target_include_directories(UiRetro PRIVATE ${LIBRETRO_INCLUDE_DIR})
 if(NOT LIBRETRO_STATIC)

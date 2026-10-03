@@ -26,6 +26,7 @@
 #include "vdi.h"
 #include "version.h"
 #include "vfs.h"
+#include "vkbd.h"
 #include "video.h"
 
 static bool game_loaded = false;
@@ -312,6 +313,7 @@ RETRO_API void retro_run(void)
 	}
 
 	M68000_UnsetSpecial(SPCFLAG_BRK);
+	Vkbd_Update();
 
 	if (has_cpu_config_changed)
 	{

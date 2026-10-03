@@ -31,6 +31,7 @@ const char Screen_fileid[] = "Hatari screen.c";
 #include "version.h"
 #include "video.h"
 #include "videl.h"
+#include "vkbd.h"
 
 
 #define DEBUG 0
@@ -49,6 +50,7 @@ static uint32_t *framebuffer;
 static int screen_width, screen_height;
 static bool drive_leds_enabled = true;
 static bool drive_leds_changed;
+static bool keyboard_was_visible;
 
 void Screen_ShowDriveLeds(bool show)
 {
@@ -252,7 +254,7 @@ static uint32_t *Core_DrawOverlays(uint32_t *pixels, int width, int height, int 
 	static size_t overlay_size;
 	size_t size = (size_t)pitch * height;
 
-	if (!drive_leds_enabled || !pixels || !Statusbar_LedsVisible())
+	if (!pixels || (!(drive_leds_enabled && Statusbar_LedsVisible()) && !Vkbd_IsActive()))
 		return pixels;
 
 	if (size > overlay_size)
@@ -265,7 +267,9 @@ static uint32_t *Core_DrawOverlays(uint32_t *pixels, int width, int height, int 
 	}
 	memcpy(overlay, pixels, size);
 
-	Statusbar_DrawLeds(overlay, width, height, pitch);
+	if (drive_leds_enabled)
+		Statusbar_DrawLeds(overlay, width, height, pitch);
+	Vkbd_Draw(overlay, width, height, pitch);
 	return overlay;
 }
 
@@ -281,8 +285,9 @@ bool Screen_Draw(bool bForceFlip)
 
 	/* And draw (if screen contents changed) */
 	screen_changed = ConvST_DrawFrame();
-	/* Clear the last overlay once when LEDs are disabled at runtime. */
-	if (!screen_changed && !bForceFlip && !drive_leds_enabled && !drive_leds_changed)
+	/* Clear the last overlay once when LEDs or the keyboard are hidden. */
+	if (!screen_changed && !bForceFlip && !drive_leds_enabled && !drive_leds_changed
+	    && !Vkbd_IsActive() && !keyboard_was_visible)
 		return false;
 
 	Screen_GetDimension(&pixels, &width, &height, &pitch);
@@ -291,6 +296,7 @@ bool Screen_Draw(bool bForceFlip)
 	/* LEDs can change even when the emulated screen has not changed.
 	 * Submit the clean frame too, so an LED that goes off is erased. */
 	video_refresh_cb(pixels, width, height, pitch);
+	keyboard_was_visible = Vkbd_IsActive();
 	drive_leds_changed = false;
 
 	return screen_changed;
@@ -303,6 +309,7 @@ void Screen_GenConvUpdate(bool update_statusbar)
 	                                    screen_height, screen_width * 4);
 	video_refresh_cb(pixels, screen_width, screen_height,
 	                 screen_width * 4);
+	keyboard_was_visible = Vkbd_IsActive();
 	drive_leds_changed = false;
 }
 
