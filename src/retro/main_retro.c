@@ -244,7 +244,9 @@ RETRO_API void retro_get_system_av_info(struct retro_system_av_info *info)
 
 RETRO_API void retro_reset(void)
 {
-	Reset_Warm();
+	/* The devices are reset here, the CPU only by m68k_go() in retro_run(),
+	 * which always clears the memory as well: so a cold reset, said so */
+	Reset_Cold();
 }
 
 RETRO_API void retro_run(void)
@@ -273,6 +275,15 @@ RETRO_API void retro_run(void)
 	{
 		has_cpu_config_changed = false;
 		UAE_Set_Quit_Reset(false);
+		m68k_go(true);
+	}
+	else if (quit_program == UAE_RESET || quit_program == UAE_RESET_KEYBOARD ||
+	         quit_program == UAE_RESET_HARD)
+	{
+		/* A reset asked for since the last frame (retro_reset): only
+		 * m68k_go() carries one out. m68k_run() alone would go on with
+		 * the code from before on devices that were reset under it - the
+		 * mouse no longer moved and the machine did not restart. */
 		m68k_go(true);
 	}
 	else
