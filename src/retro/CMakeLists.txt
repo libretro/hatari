@@ -5,6 +5,7 @@ add_library(UiRetro OBJECT
 		audio.c
 		disk_control.c
 		file_retro.c
+		floppy_sound.c
 		harddisk.c
 		joy_ui.c
 		gui_event.c

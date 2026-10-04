@@ -13,6 +13,7 @@
 #include "disk_control.h"
 #include "file.h"
 #include "floppy.h"
+#include "floppy_sound.h"
 #include "harddisk.h"
 #include "log.h"
 #include "memorySnapShot.h"
@@ -197,6 +198,7 @@ RETRO_API void retro_init(void)
 	if (environment_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) && system_dir)
 	{
 		retro_system_directory = system_dir;
+		FloppySound_Init(system_dir);
 
 		snprintf(tos_path, sizeof(tos_path), "%s%c%s",
 		         system_dir, PATHSEP, "tos.img");
@@ -231,6 +233,7 @@ RETRO_API void retro_deinit(void)
 {
 	scratch_path[0] = '\0';
 	Main_UnInit();
+	FloppySound_UnInit();
 }
 
 RETRO_API void retro_get_system_info(struct retro_system_info *info)
@@ -332,6 +335,8 @@ RETRO_API void retro_run(void)
 	}
 
 	/* Note: video_refresh_cb is called in Screen_Draw() already! */
+	/* Video callbacks have already submitted the frame and its LEDs. */
+	Statusbar_FrameDone();
 }
 
 RETRO_API void retro_set_controller_port_device(unsigned port, unsigned device)

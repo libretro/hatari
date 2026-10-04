@@ -47,6 +47,16 @@ bool bInFullScreen = false;   /* true if in full screen */
 
 static uint32_t *framebuffer;
 static int screen_width, screen_height;
+static bool drive_leds_enabled = true;
+static bool drive_leds_changed;
+
+void Screen_ShowDriveLeds(bool show)
+{
+	if (drive_leds_enabled != show)
+		drive_leds_changed = true;
+	drive_leds_enabled = show;
+	Statusbar_ShowLeds(show);
+}
 
 
 /**
@@ -233,6 +243,31 @@ void Screen_UnLock(void)
 {
 }
 
+/**
+ * draw overlays (like drive LEDs) on top of the ST screen.
+ */
+static uint32_t *Core_DrawOverlays(uint32_t *pixels, int width, int height, int pitch)
+{
+	static uint32_t *overlay;
+	static size_t overlay_size;
+	size_t size = (size_t)pitch * height;
+
+	if (!drive_leds_enabled || !pixels || !Statusbar_LedsVisible())
+		return pixels;
+
+	if (size > overlay_size)
+	{
+		uint32_t *bigger = realloc(overlay, size);
+		if (!bigger)
+			return pixels;
+		overlay = bigger;
+		overlay_size = size;
+	}
+	memcpy(overlay, pixels, size);
+
+	Statusbar_DrawLeds(overlay, width, height, pitch);
+	return overlay;
+}
 
 /**
  * Draw ST screen to window/full-screen
@@ -241,15 +276,22 @@ void Screen_UnLock(void)
 bool Screen_Draw(bool bForceFlip)
 {
 	bool screen_changed;
+	int width, height, pitch;
+	uint32_t *pixels;
 
 	/* And draw (if screen contents changed) */
 	screen_changed = ConvST_DrawFrame();
+	/* Clear the last overlay once when LEDs are disabled at runtime. */
+	if (!screen_changed && !bForceFlip && !drive_leds_enabled && !drive_leds_changed)
+		return false;
 
-	if (screen_changed)
-	{
-		video_refresh_cb(framebuffer, screen_width, screen_height,
-		                 screen_width * 4);
-	}
+	Screen_GetDimension(&pixels, &width, &height, &pitch);
+	pixels = Core_DrawOverlays(pixels, width, height, pitch);
+
+	/* LEDs can change even when the emulated screen has not changed.
+	 * Submit the clean frame too, so an LED that goes off is erased. */
+	video_refresh_cb(pixels, width, height, pitch);
+	drive_leds_changed = false;
 
 	return screen_changed;
 }
@@ -257,8 +299,11 @@ bool Screen_Draw(bool bForceFlip)
 
 void Screen_GenConvUpdate(bool update_statusbar)
 {
-	video_refresh_cb(framebuffer, screen_width, screen_height,
+	uint32_t *pixels = Core_DrawOverlays(framebuffer, screen_width,
+	                                    screen_height, screen_width * 4);
+	video_refresh_cb(pixels, screen_width, screen_height,
 	                 screen_width * 4);
+	drive_leds_changed = false;
 }
 
 uint32_t Screen_GetGenConvWidth(void)

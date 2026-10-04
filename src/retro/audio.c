@@ -18,6 +18,7 @@ const char Audio_fileid[] = "Hatari audio.c";
 #include "dmaSnd.h"
 #include "crossbar.h"
 #include "video.h"
+#include "floppy_sound.h"
 
 
 bool bSoundWorking = false;			/* Is sound OK */
@@ -80,12 +81,18 @@ void Audio_Unlock(void)
 	{
 		if (AudioMixBuffer_pos_read + nGeneratedSamples <= AUDIOMIXBUFFER_SIZE)
 		{
+			FloppySound_Mix(&AudioMixBuffer[AudioMixBuffer_pos_read][0],
+			                nGeneratedSamples, nAudioFrequency);
 			audio_sample_batch_cb(&AudioMixBuffer[AudioMixBuffer_pos_read][0],
 			                      nGeneratedSamples);
 		}
 		else
 		{
 			int samples_at_end = AUDIOMIXBUFFER_SIZE - AudioMixBuffer_pos_read;
+			FloppySound_Mix(&AudioMixBuffer[AudioMixBuffer_pos_read][0],
+			                samples_at_end, nAudioFrequency);
+			FloppySound_Mix(&AudioMixBuffer[0][0],
+			                nGeneratedSamples - samples_at_end, nAudioFrequency);
 			audio_sample_batch_cb(&AudioMixBuffer[AudioMixBuffer_pos_read][0],
 			                      samples_at_end);
 			audio_sample_batch_cb(&AudioMixBuffer[0][0],
