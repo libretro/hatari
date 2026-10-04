@@ -13,6 +13,7 @@
 #include "disk_control.h"
 #include "file.h"
 #include "floppy.h"
+#include "floppy_sound.h"
 #include "harddisk.h"
 #include "memorySnapShot.h"
 #include "m68000.h"
@@ -20,6 +21,7 @@
 #include "reset.h"
 #include "screen.h"
 #include "sound.h"
+#include "statusbar.h"
 #include "tos.h"
 #include "vdi.h"
 #include "version.h"
@@ -179,6 +181,7 @@ RETRO_API void retro_init(void)
 	if (environment_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) && system_dir)
 	{
 		retro_system_directory = system_dir;
+		FloppySound_Init(system_dir);
 
 		snprintf(tos_path, sizeof(tos_path), "%s%s%s",
 		         system_dir, RETRO_PATH_SEPARATOR, "tos.img");
@@ -210,6 +213,7 @@ RETRO_API void retro_deinit(void)
 {
 	scratch_path[0] = '\0';
 	Main_UnInit();
+	FloppySound_UnInit();
 }
 
 RETRO_API void retro_get_system_info(struct retro_system_info *info)
@@ -247,6 +251,34 @@ RETRO_API void retro_reset(void)
 	Reset_Warm();
 }
 
+/**
+ * The frame with the drive leds drawn over it, in a
+ * copy: the emulator's own buffer is not drawn anew every frame where the
+ * picture stays the same.
+ */
+static uint32_t *Core_DrawOverlays(uint32_t *pixels, int width, int height, int pitch)
+{
+	static uint32_t *overlay;
+	static size_t overlay_size;
+	size_t size = (size_t)pitch * height;
+
+	if (!pixels || !Statusbar_LedsVisible())
+		return pixels;
+
+	if (size > overlay_size)
+	{
+		uint32_t *bigger = realloc(overlay, size);
+		if (!bigger)
+			return pixels;
+		overlay = bigger;
+		overlay_size = size;
+	}
+	memcpy(overlay, pixels, size);
+
+	Statusbar_DrawLeds(overlay, width, height, pitch);
+	return overlay;
+}
+
 RETRO_API void retro_run(void)
 {
 	bool options_updated = false;
@@ -282,7 +314,9 @@ RETRO_API void retro_run(void)
 	}
 
 	Screen_GetDimension(&pixels, &width, &height, &pitch);
+	pixels = Core_DrawOverlays(pixels, width, height, pitch);
 	video_refresh_cb(pixels, width, height, pitch);
+	Statusbar_FrameDone();
 }
 
 RETRO_API void retro_set_controller_port_device(unsigned port, unsigned device)

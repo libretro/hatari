@@ -21,3 +21,9 @@ extern retro_video_refresh_t video_refresh_cb;
 extern retro_input_state_t input_state_cb;
 extern void Core_RefreshRateChanged(void);
 extern void Retro_Log(int nType, const char *msg);
+
+/* statusbar.c: the drive leds, drawn over the frame */
+void Statusbar_ShowLeds(bool show);
+bool Statusbar_LedsVisible(void);
+void Statusbar_DrawLeds(uint32_t *pixels, int width, int height, int pitch);
+void Statusbar_FrameDone(void);

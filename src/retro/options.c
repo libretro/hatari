@@ -9,6 +9,7 @@
 
 #include "configuration.h"
 #include "fdc.h"
+#include "floppy_sound.h"
 #include "main_retro.h"
 #include "options.h"
 #include "reset.h"
@@ -349,6 +350,50 @@ static struct retro_core_option_v2_definition option_defs_us[] = {
          { NULL, NULL },
       },
       "off"
+   },
+   {
+      "hatari_drive_leds",
+      "Drive LEDs",
+      "Drive LEDs",
+      "Show drive activity in the top right corner of the screen: an amber LED per floppy drive, as on an STFM, and a green one for the hard disk.",
+      NULL,
+      "floppy",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      "hatari_floppy_sound",
+      "Floppy Drive Sound",
+      "Floppy Drive Sound",
+      "Play a mechanical floppy drive sound when a drive is accessed. For a sound of your own, put floppy.raw (signed 16-bit stereo at 44100 Hz, no header) in the frontend's system directory.",
+      NULL,
+      "floppy",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      "hatari_floppy_sound_volume",
+      "Floppy Drive Sound Volume",
+      "Floppy Drive Sound Volume",
+      "Volume of the floppy drive sound.",
+      NULL,
+      "floppy",
+      {
+         { "25",  "25%" },
+         { "50",  "50%" },
+         { "75",  "75%" },
+         { "100", "100%" },
+         { NULL, NULL },
+      },
+      "75"
    },
    {
       "hatari_drive_a_enable",
@@ -817,6 +862,10 @@ void Core_ApplyRuntimeOptions(void)
 	FDC_Drive_Set_Enable(1, ConfigureParams.DiskImage.EnableDriveB);
 	FDC_Drive_Set_NumberOfHeads(0, ConfigureParams.DiskImage.DriveA_NumberOfHeads);
 	FDC_Drive_Set_NumberOfHeads(1, ConfigureParams.DiskImage.DriveB_NumberOfHeads);
+
+	Statusbar_ShowLeds(Core_VarBool("hatari_drive_leds", true));
+	FloppySound_SetEnabled(Core_VarBool("hatari_floppy_sound", true));
+	FloppySound_SetVolume(Core_VarInt("hatari_floppy_sound_volume", 75));
  
 	/* --- Atari Screen --- */
 	str = Core_VarStr("hatari_monitor_type", "rgb");
