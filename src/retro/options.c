@@ -15,6 +15,7 @@
 #include "reset.h"
 #include "screen.h"
 #include "video.h"
+#include "vkbd.h"
 
 /* ------------------------------------------------------------------- */
 /* Categories                                                          */
@@ -582,6 +583,40 @@ static struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      "hatari_vkbd_button",
+      "Virtual Keyboard Button",
+      "Virtual Keyboard Button",
+      "RetroPad button that shows and hides the on-screen keyboard. While it is shown, the D-pad or left stick moves, B presses the key, Y toggles Shift and R switches between the main keys and the keypad; a touchscreen can tap the keys. The first RetroPad does not drive the joystick meanwhile.",
+      NULL,
+      "devices",
+      {
+         { "x",        "X" },
+         { "select",   "Select" },
+         { "start",    "Start" },
+         { "l",        "L" },
+         { "l3",       "L3" },
+         { "r3",       "R3" },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "x"
+   },
+   {
+      "hatari_vkbd_theme",
+      "Virtual Keyboard Colors",
+      "Virtual Keyboard Colors",
+      "Colors of the on-screen keyboard. Its Col key switches them too.",
+      NULL,
+      "devices",
+      {
+         { "beige", "Beige" },
+         { "dark",  "Dark" },
+         { "light", "Light" },
+         { NULL, NULL },
+      },
+      "beige"
+   },
+   {
       "hatari_joystick_jump_fire2",
       "Joystick Button 2 = Jump",
       "Joystick Button 2 = Jump",
@@ -866,6 +901,26 @@ void Core_ApplyRuntimeOptions(void)
 	Statusbar_ShowLeds(Core_VarBool("hatari_drive_leds", true));
 	FloppySound_SetEnabled(Core_VarBool("hatari_floppy_sound", true));
 	FloppySound_SetVolume(Core_VarInt("hatari_floppy_sound_volume", 75));
+
+	{
+		static const struct { const char *name; int id; } buttons[] = {
+			{ "x", RETRO_DEVICE_ID_JOYPAD_X },
+			{ "select", RETRO_DEVICE_ID_JOYPAD_SELECT },
+			{ "start", RETRO_DEVICE_ID_JOYPAD_START },
+			{ "l", RETRO_DEVICE_ID_JOYPAD_L },
+			{ "l3", RETRO_DEVICE_ID_JOYPAD_L3 },
+			{ "r3", RETRO_DEVICE_ID_JOYPAD_R3 },
+		};
+		int id = -1;
+		str = Core_VarStr("hatari_vkbd_button", "x");
+		for (i = 0; i < (int)(sizeof(buttons) / sizeof(buttons[0])); i++)
+			if (!strcmp(str, buttons[i].name))
+				id = buttons[i].id;
+		Vkbd_SetToggleButton(id);
+
+		str = Core_VarStr("hatari_vkbd_theme", "beige");
+		Vkbd_SetTheme(!strcmp(str, "dark") ? 1 : !strcmp(str, "light") ? 2 : 0);
+	}
  
 	/* --- Atari Screen --- */
 	str = Core_VarStr("hatari_monitor_type", "rgb");
