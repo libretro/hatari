@@ -583,6 +583,20 @@ static struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      "hatari_vkbd",
+      "Virtual Keyboard",
+      "Virtual Keyboard",
+      "The on-screen keyboard, shown and hidden with the button chosen below. Disable it when a real keyboard is used, so that no RetroPad button brings it up.",
+      NULL,
+      "devices",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       "hatari_vkbd_button",
       "Virtual Keyboard Button",
       "Virtual Keyboard Button",
@@ -596,7 +610,6 @@ static struct retro_core_option_v2_definition option_defs_us[] = {
          { "l",        "L" },
          { "l3",       "L3" },
          { "r3",       "R3" },
-         { "disabled", NULL },
          { NULL, NULL },
       },
       "x"
@@ -916,6 +929,9 @@ void Core_ApplyRuntimeOptions(void)
 		for (i = 0; i < (int)(sizeof(buttons) / sizeof(buttons[0])); i++)
 			if (!strcmp(str, buttons[i].name))
 				id = buttons[i].id;
+		/* Disabled, no button shows it, and one that is shown goes away */
+		if (!Core_VarBool("hatari_vkbd", true))
+			id = -1;
 		Vkbd_SetToggleButton(id);
 
 		str = Core_VarStr("hatari_vkbd_theme", "beige");
