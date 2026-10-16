@@ -7,6 +7,7 @@
   Handling of the real joysticks/-pads from the host.
 */
 
+#include <string.h>
 #include <libretro.h>
 
 #include "main.h"
@@ -18,6 +19,7 @@
 #include "keymap.h"
 #include "log.h"
 #include "video.h"
+#include "vkbd.h"
 
 
 
@@ -94,6 +96,13 @@ bool JoyUI_ReadJoystick(int id, JOYREADING *joyread)
 	 * TODO: Make the mapping of all ports configurable! */
 	if (id == 0 || id == 1)
 		id ^= 1;
+
+	/* The first RetroPad drives the virtual keyboard while it is shown */
+	if (id == 0 && Vkbd_IsActive())
+	{
+		memset(joyread, 0, sizeof(*joyread));
+		return true;
+	}
 
 	joyread->XPos = input_state_cb(id, RETRO_DEVICE_ANALOG,
 	                               RETRO_DEVICE_INDEX_ANALOG_LEFT,
