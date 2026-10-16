@@ -299,6 +299,8 @@ RETRO_API void retro_run(void)
 	static int prev_refreshrate;
 	bool options_updated = false;
 
+	input_poll_cb();
+
 	if (environment_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &options_updated) &&
 	    options_updated)
 	{
