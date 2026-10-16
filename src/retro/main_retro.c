@@ -289,6 +289,8 @@ RETRO_API void retro_run(void)
 	int width, height, pitch;
 	uint32_t *pixels;
 
+	input_poll_cb();
+
 	if (!have_bios)
 	{
 		Screen_GetDimension(&pixels, &width, &height, &pitch);
