@@ -27,6 +27,7 @@
 #include "vfs.h"
 #include "video.h"
 
+static bool game_loaded = false;
 bool has_cpu_config_changed = true;
 const char *retro_save_directory;
 const char *retro_system_directory;
@@ -257,6 +258,9 @@ RETRO_API void retro_get_system_av_info(struct retro_system_av_info *info)
 	info->timing.fps = (float)nScreenRefreshRate;   /* 50 / 60 / 71 */
 
 	info->timing.sample_rate = nAudioFrequency;
+
+	Log_Printf(LOG_INFO, "System AV info updated to - width: %d height: %d aspect_ratio: %f fps: %d sample_rate: %d.\n",
+		width, height, (float)width / (float)height, nScreenRefreshRate, nAudioFrequency);
 }
 
 RETRO_API void retro_reset(void)
@@ -271,7 +275,14 @@ static void Core_RefreshRateChanged(void)
 	if (!environment_cb)
 		return;
 
+	if (!game_loaded)
+		return;
+
 	retro_get_system_av_info(&av_info);
+
+	if (av_info.geometry.base_width == 0 || av_info.geometry.base_height == 0)
+		return;
+
 	environment_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
 
 	Log_Printf(LOG_INFO, "Screen refresh updated to: %dHz\n", nScreenRefreshRate);
@@ -448,6 +459,8 @@ RETRO_API bool retro_load_game(const struct retro_game_info *game)
 
 	Retro_SetInputDescriptors();
 
+	game_loaded = true;
+
 	return true;
 }
 
@@ -458,6 +471,8 @@ RETRO_API bool retro_load_game_special(unsigned game_type, const struct retro_ga
 
 RETRO_API void retro_unload_game(void)
 {
+	game_loaded = false;
+
 	Floppy_EjectDiskFromDrive(0);
 
 	DiskControl_UnInit();
