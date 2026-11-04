@@ -432,7 +432,7 @@ if(APPLE)
 		target_link_libraries(${APP_NAME} "-framework Cocoa")
 	endif(ENABLE_HATARI)
 	if(ENABLE_LIBRETRO)
-		target_link_libraries(retro-hatari "-framework Cocoa")
+		target_link_libraries(retro-hatari "-framework Foundation")
 	endif(ENABLE_LIBRETRO)
 endif()
 

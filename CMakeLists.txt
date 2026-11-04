@@ -114,7 +114,7 @@ cmake_dependent_option(ENABLE_MAN_PAGES "Built and install man pages"
                        ON GZIP OFF)
 
 cmake_dependent_option(ENABLE_OSX_BUNDLE "Built Hatari as macOS application bundle"
-                       ON APPLE OFF)
+                       ON "APPLE;ENABLE_HATARI" OFF)
 
 if(ENABLE_OSX_BUNDLE)
 	set(APP_NAME "Hatari")
