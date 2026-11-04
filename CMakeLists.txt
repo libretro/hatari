@@ -58,6 +58,7 @@ option(ENABLE_TRACING "Enable tracing messages for debugging" ON)
 option(ENABLE_TOOLS "Build the Hatari tools" ON)
 
 option(LIBRETRO_STATIC "Set STATIC mode for compiling libretro core" OFF)
+option(LIBRETRO_SUFFIX "Libretro core suffix" OFF)
 
 if(ENABLE_LIBRETRO)
     set(LIBRETRO_INCLUDE_DIR

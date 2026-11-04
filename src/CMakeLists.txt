@@ -336,6 +336,9 @@ if(ENABLE_LIBRETRO)
 			$<TARGET_OBJECTS:Debug>
 			$<TARGET_OBJECTS:DebugUT>
 			$<TARGET_OBJECTS:UiRetro>)
+
+	# Support the target name expected by libretro CI.
+	add_custom_target(hatari_libretro DEPENDS retro-hatari)
 endif(ENABLE_LIBRETRO)
 
 if(ENABLE_HATARI)
@@ -447,3 +450,35 @@ if(ENABLE_HATARI)
 		endif(TOS_IMG_FILE)
 	endif(ENABLE_OSX_BUNDLE)
 endif(ENABLE_HATARI)
+
+
+if(ENABLE_LIBRETRO)
+	set_target_properties(retro-hatari PROPERTIES
+		PREFIX ""
+	)
+
+	if(APPLE)
+		set_target_properties(retro-hatari PROPERTIES
+			SUFFIX ".dylib"
+		)
+	endif(APPLE)
+
+	set_target_properties(retro-hatari PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "hatari_libretro"
+	)
+
+	if(LIBRETRO_SUFFIX)
+		set_target_properties(retro-hatari PROPERTIES
+			OUTPUT_NAME "hatari_libretro${LIBRETRO_SUFFIX}"
+		)
+	endif()
+
+	if(ZLIB_FOUND)
+		target_link_libraries(retro-hatari ${ZLIB_LIBRARY})
+	endif(ZLIB_FOUND)
+
+	if(CapsImage_FOUND)
+		target_link_libraries(retro-hatari ${CAPSIMAGE_LIBRARY})
+	endif(CapsImage_FOUND)
+endif(ENABLE_LIBRETRO)
