@@ -11,6 +11,11 @@ const char File_fileid[] = "Hatari file_retro.c";
 #include <errno.h>
 #include <unistd.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <tchar.h>
+#endif
+
 #include "main.h"
 #include "file.h"
 #include "file_archive.h"
