@@ -57,6 +57,18 @@ option(ENABLE_DSP_EMU "Enable DSP 56k emulator for Falcon mode" ON)
 option(ENABLE_TRACING "Enable tracing messages for debugging" ON)
 option(ENABLE_TOOLS "Build the Hatari tools" ON)
 
+if(ENABLE_LIBRETRO)
+    set(LIBRETRO_INCLUDE_DIR
+        "${CMAKE_SOURCE_DIR}/src/retro/libretro-common/include"
+    )
+
+    if(NOT EXISTS "${LIBRETRO_INCLUDE_DIR}/libretro.h")
+        message(FATAL_ERROR
+            "ENABLE_LIBRETRO is enabled but ${LIBRETRO_INCLUDE_DIR}/libretro.h was not found"
+        )
+    endif()
+endif()
+
 find_path(LIBRETRO_INCLUDE_DIR libretro.h
           PATH_SUFFIXES libretro libretro-common)
 cmake_dependent_option(ENABLE_LIBRETRO "Build a core for libretro"
