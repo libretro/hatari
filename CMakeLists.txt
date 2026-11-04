@@ -209,6 +209,26 @@ else()
 endif()
 check_large_file()
 
+# Disable as unused and generates dependency requirements
+if(NOT ENABLE_HATARI AND ENABLE_LIBRETRO)
+	set(LibArchive_FOUND FALSE)
+	set(PNG_FOUND FALSE)
+	set(Readline_FOUND FALSE)
+	set(HAVE_LIBREADLINE 0)
+	set(HAVE_LIBPNG 0)
+	set(HAVE_LIBARCHIVE 0)
+
+	# remove from static platforms
+	if(LIBRETRO_STATIC)
+		set(ZLIB_FOUND FALSE)
+		set(HAVE_LIBZ 0)
+		set(HAVE_ZLIB_H 0)
+		set(HAVE_FLOCK FALSE)
+
+		# wii toolchain
+		set(HAVE_SELECT FALSE)
+	endif(LIBRETRO_STATIC)
+endif(NOT ENABLE_HATARI AND ENABLE_LIBRETRO)
 
 # ################
 # CPP Definitions:
