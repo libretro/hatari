@@ -56,6 +56,11 @@ const char Symbols_fileid[] = "Hatari symbols.c";
 #define MAX_SYM_SIZE 1024
 #define MAX_SYM_SIZE_S "1024"
 
+// Undeclared in PS Vita SDK
+#ifndef PATH_MAX
+#define PATH_MAX FILENAME_MAX
+#endif
+
 /* TODO: add symbol name/address file names to configuration? */
 static symbol_list_t *CpuSymbolsList;
 static symbol_list_t *DspSymbolsList;
