@@ -418,12 +418,27 @@ void File_MakeAbsoluteName(char *pFileName)
 			free(pTempName);
 			return;
 		}
+#ifdef LIBRETRO
+		/* File_AddSlashToEndFileName() writes two bytes past the end of what
+		 * it is given, so leave it room rather than trusting the length of
+		 * whatever the platform's getcwd() returned.
+		 */
+		if (strlen(pTempName) >= FILENAME_MAX - 2)
+		{
+			free(pTempName);
+			return;
+		}
+#endif
 		File_AddSlashToEndFileName(pTempName);
 		outpos = strlen(pTempName);
 	}
 
 	/* Now filter out the relative paths "./" and "../" */
+#ifdef LIBRETRO
+	while (pFileName[inpos] != 0 && outpos < FILENAME_MAX - 1)
+#else
 	while (pFileName[inpos] != 0 && outpos < FILENAME_MAX)
+#endif
 	{
 		if (pFileName[inpos] == '.' && pFileName[inpos+1] == PATHSEP)
 		{
@@ -472,7 +487,11 @@ void File_MakeAbsoluteName(char *pFileName)
 		else
 		{
 			/* Copy until next slash or end of input string */
+#ifdef LIBRETRO
+			while (pFileName[inpos] != 0 && outpos < FILENAME_MAX - 1)
+#else
 			while (pFileName[inpos] != 0 && outpos < FILENAME_MAX)
+#endif
 			{
 				pTempName[outpos++] = pFileName[inpos++];
 				if (pFileName[inpos - 1] == PATHSEP)
