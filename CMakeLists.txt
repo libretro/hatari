@@ -57,6 +57,8 @@ option(ENABLE_DSP_EMU "Enable DSP 56k emulator for Falcon mode" ON)
 option(ENABLE_TRACING "Enable tracing messages for debugging" ON)
 option(ENABLE_TOOLS "Build the Hatari tools" ON)
 
+option(LIBRETRO_STATIC "Set STATIC mode for compiling libretro core" OFF)
+
 if(ENABLE_LIBRETRO)
     set(LIBRETRO_INCLUDE_DIR
         "${CMAKE_SOURCE_DIR}/src/retro/libretro-common/include"

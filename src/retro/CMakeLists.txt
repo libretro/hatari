@@ -18,4 +18,6 @@ add_library(UiRetro OBJECT
 		vfs.c)
 
 target_include_directories(UiRetro PRIVATE ${LIBRETRO_INCLUDE_DIR})
-set_target_properties(UiRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+if(NOT LIBRETRO_STATIC)
+	set_target_properties(UiRetro PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+endif(NOT LIBRETRO_STATIC)

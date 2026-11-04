@@ -168,8 +168,10 @@ endif()
 if(ENABLE_LIBRETRO)
 	add_subdirectory(retro)
 
-	set_target_properties(Core PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-	set_target_properties(CoreHmsa PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+	if(NOT LIBRETRO_STATIC)
+		set_target_properties(Core PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+		set_target_properties(CoreHmsa PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+	endif(NOT LIBRETRO_STATIC)
 endif(ENABLE_LIBRETRO)
 
 if(ENABLE_HATARI)
@@ -320,7 +322,13 @@ else()
 endif()
 
 if(ENABLE_LIBRETRO)
-	add_library(retro-hatari MODULE
+	if(LIBRETRO_STATIC)
+		set(LIBRETRO_TYPE STATIC)
+	else()
+		set(LIBRETRO_TYPE MODULE)
+	endif()
+
+	add_library(retro-hatari ${LIBRETRO_TYPE}
 			$<TARGET_OBJECTS:Core>
 			$<TARGET_OBJECTS:CoreHmsa>
 			$<TARGET_OBJECTS:Falcon>
