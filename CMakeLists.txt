@@ -69,6 +69,8 @@ if(ENABLE_LIBRETRO)
             "ENABLE_LIBRETRO is enabled but ${LIBRETRO_INCLUDE_DIR}/libretro.h was not found"
         )
     endif()
+
+    include(cmake/BuildDependencies.cmake)
 endif()
 
 find_path(LIBRETRO_INCLUDE_DIR libretro.h
