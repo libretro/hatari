@@ -200,7 +200,13 @@ if(Capstone_FOUND)
 endif(Capstone_FOUND)
 
 # Check if Large File Support is available with the standard POSIX flags
-set (HATARI_LFS_FLAGS "-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64")
+if(ANDROID AND CMAKE_SIZEOF_VOID_P EQUAL 4
+   AND CMAKE_SYSTEM_VERSION VERSION_LESS 24)
+	# 32-bit android does not have ftello etc.
+    set(HATARI_LFS_FLAGS "")
+else()
+    set(HATARI_LFS_FLAGS "-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64")
+endif()
 check_large_file()
 
 
