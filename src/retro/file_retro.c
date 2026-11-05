@@ -162,6 +162,13 @@ FILE *File_Open(const char *path, const char *mode)
 	if (!path || !*path)
 		return NULL;
 
+	if (strcmp(path, "stdin") == 0)
+		return stdin;
+	if (strcmp(path, "stdout") == 0)
+		return stdout;
+	if (strcmp(path, "stderr") == 0)
+		return stderr;
+
 	/* Open a normal log file */
 	fp = fopen(path, mode);
 	if (!fp)
@@ -178,7 +185,7 @@ FILE *File_Open(const char *path, const char *mode)
  */
 FILE *File_Close(FILE *fp)
 {
-	if (fp)
+	if (fp && fp != stdin && fp != stdout && fp != stderr)
 		fclose(fp);
 
 	return NULL;
