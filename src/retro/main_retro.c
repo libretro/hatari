@@ -479,6 +479,11 @@ RETRO_API bool retro_load_game(const struct retro_game_info *game)
 
 	Retro_SetInputDescriptors();
 
+	/* The CPU, and with it the FPU emulation that save_fpu() and
+	 * restore_fpu() call into, is only reset by the first m68k_go() in
+	 * retro_run(), but a frontend may save or load a state before that. */
+	fpu_reset();
+
 	game_loaded = true;
 
 	return true;
