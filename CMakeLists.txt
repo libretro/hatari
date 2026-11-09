@@ -212,6 +212,10 @@ check_large_file()
 
 # Disable as unused and generates dependency requirements
 if(NOT ENABLE_HATARI AND ENABLE_LIBRETRO)
+	# The code's libretro-only paths test LIBRETRO; without it the core
+	# built the desktop's (a frontend path like ux0:/... taken as relative)
+	add_definitions(-DLIBRETRO)
+
 	set(LibArchive_FOUND FALSE)
 	set(PNG_FOUND FALSE)
 	set(Readline_FOUND FALSE)
